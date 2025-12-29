@@ -7,6 +7,7 @@ import { SpendingTrend } from './spending-trend'
 import { BudgetSummary } from './budget-summary'
 import { RecentTransactions } from './recent-transactions'
 import { AISuggestions } from './ai-suggestions'
+import { CashFlowForecast } from './cash-flow-forecast'
 
 interface Account {
   id: string
@@ -88,6 +89,9 @@ export function DashboardClient({
 
       {/* AI Suggestions */}
       <AISuggestions />
+
+      {/* Cash Flow Forecast */}
+      <CashFlowForecast />
 
       {/* Middle Row: Recent Transactions + Upcoming Bills */}
       <div className="grid gap-6 lg:grid-cols-2">

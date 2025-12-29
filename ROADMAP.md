@@ -13,6 +13,7 @@ A rolling feature list for the AI-powered finance app. Check off features as the
 - [x] **Budget Management** - Create and track budgets by category
 - [x] **Session Security** - 5-min idle timeout, auto-logout, cross-tab sync, secure cookies
 - [x] **Toast Notifications** - Sonner-powered stylized alerts
+- [x] **Predictive Cash Flow** - 30-day balance forecast with recurring transaction detection, visual chart, low balance alerts, and daily spending rate analysis
 
 ---
 
@@ -23,12 +24,6 @@ A rolling feature list for the AI-powered finance app. Check off features as the
 ---
 
 ## Immediate High-Value (Priority 1)
-
-- [ ] **Predictive Cash Flow**
-  - AI forecasts balance 7/14/30 days out based on recurring transactions
-  - Visual timeline showing predicted balance over time
-  - Warns before potential overdrafts
-  - "You'll have $1,247 on the 15th after rent posts"
 
 - [ ] **Smart Anomaly Detection**
   - Real-time alerts for unusual transactions (potential fraud)
@@ -161,7 +156,11 @@ A rolling feature list for the AI-powered finance app. Check off features as the
 
 ## Notes
 
-*Add implementation notes, decisions, and learnings here as features are built.*
+### Predictive Cash Flow (Dec 28, 2024)
+- **Files added:** `src/lib/cash-flow.ts`, `src/app/api/cash-flow/forecast/route.ts`, `src/components/dashboard/cash-flow-forecast.tsx`
+- **Algorithm:** Uses recurring transaction detection to identify income/expenses, projects balance daily for 30 days
+- **Features:** Area chart visualization, low/negative balance alerts, confidence scoring based on data quality
+- **Daily spending rate:** Calculated from non-recurring transactions over last 30 days with weekend adjustment (1.3x)
 
 ---
 
