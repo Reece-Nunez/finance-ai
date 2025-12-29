@@ -13,11 +13,11 @@ import {
   X,
   ArrowRightLeft,
   PiggyBank,
-  Receipt,
   Wallet,
   Brain,
   Calendar,
 } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface Suggestion {
   id: string
@@ -88,6 +88,7 @@ export function AISuggestions() {
   const [context, setContext] = useState<SuggestionContext | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [analysisStatus, setAnalysisStatus] = useState<string>('')
 
   const fetchSuggestions = useCallback(async () => {
     try {
@@ -103,17 +104,59 @@ export function AISuggestions() {
 
   const generateSuggestions = async () => {
     setRefreshing(true)
+    setAnalysisStatus('Gathering account data...')
+
+    // Simulate progress updates since the API call is single request
+    const statusUpdates = [
+      { delay: 500, status: 'Analyzing spending patterns...' },
+      { delay: 1500, status: 'Checking budget status...' },
+      { delay: 2500, status: 'Detecting upcoming bills...' },
+      { delay: 3500, status: 'Forecasting cash flow...' },
+      { delay: 4500, status: 'AI generating personalized insights...' },
+    ]
+
+    const timeouts: NodeJS.Timeout[] = []
+    for (const update of statusUpdates) {
+      const timeout = setTimeout(() => {
+        setAnalysisStatus(update.status)
+      }, update.delay)
+      timeouts.push(timeout)
+    }
+
     try {
+      toast.info('Analyzing your finances...', { id: 'suggestions' })
       const response = await fetch('/api/ai/suggestions', { method: 'POST' })
       const data = await response.json()
+
+      // Clear any pending status updates
+      timeouts.forEach(t => clearTimeout(t))
+
       setSuggestions(data.suggestions || [])
       if (data.context) {
         setContext(data.context)
       }
+
+      const count = data.suggestions?.length || 0
+      if (count > 0) {
+        toast.success(`Found ${count} suggestion${count > 1 ? 's' : ''}`, {
+          id: 'suggestions',
+          description: data.context?.patternsLearned
+            ? `Based on ${data.context.patternsLearned} learned patterns`
+            : undefined,
+        })
+      } else {
+        toast.success('All good! No issues found.', { id: 'suggestions' })
+      }
     } catch (error) {
       console.error('Error generating suggestions:', error)
+      toast.error('Failed to analyze', {
+        id: 'suggestions',
+        description: 'Please try again',
+      })
     } finally {
+      timeouts.forEach(t => clearTimeout(t))
       setRefreshing(false)
+      setAnalysisStatus('')
     }
   }
 
@@ -172,12 +215,30 @@ export function AISuggestions() {
           size="sm"
           onClick={generateSuggestions}
           disabled={refreshing}
+          className="min-w-[100px]"
         >
           <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-          Analyze
+          {refreshing ? 'Analyzing...' : 'Analyze'}
         </Button>
       </CardHeader>
       <CardContent>
+        {/* Analysis Progress */}
+        {refreshing && analysisStatus && (
+          <div className="mb-4 flex items-center gap-3 rounded-lg border border-indigo-200 bg-indigo-50/50 p-3 dark:border-indigo-800 dark:bg-indigo-950/30">
+            <div className="relative">
+              <Brain className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 animate-pulse rounded-full bg-indigo-500" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
+                {analysisStatus}
+              </p>
+              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-indigo-200 dark:bg-indigo-800">
+                <div className="h-full animate-pulse rounded-full bg-indigo-500" style={{ width: '60%' }} />
+              </div>
+            </div>
+          </div>
+        )}
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
