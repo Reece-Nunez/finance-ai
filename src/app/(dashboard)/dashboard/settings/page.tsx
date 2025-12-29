@@ -1,0 +1,1731 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import { Separator } from '@/components/ui/separator'
+import { Badge } from '@/components/ui/badge'
+import { formatCategory } from '@/lib/format'
+import {
+  User,
+  Bell,
+  Sparkles,
+  Download,
+  Moon,
+  Shield,
+  Loader2,
+  Check,
+  AlertTriangle,
+  Phone,
+  Mail,
+  Globe,
+  DollarSign,
+  Calendar,
+  Trash2,
+  LogOut,
+  TrendingDown,
+  TrendingUp,
+  AlertCircle,
+  RefreshCw,
+  PieChart,
+  FileText,
+  Brain,
+  MessageSquare,
+  Zap,
+  Target,
+  Lightbulb,
+  BarChart3,
+  ShieldCheck,
+  Eye,
+  Wallet,
+  TrendingUp as Growth,
+  CircleDollarSign,
+  Receipt,
+} from 'lucide-react'
+import { Slider } from '@/components/ui/slider'
+import { useTheme } from 'next-themes'
+
+interface AlertSettings {
+  enabled: boolean
+  email: boolean
+  push: boolean
+  sms: boolean
+}
+
+interface NotificationPreferences {
+  // Alert types with their delivery methods
+  low_balance: AlertSettings
+  overdraft: AlertSettings
+  large_withdrawal: AlertSettings
+  large_deposit: AlertSettings
+  suspicious_activity: AlertSettings
+  budget_alerts: AlertSettings
+  recurring_payments: AlertSettings
+  weekly_summary: AlertSettings
+  // Thresholds
+  large_transaction_threshold: number
+  low_balance_threshold: number
+}
+
+interface AIPreferences {
+  // Auto-categorization
+  auto_categorize: boolean
+  categorize_confidence_threshold: number // 0-100, only auto-apply if confidence >= this
+  review_low_confidence: boolean // Show for review if below threshold
+
+  // Smart Insights
+  spending_insights: boolean
+  savings_suggestions: boolean
+  budget_recommendations: boolean
+  investment_tips: boolean
+  bill_negotiation_tips: boolean
+
+  // AI Chat
+  chat_personality: 'professional' | 'friendly' | 'concise'
+  include_spending_context: boolean
+  proactive_insights: boolean
+
+  // Analysis Features
+  detect_recurring: boolean
+  detect_subscriptions: boolean
+  detect_unusual_spending: boolean
+  merchant_cleanup: boolean // Clean up merchant names
+  smart_search: boolean
+
+  // Privacy & Data
+  allow_transaction_analysis: boolean
+  improve_ai_models: boolean // Allow anonymized data to improve AI
+}
+
+interface UserProfile {
+  first_name: string
+  last_name: string
+  phone: string | null
+  date_of_birth: string | null
+  currency: string
+  timezone: string
+  notification_preferences: NotificationPreferences
+  ai_preferences?: AIPreferences
+}
+
+const TIMEZONES = [
+  { value: 'America/New_York', label: 'Eastern Time (ET)' },
+  { value: 'America/Chicago', label: 'Central Time (CT)' },
+  { value: 'America/Denver', label: 'Mountain Time (MT)' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
+  { value: 'America/Anchorage', label: 'Alaska Time (AKT)' },
+  { value: 'Pacific/Honolulu', label: 'Hawaii Time (HT)' },
+  { value: 'Europe/London', label: 'London (GMT)' },
+  { value: 'Europe/Paris', label: 'Paris (CET)' },
+  { value: 'Asia/Tokyo', label: 'Tokyo (JST)' },
+  { value: 'Australia/Sydney', label: 'Sydney (AEST)' },
+]
+
+const CURRENCIES = [
+  { value: 'USD', label: 'US Dollar ($)', symbol: '$' },
+  { value: 'EUR', label: 'Euro (€)', symbol: '€' },
+  { value: 'GBP', label: 'British Pound (£)', symbol: '£' },
+  { value: 'CAD', label: 'Canadian Dollar (C$)', symbol: 'C$' },
+  { value: 'AUD', label: 'Australian Dollar (A$)', symbol: 'A$' },
+  { value: 'JPY', label: 'Japanese Yen (¥)', symbol: '¥' },
+]
+
+export default function SettingsPage() {
+  const supabase = createClient()
+  const { theme, setTheme, resolvedTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [exporting, setExporting] = useState(false)
+
+  const DEFAULT_ALERT: AlertSettings = { enabled: true, email: true, push: true, sms: false }
+  const DEFAULT_NOTIFICATION_PREFS: NotificationPreferences = {
+    low_balance: { ...DEFAULT_ALERT },
+    overdraft: { ...DEFAULT_ALERT },
+    large_withdrawal: { ...DEFAULT_ALERT },
+    large_deposit: { ...DEFAULT_ALERT },
+    suspicious_activity: { ...DEFAULT_ALERT },
+    budget_alerts: { ...DEFAULT_ALERT },
+    recurring_payments: { ...DEFAULT_ALERT },
+    weekly_summary: { enabled: false, email: true, push: false, sms: false },
+    // Thresholds
+    large_transaction_threshold: 500,
+    low_balance_threshold: 100,
+  }
+
+  // Profile state
+  const [profile, setProfile] = useState<UserProfile>({
+    first_name: '',
+    last_name: '',
+    phone: '',
+    date_of_birth: null,
+    currency: 'USD',
+    timezone: 'America/New_York',
+    notification_preferences: DEFAULT_NOTIFICATION_PREFS,
+  })
+
+  // Default AI preferences
+  const DEFAULT_AI_PREFS: AIPreferences = {
+    auto_categorize: true,
+    categorize_confidence_threshold: 80,
+    review_low_confidence: true,
+    spending_insights: true,
+    savings_suggestions: true,
+    budget_recommendations: true,
+    investment_tips: false,
+    bill_negotiation_tips: true,
+    chat_personality: 'friendly',
+    include_spending_context: true,
+    proactive_insights: true,
+    detect_recurring: true,
+    detect_subscriptions: true,
+    detect_unusual_spending: true,
+    merchant_cleanup: true,
+    smart_search: true,
+    allow_transaction_analysis: true,
+    improve_ai_models: false,
+  }
+
+  const [aiPreferences, setAiPreferences] = useState<AIPreferences>(DEFAULT_AI_PREFS)
+  const [savingAI, setSavingAI] = useState(false)
+  const [runningCategorization, setRunningCategorization] = useState(false)
+  const [categorizationStatus, setCategorizationStatus] = useState('')
+  const [applyingChange, setApplyingChange] = useState<string | null>(null)
+  const [categorizationResult, setCategorizationResult] = useState<{
+    categorized: number
+    needs_review: number
+    found: number
+    message?: string
+    skipped_items?: Array<{
+      transaction_id: string
+      original_name: string
+      current_category?: string
+      amount: number
+      date: string
+      suggested_category: string
+      suggested_name?: string
+      confidence: number
+      reason: string
+    }>
+  } | null>(null)
+
+  // Track if notification prefs are being saved
+  const [savingNotifications, setSavingNotifications] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    async function loadData() {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+
+      if (user) {
+        // Fetch user profile
+        try {
+          const response = await fetch('/api/user/profile')
+          if (response.ok) {
+            const data = await response.json()
+            if (data.profile) {
+              // Merge saved preferences with defaults to handle new fields
+              const savedPrefs = data.profile.notification_preferences || {}
+              const mergedPrefs = { ...DEFAULT_NOTIFICATION_PREFS, ...savedPrefs }
+
+              // Merge AI preferences
+              const savedAIPrefs = data.profile.ai_preferences || {}
+              const mergedAIPrefs = { ...DEFAULT_AI_PREFS, ...savedAIPrefs }
+              setAiPreferences(mergedAIPrefs)
+
+              setProfile({
+                first_name: data.profile.first_name || '',
+                last_name: data.profile.last_name || '',
+                phone: data.profile.phone || '',
+                date_of_birth: data.profile.date_of_birth || null,
+                currency: data.profile.currency || 'USD',
+                timezone: data.profile.timezone || 'America/New_York',
+                notification_preferences: mergedPrefs,
+                ai_preferences: mergedAIPrefs,
+              })
+            } else {
+              // No profile exists, try to populate from auth metadata
+              const authFirstName = user.user_metadata?.first_name
+              const authLastName = user.user_metadata?.last_name
+              if (authFirstName || authLastName) {
+                setProfile(prev => ({
+                  ...prev,
+                  first_name: authFirstName || '',
+                  last_name: authLastName || '',
+                }))
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error loading profile:', error)
+        }
+      }
+      setLoading(false)
+    }
+    loadData()
+  }, [supabase])
+
+  const formatPhoneNumber = (value: string) => {
+    const digits = value.replace(/\D/g, '')
+    if (digits.length <= 3) return digits
+    if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`
+  }
+
+  const handlePhoneChange = (value: string) => {
+    const formatted = formatPhoneNumber(value)
+    setProfile(prev => ({ ...prev, phone: formatted }))
+  }
+
+  const handleSaveProfile = async () => {
+    setSaving(true)
+    try {
+      const response = await fetch('/api/user/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          first_name: profile.first_name,
+          last_name: profile.last_name,
+          phone: profile.phone || null,
+          date_of_birth: profile.date_of_birth || null,
+          currency: profile.currency,
+          timezone: profile.timezone,
+          notification_preferences: profile.notification_preferences,
+        }),
+      })
+
+      if (response.ok) {
+        setSaved(true)
+        setTimeout(() => setSaved(false), 2000)
+      }
+    } catch (error) {
+      console.error('Failed to save profile:', error)
+    }
+    setSaving(false)
+  }
+
+  // Auto-save notification preferences when toggled
+  const handleAlertToggle = async (
+    alertType: keyof Omit<NotificationPreferences, 'large_transaction_threshold' | 'low_balance_threshold'>,
+    field: keyof AlertSettings,
+    value: boolean
+  ) => {
+    const currentAlert = profile.notification_preferences[alertType] as AlertSettings
+    const newAlert = { ...currentAlert, [field]: value }
+    const newPrefs = { ...profile.notification_preferences, [alertType]: newAlert }
+
+    setProfile(prev => ({
+      ...prev,
+      notification_preferences: newPrefs
+    }))
+
+    setSavingNotifications(true)
+    try {
+      await fetch('/api/user/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          notification_preferences: newPrefs,
+        }),
+      })
+    } catch (error) {
+      console.error('Failed to save notification preferences:', error)
+      // Revert on error
+      setProfile(prev => ({
+        ...prev,
+        notification_preferences: { ...prev.notification_preferences, [alertType]: currentAlert }
+      }))
+    }
+    setSavingNotifications(false)
+  }
+
+  // Handle threshold changes
+  const handleThresholdChange = async (key: 'large_transaction_threshold' | 'low_balance_threshold', value: number) => {
+    const oldValue = profile.notification_preferences[key]
+    const newPrefs = { ...profile.notification_preferences, [key]: value }
+
+    setProfile(prev => ({
+      ...prev,
+      notification_preferences: newPrefs
+    }))
+
+    setSavingNotifications(true)
+    try {
+      await fetch('/api/user/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          notification_preferences: newPrefs,
+        }),
+      })
+    } catch (error) {
+      console.error('Failed to save threshold:', error)
+      setProfile(prev => ({
+        ...prev,
+        notification_preferences: { ...prev.notification_preferences, [key]: oldValue }
+      }))
+    }
+    setSavingNotifications(false)
+  }
+
+  // Manually run AI categorization
+  const runAICategorization = async (force = false) => {
+    setRunningCategorization(true)
+    setCategorizationResult(null)
+    setCategorizationStatus('Finding transactions to categorize...')
+
+    // Simulate progress updates with timeouts
+    const statusUpdates = [
+      { delay: 2000, message: 'Analyzing transactions with AI...' },
+      { delay: 8000, message: 'Processing AI suggestions...' },
+      { delay: 15000, message: 'Updating transaction records...' },
+      { delay: 25000, message: 'Almost done, finalizing...' },
+    ]
+
+    const timeouts: NodeJS.Timeout[] = []
+    statusUpdates.forEach(({ delay, message }) => {
+      timeouts.push(setTimeout(() => setCategorizationStatus(message), delay))
+    })
+
+    try {
+      const response = await fetch('/api/ai/categorize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force }),
+      })
+      const data = await response.json()
+
+      // Clear pending status updates
+      timeouts.forEach(t => clearTimeout(t))
+
+      setCategorizationResult({
+        categorized: data.categorized || 0,
+        needs_review: data.needs_review || 0,
+        found: data.found || 0,
+        message: data.message,
+        skipped_items: data.skipped_items,
+      })
+    } catch (error) {
+      console.error('Failed to run AI categorization:', error)
+      timeouts.forEach(t => clearTimeout(t))
+      setCategorizationResult({
+        categorized: 0,
+        needs_review: 0,
+        found: 0,
+        message: 'Failed to run AI categorization',
+      })
+    }
+    setCategorizationStatus('')
+    setRunningCategorization(false)
+  }
+
+  // Accept a skipped categorization suggestion
+  const acceptSkippedItem = async (item: {
+    transaction_id: string
+    suggested_category: string
+    suggested_name?: string
+  }) => {
+    setApplyingChange(item.transaction_id)
+    try {
+      const updateData: Record<string, unknown> = {
+        ai_category: item.suggested_category,
+      }
+      if (item.suggested_name) {
+        updateData.display_name = item.suggested_name
+      }
+
+      const { error } = await supabase
+        .from('transactions')
+        .update(updateData)
+        .eq('id', item.transaction_id)
+
+      if (!error) {
+        // Remove from skipped items list
+        setCategorizationResult(prev => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            categorized: prev.categorized + 1,
+            skipped_items: prev.skipped_items?.filter(
+              s => s.transaction_id !== item.transaction_id
+            ),
+          }
+        })
+      }
+    } catch (error) {
+      console.error('Failed to accept suggestion:', error)
+    }
+    setApplyingChange(null)
+  }
+
+  // Reject/dismiss a skipped categorization suggestion
+  const rejectSkippedItem = (transactionId: string) => {
+    setCategorizationResult(prev => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        skipped_items: prev.skipped_items?.filter(
+          s => s.transaction_id !== transactionId
+        ),
+      }
+    })
+  }
+
+  // Handle AI preference changes with auto-save
+  const handleAIPreferenceChange = async <K extends keyof AIPreferences>(
+    key: K,
+    value: AIPreferences[K]
+  ) => {
+    const oldValue = aiPreferences[key]
+    const newPrefs = { ...aiPreferences, [key]: value }
+
+    setAiPreferences(newPrefs)
+
+    setSavingAI(true)
+    try {
+      await fetch('/api/user/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ai_preferences: newPrefs,
+        }),
+      })
+    } catch (error) {
+      console.error('Failed to save AI preferences:', error)
+      setAiPreferences(prev => ({ ...prev, [key]: oldValue }))
+    }
+    setSavingAI(false)
+  }
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const [transactionsRes, accountsRes, budgetsRes] = await Promise.all([
+        supabase.from('transactions').select('*'),
+        supabase.from('accounts').select('*'),
+        supabase.from('budgets').select('*'),
+      ])
+
+      const exportData = {
+        exportedAt: new Date().toISOString(),
+        transactions: transactionsRes.data || [],
+        accounts: accountsRes.data || [],
+        budgets: budgetsRes.data || [],
+      }
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `financeai-export-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Failed to export data:', error)
+    }
+    setExporting(false)
+  }
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    window.location.href = '/login'
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6 max-w-3xl mx-auto p-6">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
+        <p className="text-muted-foreground">Manage your account and preferences</p>
+      </div>
+
+      {/* Profile Settings */}
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-3">
+          <div className="rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 p-2.5">
+            <User className="h-5 w-5 text-white" />
+          </div>
+          <div className="flex-1">
+            <CardTitle>Personal Information</CardTitle>
+            <CardDescription>Update your profile details</CardDescription>
+          </div>
+          <Badge variant="outline" className="text-xs">
+            {profile.first_name ? 'Complete' : 'Incomplete'}
+          </Badge>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Name Row */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="firstName">First Name</Label>
+              <Input
+                id="firstName"
+                value={profile.first_name}
+                onChange={(e) => setProfile(prev => ({ ...prev, first_name: e.target.value }))}
+                placeholder="John"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Last Name</Label>
+              <Input
+                id="lastName"
+                value={profile.last_name}
+                onChange={(e) => setProfile(prev => ({ ...prev, last_name: e.target.value }))}
+                placeholder="Doe"
+              />
+            </div>
+          </div>
+
+          {/* Email (read-only) */}
+          <div className="space-y-2">
+            <Label htmlFor="email">Email Address</Label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="email"
+                value={user?.email || ''}
+                disabled
+                className="bg-muted pl-10"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Email cannot be changed. Contact support if you need to update it.
+            </p>
+          </div>
+
+          {/* Phone */}
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone Number</Label>
+            <div className="relative">
+              <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="phone"
+                type="tel"
+                value={profile.phone || ''}
+                onChange={(e) => handlePhoneChange(e.target.value)}
+                placeholder="(555) 123-4567"
+                className="pl-10"
+                maxLength={14}
+              />
+            </div>
+          </div>
+
+          {/* Date of Birth */}
+          <div className="space-y-2">
+            <Label htmlFor="dob">Date of Birth</Label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="dob"
+                type="date"
+                value={profile.date_of_birth || ''}
+                onChange={(e) => setProfile(prev => ({ ...prev, date_of_birth: e.target.value }))}
+                className="pl-10"
+              />
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Preferences Row */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Currency */}
+            <div className="space-y-2">
+              <Label htmlFor="currency">Currency</Label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <select
+                  id="currency"
+                  value={profile.currency}
+                  onChange={(e) => setProfile(prev => ({ ...prev, currency: e.target.value }))}
+                  className="w-full h-10 pl-10 pr-4 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  {CURRENCIES.map(c => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Timezone */}
+            <div className="space-y-2">
+              <Label htmlFor="timezone">Timezone</Label>
+              <div className="relative">
+                <Globe className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <select
+                  id="timezone"
+                  value={profile.timezone}
+                  onChange={(e) => setProfile(prev => ({ ...prev, timezone: e.target.value }))}
+                  className="w-full h-10 pl-10 pr-4 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  {TIMEZONES.map(tz => (
+                    <option key={tz.value} value={tz.value}>{tz.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <Button
+            onClick={handleSaveProfile}
+            disabled={saving}
+            className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
+          >
+            {saving ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
+            ) : saved ? (
+              <><Check className="mr-2 h-4 w-4" /> Saved!</>
+            ) : (
+              'Save Profile'
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Appearance */}
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-3">
+          <div className="rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 p-2.5">
+            <Moon className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <CardTitle>Appearance</CardTitle>
+            <CardDescription>Customize how the app looks</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>Dark Mode</Label>
+              <p className="text-sm text-muted-foreground">
+                Switch between light and dark theme
+              </p>
+            </div>
+            <Switch
+              checked={mounted && resolvedTheme === 'dark'}
+              onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+              disabled={!mounted}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Notification Settings */}
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-3">
+          <div className="rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 p-2.5">
+            <Bell className="h-5 w-5 text-white" />
+          </div>
+          <div className="flex-1">
+            <CardTitle>Notifications</CardTitle>
+            <CardDescription>Configure alerts and how you receive them</CardDescription>
+          </div>
+          {savingNotifications && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Saving...
+            </div>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!profile.phone && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-sm">
+              <Phone className="h-4 w-4 text-amber-600" />
+              <span className="text-amber-800 dark:text-amber-200">Add a phone number above to enable SMS notifications</span>
+            </div>
+          )}
+
+          {/* Alert Type Cards */}
+          <div className="space-y-3">
+            {/* Low Balance */}
+            <div className={`rounded-lg border ${profile.notification_preferences.low_balance.enabled ? 'border-amber-200 dark:border-amber-800' : 'opacity-60'}`}>
+              <div className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-full bg-amber-100 dark:bg-amber-900/30 p-2">
+                    <TrendingDown className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div>
+                    <Label className="text-base font-medium">Low Balance</Label>
+                    <p className="text-sm text-muted-foreground">When account balance drops below threshold</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={profile.notification_preferences.low_balance.enabled}
+                  onCheckedChange={(checked) => handleAlertToggle('low_balance', 'enabled', checked)}
+                  disabled={savingNotifications}
+                />
+              </div>
+              {profile.notification_preferences.low_balance.enabled && (
+                <div className="flex items-center gap-4 px-4 pb-4 pt-0">
+                  <span className="text-xs text-muted-foreground">Notify via:</span>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={profile.notification_preferences.low_balance.email}
+                      onChange={(e) => handleAlertToggle('low_balance', 'email', e.target.checked)}
+                      disabled={savingNotifications}
+                      className="rounded border-gray-300"
+                    />
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs">Email</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={profile.notification_preferences.low_balance.push}
+                      onChange={(e) => handleAlertToggle('low_balance', 'push', e.target.checked)}
+                      disabled={savingNotifications}
+                      className="rounded border-gray-300"
+                    />
+                    <Bell className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs">Push</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={profile.notification_preferences.low_balance.sms}
+                      onChange={(e) => handleAlertToggle('low_balance', 'sms', e.target.checked)}
+                      disabled={savingNotifications || !profile.phone}
+                      className="rounded border-gray-300"
+                    />
+                    <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs">SMS</span>
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* Overdraft */}
+            <div className={`rounded-lg border ${profile.notification_preferences.overdraft.enabled ? 'border-red-200 dark:border-red-800' : 'opacity-60'}`}>
+              <div className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-full bg-red-100 dark:bg-red-900/30 p-2">
+                    <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                  </div>
+                  <div>
+                    <Label className="text-base font-medium">Overdraft</Label>
+                    <p className="text-sm text-muted-foreground">When account balance goes negative</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={profile.notification_preferences.overdraft.enabled}
+                  onCheckedChange={(checked) => handleAlertToggle('overdraft', 'enabled', checked)}
+                  disabled={savingNotifications}
+                />
+              </div>
+              {profile.notification_preferences.overdraft.enabled && (
+                <div className="flex items-center gap-4 px-4 pb-4 pt-0">
+                  <span className="text-xs text-muted-foreground">Notify via:</span>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={profile.notification_preferences.overdraft.email} onChange={(e) => handleAlertToggle('overdraft', 'email', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Email</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={profile.notification_preferences.overdraft.push} onChange={(e) => handleAlertToggle('overdraft', 'push', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                    <Bell className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Push</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={profile.notification_preferences.overdraft.sms} onChange={(e) => handleAlertToggle('overdraft', 'sms', e.target.checked)} disabled={savingNotifications || !profile.phone} className="rounded border-gray-300" />
+                    <Phone className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">SMS</span>
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* Large Withdrawals */}
+            <div className={`rounded-lg border ${profile.notification_preferences.large_withdrawal.enabled ? 'border-orange-200 dark:border-orange-800' : 'opacity-60'}`}>
+              <div className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-full bg-orange-100 dark:bg-orange-900/30 p-2">
+                    <TrendingDown className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                  </div>
+                  <div>
+                    <Label className="text-base font-medium">Large Withdrawals</Label>
+                    <p className="text-sm text-muted-foreground">Spending over your set threshold</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={profile.notification_preferences.large_withdrawal.enabled}
+                  onCheckedChange={(checked) => handleAlertToggle('large_withdrawal', 'enabled', checked)}
+                  disabled={savingNotifications}
+                />
+              </div>
+              {profile.notification_preferences.large_withdrawal.enabled && (
+                <div className="flex items-center gap-4 px-4 pb-4 pt-0">
+                  <span className="text-xs text-muted-foreground">Notify via:</span>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={profile.notification_preferences.large_withdrawal.email} onChange={(e) => handleAlertToggle('large_withdrawal', 'email', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Email</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={profile.notification_preferences.large_withdrawal.push} onChange={(e) => handleAlertToggle('large_withdrawal', 'push', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                    <Bell className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Push</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={profile.notification_preferences.large_withdrawal.sms} onChange={(e) => handleAlertToggle('large_withdrawal', 'sms', e.target.checked)} disabled={savingNotifications || !profile.phone} className="rounded border-gray-300" />
+                    <Phone className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">SMS</span>
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* Large Deposits */}
+            <div className={`rounded-lg border ${profile.notification_preferences.large_deposit.enabled ? 'border-emerald-200 dark:border-emerald-800' : 'opacity-60'}`}>
+              <div className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-full bg-emerald-100 dark:bg-emerald-900/30 p-2">
+                    <TrendingUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div>
+                    <Label className="text-base font-medium">Large Deposits</Label>
+                    <p className="text-sm text-muted-foreground">Income over your set threshold</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={profile.notification_preferences.large_deposit.enabled}
+                  onCheckedChange={(checked) => handleAlertToggle('large_deposit', 'enabled', checked)}
+                  disabled={savingNotifications}
+                />
+              </div>
+              {profile.notification_preferences.large_deposit.enabled && (
+                <div className="flex items-center gap-4 px-4 pb-4 pt-0">
+                  <span className="text-xs text-muted-foreground">Notify via:</span>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={profile.notification_preferences.large_deposit.email} onChange={(e) => handleAlertToggle('large_deposit', 'email', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Email</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={profile.notification_preferences.large_deposit.push} onChange={(e) => handleAlertToggle('large_deposit', 'push', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                    <Bell className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Push</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={profile.notification_preferences.large_deposit.sms} onChange={(e) => handleAlertToggle('large_deposit', 'sms', e.target.checked)} disabled={savingNotifications || !profile.phone} className="rounded border-gray-300" />
+                    <Phone className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">SMS</span>
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* Suspicious Activity */}
+            <div className={`rounded-lg border ${profile.notification_preferences.suspicious_activity.enabled ? 'border-purple-200 dark:border-purple-800' : 'opacity-60'}`}>
+              <div className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-full bg-purple-100 dark:bg-purple-900/30 p-2">
+                    <AlertTriangle className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <div>
+                    <Label className="text-base font-medium">Suspicious Activity</Label>
+                    <p className="text-sm text-muted-foreground">Unusual spending patterns detected</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={profile.notification_preferences.suspicious_activity.enabled}
+                  onCheckedChange={(checked) => handleAlertToggle('suspicious_activity', 'enabled', checked)}
+                  disabled={savingNotifications}
+                />
+              </div>
+              {profile.notification_preferences.suspicious_activity.enabled && (
+                <div className="flex items-center gap-4 px-4 pb-4 pt-0">
+                  <span className="text-xs text-muted-foreground">Notify via:</span>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={profile.notification_preferences.suspicious_activity.email} onChange={(e) => handleAlertToggle('suspicious_activity', 'email', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Email</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={profile.notification_preferences.suspicious_activity.push} onChange={(e) => handleAlertToggle('suspicious_activity', 'push', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                    <Bell className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Push</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={profile.notification_preferences.suspicious_activity.sms} onChange={(e) => handleAlertToggle('suspicious_activity', 'sms', e.target.checked)} disabled={savingNotifications || !profile.phone} className="rounded border-gray-300" />
+                    <Phone className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">SMS</span>
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* Budget Alerts */}
+            <div className={`rounded-lg border ${profile.notification_preferences.budget_alerts.enabled ? 'border-blue-200 dark:border-blue-800' : 'opacity-60'}`}>
+              <div className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-full bg-blue-100 dark:bg-blue-900/30 p-2">
+                    <PieChart className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <Label className="text-base font-medium">Budget Alerts</Label>
+                    <p className="text-sm text-muted-foreground">When approaching or exceeding budget limits</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={profile.notification_preferences.budget_alerts.enabled}
+                  onCheckedChange={(checked) => handleAlertToggle('budget_alerts', 'enabled', checked)}
+                  disabled={savingNotifications}
+                />
+              </div>
+              {profile.notification_preferences.budget_alerts.enabled && (
+                <div className="flex items-center gap-4 px-4 pb-4 pt-0">
+                  <span className="text-xs text-muted-foreground">Notify via:</span>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={profile.notification_preferences.budget_alerts.email} onChange={(e) => handleAlertToggle('budget_alerts', 'email', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Email</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={profile.notification_preferences.budget_alerts.push} onChange={(e) => handleAlertToggle('budget_alerts', 'push', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                    <Bell className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Push</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={profile.notification_preferences.budget_alerts.sms} onChange={(e) => handleAlertToggle('budget_alerts', 'sms', e.target.checked)} disabled={savingNotifications || !profile.phone} className="rounded border-gray-300" />
+                    <Phone className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">SMS</span>
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* Recurring Payments */}
+            <div className={`rounded-lg border ${profile.notification_preferences.recurring_payments.enabled ? 'border-indigo-200 dark:border-indigo-800' : 'opacity-60'}`}>
+              <div className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-full bg-indigo-100 dark:bg-indigo-900/30 p-2">
+                    <RefreshCw className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                  </div>
+                  <div>
+                    <Label className="text-base font-medium">Recurring Payments</Label>
+                    <p className="text-sm text-muted-foreground">Reminders for upcoming bills and subscriptions</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={profile.notification_preferences.recurring_payments.enabled}
+                  onCheckedChange={(checked) => handleAlertToggle('recurring_payments', 'enabled', checked)}
+                  disabled={savingNotifications}
+                />
+              </div>
+              {profile.notification_preferences.recurring_payments.enabled && (
+                <div className="flex items-center gap-4 px-4 pb-4 pt-0">
+                  <span className="text-xs text-muted-foreground">Notify via:</span>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={profile.notification_preferences.recurring_payments.email} onChange={(e) => handleAlertToggle('recurring_payments', 'email', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Email</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={profile.notification_preferences.recurring_payments.push} onChange={(e) => handleAlertToggle('recurring_payments', 'push', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                    <Bell className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Push</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={profile.notification_preferences.recurring_payments.sms} onChange={(e) => handleAlertToggle('recurring_payments', 'sms', e.target.checked)} disabled={savingNotifications || !profile.phone} className="rounded border-gray-300" />
+                    <Phone className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">SMS</span>
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* Weekly Summary */}
+            <div className={`rounded-lg border ${profile.notification_preferences.weekly_summary.enabled ? 'border-slate-200 dark:border-slate-700' : 'opacity-60'}`}>
+              <div className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-full bg-slate-100 dark:bg-slate-800 p-2">
+                    <FileText className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+                  </div>
+                  <div>
+                    <Label className="text-base font-medium">Weekly Summary</Label>
+                    <p className="text-sm text-muted-foreground">Weekly digest of your spending and finances</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={profile.notification_preferences.weekly_summary.enabled}
+                  onCheckedChange={(checked) => handleAlertToggle('weekly_summary', 'enabled', checked)}
+                  disabled={savingNotifications}
+                />
+              </div>
+              {profile.notification_preferences.weekly_summary.enabled && (
+                <div className="flex items-center gap-4 px-4 pb-4 pt-0">
+                  <span className="text-xs text-muted-foreground">Notify via:</span>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={profile.notification_preferences.weekly_summary.email} onChange={(e) => handleAlertToggle('weekly_summary', 'email', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Email</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={profile.notification_preferences.weekly_summary.push} onChange={(e) => handleAlertToggle('weekly_summary', 'push', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                    <Bell className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Push</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={profile.notification_preferences.weekly_summary.sms} onChange={(e) => handleAlertToggle('weekly_summary', 'sms', e.target.checked)} disabled={savingNotifications || !profile.phone} className="rounded border-gray-300" />
+                    <Phone className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">SMS</span>
+                  </label>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Thresholds */}
+          <div>
+            <h4 className="text-sm font-medium mb-3">Alert Thresholds</h4>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="largeTransaction">Large Transaction Amount</Label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="largeTransaction"
+                    type="number"
+                    min={50}
+                    step={50}
+                    value={profile.notification_preferences.large_transaction_threshold}
+                    onChange={(e) => handleThresholdChange('large_transaction_threshold', parseInt(e.target.value) || 500)}
+                    className="pl-10"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Alert for transactions over this amount
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="lowBalance">Low Balance Threshold</Label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="lowBalance"
+                    type="number"
+                    min={0}
+                    step={25}
+                    value={profile.notification_preferences.low_balance_threshold}
+                    onChange={(e) => handleThresholdChange('low_balance_threshold', parseInt(e.target.value) || 100)}
+                    className="pl-10"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Alert when balance drops below this
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* AI Settings */}
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-3">
+          <div className="rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 p-2.5">
+            <Sparkles className="h-5 w-5 text-white" />
+          </div>
+          <div className="flex-1">
+            <CardTitle>AI Preferences</CardTitle>
+            <CardDescription>Control AI-powered features and personalization</CardDescription>
+          </div>
+          {savingAI && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Saving...
+            </div>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Auto-Categorization */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <Brain className="h-4 w-4 text-emerald-600" />
+              <h4 className="text-sm font-medium">Auto-Categorization</h4>
+            </div>
+            <div className="space-y-4 pl-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Automatically Categorize Transactions</Label>
+                  <p className="text-xs text-muted-foreground">
+                    AI assigns categories to new transactions
+                  </p>
+                </div>
+                <Switch
+                  checked={aiPreferences.auto_categorize}
+                  onCheckedChange={(checked) => handleAIPreferenceChange('auto_categorize', checked)}
+                  disabled={savingAI}
+                />
+              </div>
+
+              {aiPreferences.auto_categorize && (
+                <>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label>Confidence Threshold</Label>
+                      <span className="text-sm font-medium text-emerald-600">
+                        {aiPreferences.categorize_confidence_threshold}%
+                      </span>
+                    </div>
+                    <Slider
+                      value={[aiPreferences.categorize_confidence_threshold]}
+                      onValueChange={([value]) => handleAIPreferenceChange('categorize_confidence_threshold', value)}
+                      min={50}
+                      max={100}
+                      step={5}
+                      disabled={savingAI}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Only auto-apply categories when AI confidence is at least this high
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Review Low Confidence</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Queue uncertain categorizations for your review
+                      </p>
+                    </div>
+                    <Switch
+                      checked={aiPreferences.review_low_confidence}
+                      onCheckedChange={(checked) => handleAIPreferenceChange('review_low_confidence', checked)}
+                      disabled={savingAI}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Clean Up Merchant Names</Label>
+                      <p className="text-xs text-muted-foreground">
+                        AI normalizes messy merchant names (e.g., "AMZN*123XY" → "Amazon")
+                      </p>
+                    </div>
+                    <Switch
+                      checked={aiPreferences.merchant_cleanup}
+                      onCheckedChange={(checked) => handleAIPreferenceChange('merchant_cleanup', checked)}
+                      disabled={savingAI}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Manual trigger button */}
+              <div className="pt-2 border-t">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Run AI Now</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Manually categorize and clean up uncategorized transactions
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => runAICategorization(false)}
+                    disabled={runningCategorization || !aiPreferences.auto_categorize}
+                    className="gap-2"
+                  >
+                    {runningCategorization ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Run AI
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="h-4 w-4" />
+                        Run AI
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {/* Show status while running */}
+                {runningCategorization && categorizationStatus && (
+                  <div className="mt-2 p-3 rounded-md bg-blue-50 dark:bg-blue-950/30 text-sm">
+                    <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>{categorizationStatus}</span>
+                    </div>
+                  </div>
+                )}
+                {categorizationResult && (
+                  <div className={`mt-2 p-3 rounded-md text-sm ${
+                    categorizationResult.categorized > 0
+                      ? 'bg-emerald-50 dark:bg-emerald-950/30'
+                      : categorizationResult.found === 0
+                        ? 'bg-gray-50 dark:bg-gray-900/30'
+                        : 'bg-amber-50 dark:bg-amber-950/30'
+                  }`}>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        {categorizationResult.categorized > 0 ? (
+                          <Check className="h-4 w-4 text-emerald-600" />
+                        ) : (
+                          <AlertCircle className="h-4 w-4 text-amber-600" />
+                        )}
+                        <span className={categorizationResult.categorized > 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}>
+                          {categorizationResult.categorized > 0
+                            ? `Categorized ${categorizationResult.categorized} transaction${categorizationResult.categorized !== 1 ? 's' : ''}`
+                            : categorizationResult.message || 'No transactions were categorized'
+                          }
+                        </span>
+                      </div>
+                      {categorizationResult.found > 0 && (
+                        <p className="text-xs text-muted-foreground pl-6">
+                          Found {categorizationResult.found} transaction{categorizationResult.found !== 1 ? 's' : ''} to process
+                        </p>
+                      )}
+                      {categorizationResult.needs_review > 0 && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 pl-6">
+                          {categorizationResult.needs_review} marked for review (low confidence)
+                        </p>
+                      )}
+
+                      {/* Show skipped items */}
+                      {categorizationResult.skipped_items && categorizationResult.skipped_items.length > 0 && (
+                        <div className="mt-3 border-t pt-2">
+                          <p className="text-xs font-medium text-muted-foreground mb-2">
+                            Skipped due to low confidence ({categorizationResult.skipped_items.length}):
+                          </p>
+                          <div className="space-y-2 max-h-64 overflow-y-auto">
+                            {categorizationResult.skipped_items.map((item, idx) => (
+                              <div key={idx} className="text-xs p-2 bg-white dark:bg-gray-800 rounded border">
+                                <div className="flex justify-between items-start gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <p className="font-medium truncate">{item.original_name}</p>
+                                      <span className="text-muted-foreground shrink-0">
+                                        ${Math.abs(item.amount).toFixed(2)}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                                      <span>{new Date(item.date).toLocaleDateString()}</span>
+                                      {item.current_category && (
+                                        <>
+                                          <span>•</span>
+                                          <span>{formatCategory(item.current_category)}</span>
+                                        </>
+                                      )}
+                                    </div>
+                                    <p className="text-muted-foreground">
+                                      Suggested: <span className="text-foreground font-medium">{formatCategory(item.suggested_category)}</span>
+                                      {item.suggested_name && (
+                                        <span> → <span className="text-emerald-600 dark:text-emerald-400">{item.suggested_name}</span></span>
+                                      )}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <span className="text-amber-600 dark:text-amber-400 font-medium mr-2">
+                                      {item.confidence}%
+                                    </span>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                      onClick={() => acceptSkippedItem(item)}
+                                      disabled={applyingChange === item.transaction_id}
+                                      title="Accept suggestion"
+                                    >
+                                      {applyingChange === item.transaction_id ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <Check className="h-3.5 w-3.5" />
+                                      )}
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                      onClick={() => rejectSkippedItem(item.transaction_id)}
+                                      disabled={applyingChange === item.transaction_id}
+                                      title="Reject suggestion"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Re-run all button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => runAICategorization(true)}
+                  disabled={runningCategorization || !aiPreferences.auto_categorize}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                  Re-run on all recent transactions
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Smart Insights */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <Lightbulb className="h-4 w-4 text-amber-500" />
+              <h4 className="text-sm font-medium">Smart Insights</h4>
+            </div>
+            <div className="grid gap-3 pl-6 sm:grid-cols-2">
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-blue-500" />
+                  <Label className="text-sm">Spending Insights</Label>
+                </div>
+                <Switch
+                  checked={aiPreferences.spending_insights}
+                  onCheckedChange={(checked) => handleAIPreferenceChange('spending_insights', checked)}
+                  disabled={savingAI}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="flex items-center gap-2">
+                  <Wallet className="h-4 w-4 text-emerald-500" />
+                  <Label className="text-sm">Savings Suggestions</Label>
+                </div>
+                <Switch
+                  checked={aiPreferences.savings_suggestions}
+                  onCheckedChange={(checked) => handleAIPreferenceChange('savings_suggestions', checked)}
+                  disabled={savingAI}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="flex items-center gap-2">
+                  <Target className="h-4 w-4 text-purple-500" />
+                  <Label className="text-sm">Budget Recommendations</Label>
+                </div>
+                <Switch
+                  checked={aiPreferences.budget_recommendations}
+                  onCheckedChange={(checked) => handleAIPreferenceChange('budget_recommendations', checked)}
+                  disabled={savingAI}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="flex items-center gap-2">
+                  <Receipt className="h-4 w-4 text-orange-500" />
+                  <Label className="text-sm">Bill Negotiation Tips</Label>
+                </div>
+                <Switch
+                  checked={aiPreferences.bill_negotiation_tips}
+                  onCheckedChange={(checked) => handleAIPreferenceChange('bill_negotiation_tips', checked)}
+                  disabled={savingAI}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-lg border sm:col-span-2">
+                <div className="flex items-center gap-2">
+                  <CircleDollarSign className="h-4 w-4 text-indigo-500" />
+                  <div>
+                    <Label className="text-sm">Investment Tips</Label>
+                    <p className="text-xs text-muted-foreground">General investment education</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={aiPreferences.investment_tips}
+                  onCheckedChange={(checked) => handleAIPreferenceChange('investment_tips', checked)}
+                  disabled={savingAI}
+                />
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* AI Chat Personality */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <MessageSquare className="h-4 w-4 text-blue-500" />
+              <h4 className="text-sm font-medium">AI Chat</h4>
+            </div>
+            <div className="space-y-4 pl-6">
+              <div className="space-y-2">
+                <Label>Chat Personality</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['professional', 'friendly', 'concise'] as const).map((personality) => (
+                    <button
+                      key={personality}
+                      onClick={() => handleAIPreferenceChange('chat_personality', personality)}
+                      disabled={savingAI}
+                      className={`p-3 rounded-lg border text-center transition-colors ${
+                        aiPreferences.chat_personality === personality
+                          ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300'
+                          : 'hover:bg-muted'
+                      }`}
+                    >
+                      <span className="text-lg mb-1 block">
+                        {personality === 'professional' ? '👔' : personality === 'friendly' ? '😊' : '⚡'}
+                      </span>
+                      <span className="text-sm font-medium capitalize">{personality}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {aiPreferences.chat_personality === 'professional' && 'Formal, detailed responses with financial terminology'}
+                  {aiPreferences.chat_personality === 'friendly' && 'Conversational, encouraging tone with simple explanations'}
+                  {aiPreferences.chat_personality === 'concise' && 'Brief, to-the-point answers focused on key information'}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Include Spending Context</Label>
+                  <p className="text-xs text-muted-foreground">
+                    AI references your actual spending in conversations
+                  </p>
+                </div>
+                <Switch
+                  checked={aiPreferences.include_spending_context}
+                  onCheckedChange={(checked) => handleAIPreferenceChange('include_spending_context', checked)}
+                  disabled={savingAI}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Proactive Insights</Label>
+                  <p className="text-xs text-muted-foreground">
+                    AI suggests topics and insights based on your data
+                  </p>
+                </div>
+                <Switch
+                  checked={aiPreferences.proactive_insights}
+                  onCheckedChange={(checked) => handleAIPreferenceChange('proactive_insights', checked)}
+                  disabled={savingAI}
+                />
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Analysis Features */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <Zap className="h-4 w-4 text-yellow-500" />
+              <h4 className="text-sm font-medium">Smart Analysis</h4>
+            </div>
+            <div className="space-y-3 pl-6">
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="space-y-0.5">
+                  <Label>Detect Recurring Transactions</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Identify regular bills and income patterns
+                  </p>
+                </div>
+                <Switch
+                  checked={aiPreferences.detect_recurring}
+                  onCheckedChange={(checked) => handleAIPreferenceChange('detect_recurring', checked)}
+                  disabled={savingAI}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="space-y-0.5">
+                  <Label>Detect Subscriptions</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Track streaming, software, and other subscriptions
+                  </p>
+                </div>
+                <Switch
+                  checked={aiPreferences.detect_subscriptions}
+                  onCheckedChange={(checked) => handleAIPreferenceChange('detect_subscriptions', checked)}
+                  disabled={savingAI}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="space-y-0.5">
+                  <Label>Unusual Spending Detection</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Alert when spending deviates from your patterns
+                  </p>
+                </div>
+                <Switch
+                  checked={aiPreferences.detect_unusual_spending}
+                  onCheckedChange={(checked) => handleAIPreferenceChange('detect_unusual_spending', checked)}
+                  disabled={savingAI}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="space-y-0.5">
+                  <Label>Smart Search</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Natural language search for transactions
+                  </p>
+                </div>
+                <Switch
+                  checked={aiPreferences.smart_search}
+                  onCheckedChange={(checked) => handleAIPreferenceChange('smart_search', checked)}
+                  disabled={savingAI}
+                />
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Privacy & Data */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <ShieldCheck className="h-4 w-4 text-slate-500" />
+              <h4 className="text-sm font-medium">Privacy & Data</h4>
+            </div>
+            <div className="space-y-3 pl-6">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                <div className="space-y-0.5">
+                  <Label>Allow Transaction Analysis</Label>
+                  <p className="text-xs text-muted-foreground">
+                    AI can analyze your transactions for insights
+                  </p>
+                </div>
+                <Switch
+                  checked={aiPreferences.allow_transaction_analysis}
+                  onCheckedChange={(checked) => handleAIPreferenceChange('allow_transaction_analysis', checked)}
+                  disabled={savingAI}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                <div className="space-y-0.5">
+                  <Label>Help Improve AI Models</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Share anonymized data to improve categorization accuracy
+                  </p>
+                </div>
+                <Switch
+                  checked={aiPreferences.improve_ai_models}
+                  onCheckedChange={(checked) => handleAIPreferenceChange('improve_ai_models', checked)}
+                  disabled={savingAI}
+                />
+              </div>
+
+              <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+                <div className="flex items-start gap-2">
+                  <Eye className="h-4 w-4 text-emerald-600 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
+                      Your data is secure
+                    </p>
+                    <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1">
+                      All AI processing is done securely. Your financial data is never sold or shared with third parties for advertising.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Data Export */}
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-3">
+          <div className="rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 p-2.5">
+            <Download className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <CardTitle>Data Export</CardTitle>
+            <CardDescription>Download your financial data</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-4">
+            Export all your transactions, accounts, and budgets as a JSON file.
+          </p>
+          <Button
+            variant="outline"
+            onClick={handleExport}
+            disabled={exporting}
+          >
+            {exporting ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Exporting...</>
+            ) : (
+              <><Download className="mr-2 h-4 w-4" /> Export Data</>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Security */}
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-3">
+          <div className="rounded-lg bg-gradient-to-br from-red-500 to-rose-600 p-2.5">
+            <Shield className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <CardTitle>Security</CardTitle>
+            <CardDescription>Manage your account security</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+            <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+            <p className="text-sm text-amber-800 dark:text-amber-200">
+              Password changes are managed through email verification.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <Button variant="outline" asChild className="flex-1">
+              <a href="/auth/reset-password">Change Password</a>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Account Actions */}
+      <Card className="border-red-200 dark:border-red-900">
+        <CardHeader className="flex flex-row items-center gap-3">
+          <div className="rounded-lg bg-gradient-to-br from-slate-500 to-slate-700 p-2.5">
+            <LogOut className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <CardTitle>Account</CardTitle>
+            <CardDescription>Sign out or manage your account</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Button
+            variant="outline"
+            onClick={handleSignOut}
+            className="w-full"
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Sign Out
+          </Button>
+          <Separator />
+          <div className="pt-2">
+            <p className="text-sm text-muted-foreground mb-3">
+              Permanently delete your account and all associated data. This action cannot be undone.
+            </p>
+            <Button variant="destructive" className="w-full" disabled>
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete Account
+            </Button>
+            <p className="text-xs text-muted-foreground mt-2">
+              Contact support to delete your account
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

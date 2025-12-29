@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run build:*)",
+      "Bash(ls:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd finance app foundation with auth, Plaid integration, and AI chat\n\nSet up core infrastructure including Supabase authentication, Plaid banking \nconnection, Anthropic AI SDK for chat functionality, and shadcn/ui components. \nIncludes dashboard layout, auth flows, and API routes.\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+    ]
+  }
+}
