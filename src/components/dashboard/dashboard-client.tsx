@@ -8,6 +8,7 @@ import { BudgetSummary } from './budget-summary'
 import { RecentTransactions } from './recent-transactions'
 import { AISuggestions } from './ai-suggestions'
 import { CashFlowForecast } from './cash-flow-forecast'
+import { AnomalyAlerts } from './anomaly-alerts'
 
 interface Account {
   id: string
@@ -89,6 +90,9 @@ export function DashboardClient({
 
       {/* AI Suggestions */}
       <AISuggestions />
+
+      {/* Anomaly Detection */}
+      <AnomalyAlerts />
 
       {/* Cash Flow Forecast */}
       <CashFlowForecast />

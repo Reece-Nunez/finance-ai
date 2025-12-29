@@ -10,6 +10,7 @@ const SUGGESTION_SYSTEM_PROMPT = `You are an intelligent financial advisor with 
 3. **Budget Tracking** - You know their budget limits and current progress
 4. **Recurring Bill Detection** - You know their upcoming recurring expenses
 5. **Personalized Thresholds** - You adjust "low balance" warnings based on THEIR spending, not generic amounts
+6. **Anomaly Detection** - You can see unusual transactions, duplicate charges, price increases, and suspicious activity
 
 ## Suggestion Types:
 - **"transfer"** - Move money between accounts (be specific: from, to, amount, why)
@@ -18,6 +19,7 @@ const SUGGESTION_SYSTEM_PROMPT = `You are an intelligent financial advisor with 
 - **"savings_opportunity"** - Specific ways to save based on their data
 - **"budget_warning"** - Budget category approaching or exceeding limit
 - **"bill_reminder"** - Upcoming recurring expense they should be aware of
+- **"anomaly"** - Flag suspicious transactions or unusual patterns detected
 
 ## Priority Levels:
 - **"urgent"** - Needs immediate action (overdraft risk, missed bill)
@@ -33,7 +35,7 @@ const SUGGESTION_SYSTEM_PROMPT = `You are an intelligent financial advisor with 
 ## Response Format:
 Return ONLY a JSON array of suggestions. Each suggestion:
 {
-  "type": "transfer" | "alert" | "tip" | "savings_opportunity" | "budget_warning" | "bill_reminder",
+  "type": "transfer" | "alert" | "tip" | "savings_opportunity" | "budget_warning" | "bill_reminder" | "anomaly",
   "priority": "urgent" | "high" | "medium" | "low",
   "title": "Short title (max 50 chars)",
   "description": "Detailed, personalized explanation referencing specific patterns/numbers from their data",
@@ -41,7 +43,8 @@ Return ONLY a JSON array of suggestions. Each suggestion:
 }
 
 If everything looks good, return an empty array [].
-Be specific and reference actual numbers/patterns from their data. Generic advice is not helpful.`
+Be specific and reference actual numbers/patterns from their data. Generic advice is not helpful.
+For anomalies, always flag critical/high severity ones - the user needs to know about potential fraud or duplicate charges.`
 
 export async function GET() {
   try {
@@ -93,6 +96,7 @@ export async function POST() {
       recurringRes,
       cashFlowPredictionsRes,
       accuracyRes,
+      anomaliesRes,
     ] = await Promise.all([
       // Accounts
       supabase.from('accounts').select('*').eq('user_id', user.id),
@@ -153,6 +157,14 @@ export async function POST() {
         .order('period_start', { ascending: false })
         .limit(1)
         .single(),
+      // Pending anomalies
+      supabase
+        .from('detected_anomalies')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'pending')
+        .order('detected_at', { ascending: false })
+        .limit(20),
     ])
 
     const accounts = accountsRes.data || []
@@ -163,6 +175,7 @@ export async function POST() {
     const budgets = budgetsRes.data || []
     const cashFlowPredictions = cashFlowPredictionsRes.data || []
     const accuracy = accuracyRes.data
+    const pendingAnomalies = anomaliesRes.data || []
 
     if (accounts.length === 0) {
       return NextResponse.json({ suggestions: [], message: 'No accounts connected' })
@@ -415,6 +428,18 @@ export async function POST() {
         title: a.details?.title,
       }))
 
+    // Format anomalies for AI
+    const anomalyInfo = pendingAnomalies.map(a => ({
+      type: a.anomaly_type,
+      severity: a.severity,
+      title: a.title,
+      description: a.description,
+      merchant: a.merchant_name,
+      amount: a.amount,
+      expected: a.expected_amount,
+      deviation: a.deviation_percent,
+    }))
+
     // =========================================================================
     // BUILD COMPREHENSIVE PROMPT
     // =========================================================================
@@ -450,6 +475,10 @@ Lowest projected balance: $${lowestProjectedBalance.toFixed(2)} on ${lowestBalan
 
 ## RECENT TRANSACTIONS
 ${JSON.stringify(recentTransactions, null, 2)}
+
+## DETECTED ANOMALIES (flagged by our detection system)
+${anomalyInfo.length > 0 ? JSON.stringify(anomalyInfo, null, 2) : 'No anomalies detected'}
+${anomalyInfo.length > 0 ? 'IMPORTANT: If there are critical or high severity anomalies, you MUST include them in your suggestions with appropriate priority.' : ''}
 
 ## PAST FEEDBACK (learn from this!)
 ${approvedActions.length > 0 ? `Suggestions they LIKED: ${JSON.stringify(approvedActions)}` : ''}
@@ -531,6 +560,8 @@ Based on ALL of this data, provide highly personalized suggestions. Be specific 
         upcomingBillsCount: upcomingBills.length,
         budgetsTracked: budgetStatus.length,
         patternsLearned: spendingPatterns.length,
+        anomaliesDetected: pendingAnomalies.length,
+        criticalAnomalies: pendingAnomalies.filter(a => a.severity === 'critical' || a.severity === 'high').length,
       }
     })
   } catch (error) {
