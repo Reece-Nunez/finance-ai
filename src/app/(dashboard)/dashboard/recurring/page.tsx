@@ -26,8 +26,6 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
-  TrendingUp,
-  TrendingDown,
   MoreVertical,
   Eye,
   History,
@@ -35,8 +33,8 @@ import {
   CreditCard,
   Sparkles,
   Filter,
-  X,
 } from 'lucide-react'
+import { MerchantLogo } from '@/components/ui/merchant-logo'
 
 interface Transaction {
   id: string
@@ -127,19 +125,11 @@ function RecurringItem({
   return (
     <div className="flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/50">
       <div className="flex items-center gap-4">
-        <div
-          className={`flex h-10 w-10 items-center justify-center rounded-full ${
-            item.isIncome
-              ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
-              : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-          }`}
-        >
-          {item.isIncome ? (
-            <TrendingUp className="h-5 w-5" />
-          ) : (
-            <TrendingDown className="h-5 w-5" />
-          )}
-        </div>
+        <MerchantLogo
+          merchantName={item.displayName || item.name}
+          category={item.category}
+          size="md"
+        />
         <div>
           <p className="font-medium">{item.displayName}</p>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -647,19 +637,11 @@ function CalendarDayModal({
               className="flex items-center justify-between rounded-lg border p-3"
             >
               <div className="flex items-center gap-3">
-                <div
-                  className={`flex h-10 w-10 items-center justify-center rounded-full ${
-                    item.isIncome
-                      ? 'bg-green-100 text-green-600 dark:bg-green-900/30'
-                      : 'bg-red-100 text-red-600 dark:bg-red-900/30'
-                  }`}
-                >
-                  {item.isIncome ? (
-                    <TrendingUp className="h-5 w-5" />
-                  ) : (
-                    <TrendingDown className="h-5 w-5" />
-                  )}
-                </div>
+                <MerchantLogo
+                  merchantName={item.displayName || item.name}
+                  category={item.category}
+                  size="md"
+                />
                 <div>
                   <p className="font-medium">{item.displayName}</p>
                   <p className="text-sm text-muted-foreground">
@@ -785,18 +767,13 @@ function DetailModal({
       <SheetContent className="w-full overflow-y-auto sm:max-w-md">
         <SheetHeader className="space-y-4">
           <div className="flex flex-col items-center pt-4">
-            <div
-              className={`mb-3 flex h-16 w-16 items-center justify-center rounded-full ${
-                item.isIncome
-                  ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
-                  : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-              }`}
-            >
-              {item.isIncome ? (
-                <TrendingUp className="h-8 w-8" />
-              ) : (
-                <TrendingDown className="h-8 w-8" />
-              )}
+            <div className="mb-3">
+              <MerchantLogo
+                merchantName={item.displayName || item.name}
+                category={item.category}
+                size="lg"
+                className="h-16 w-16"
+              />
             </div>
             <SheetTitle className="text-xl">{item.displayName}</SheetTitle>
             <p className="text-sm text-muted-foreground">{item.name}</p>

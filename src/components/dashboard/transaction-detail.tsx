@@ -14,8 +14,6 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
-  TrendingUp,
-  TrendingDown,
   Calendar,
   Clock,
   DollarSign,
@@ -31,11 +29,10 @@ import {
   X,
   EyeOff,
   CreditCard,
-  Building2,
   Split,
-  CalendarDays,
 } from 'lucide-react'
 import { CategorySelector } from './category-selector'
+import { MerchantLogo } from '@/components/ui/merchant-logo'
 
 interface AccountInfo {
   name: string
@@ -494,18 +491,13 @@ export function TransactionDetail({
         <SheetHeader className="space-y-4">
           {/* Amount Header */}
           <div className="flex flex-col items-center pt-4">
-            <div
-              className={`mb-3 flex h-16 w-16 items-center justify-center rounded-full ${
-                isIncome
-                  ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
-                  : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-              }`}
-            >
-              {isIncome ? (
-                <TrendingUp className="h-8 w-8" />
-              ) : (
-                <TrendingDown className="h-8 w-8" />
-              )}
+            <div className="mb-3">
+              <MerchantLogo
+                merchantName={transaction.merchant_name || transaction.name}
+                category={transaction.category}
+                size="lg"
+                className="h-16 w-16"
+              />
             </div>
             <SheetTitle
               className={`text-3xl font-bold ${

@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { RefreshCw, Calendar, DollarSign, AlertCircle } from 'lucide-react'
 import { RecurringTransaction, formatFrequency, calculateYearlyCost } from '@/lib/recurring'
 import { formatCategory } from '@/lib/format'
+import { MerchantLogo } from '@/components/ui/merchant-logo'
 
 interface RecurringTransactionsProps {
   recurring: RecurringTransaction[]
@@ -78,9 +79,11 @@ export function RecurringTransactions({ recurring }: RecurringTransactionsProps)
                 className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/50"
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400">
-                    <RefreshCw className="h-5 w-5" />
-                  </div>
+                  <MerchantLogo
+                    merchantName={r.merchantName}
+                    category={r.category}
+                    size="md"
+                  />
                   <div>
                     <p className="font-medium capitalize">{r.merchantName}</p>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">

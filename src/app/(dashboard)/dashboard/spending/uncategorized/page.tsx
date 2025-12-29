@@ -8,12 +8,11 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import {
   ArrowLeft,
-  TrendingUp,
-  TrendingDown,
   CheckCircle2,
   Sparkles,
 } from 'lucide-react'
 import { CategorySelector } from '@/components/dashboard/category-selector'
+import { MerchantLogo } from '@/components/ui/merchant-logo'
 
 interface Transaction {
   id: string
@@ -199,19 +198,11 @@ export default function UncategorizedPage() {
                   className="flex items-center justify-between rounded-lg border p-4"
                 >
                   <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div
-                      className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ${
-                        tx.amount < 0
-                          ? 'bg-green-100 text-green-600 dark:bg-green-900/30'
-                          : 'bg-red-100 text-red-600 dark:bg-red-900/30'
-                      }`}
-                    >
-                      {tx.amount < 0 ? (
-                        <TrendingUp className="h-5 w-5" />
-                      ) : (
-                        <TrendingDown className="h-5 w-5" />
-                      )}
-                    </div>
+                    <MerchantLogo
+                      merchantName={tx.merchant_name || tx.name}
+                      category={tx.category}
+                      size="md"
+                    />
                     <div className="min-w-0 flex-1">
                       <p className="font-medium truncate">
                         {tx.display_name || tx.merchant_name || tx.name}

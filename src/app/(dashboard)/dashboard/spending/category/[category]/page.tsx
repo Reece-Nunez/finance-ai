@@ -16,14 +16,13 @@ import {
 import {
   ChevronLeft,
   ChevronRight,
-  TrendingUp,
-  TrendingDown,
   ArrowUp,
   ArrowDown,
   ArrowLeft,
   Calendar,
 } from 'lucide-react'
 import { TransactionDetail } from '@/components/dashboard/transaction-detail'
+import { MerchantLogo } from '@/components/ui/merchant-logo'
 
 interface Transaction {
   id: string
@@ -322,19 +321,11 @@ export default function CategoryDetailPage() {
                   className="flex w-full items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/50"
                 >
                   <div className="flex items-center gap-4">
-                    <div
-                      className={`flex h-10 w-10 items-center justify-center rounded-full ${
-                        tx.amount < 0
-                          ? 'bg-green-100 text-green-600 dark:bg-green-900/30'
-                          : 'bg-red-100 text-red-600 dark:bg-red-900/30'
-                      }`}
-                    >
-                      {tx.amount < 0 ? (
-                        <TrendingUp className="h-5 w-5" />
-                      ) : (
-                        <TrendingDown className="h-5 w-5" />
-                      )}
-                    </div>
+                    <MerchantLogo
+                      merchantName={tx.merchant_name || tx.name}
+                      category={tx.category}
+                      size="md"
+                    />
                     <div className="text-left">
                       <p className="font-medium">
                         {tx.display_name || tx.merchant_name || tx.name}

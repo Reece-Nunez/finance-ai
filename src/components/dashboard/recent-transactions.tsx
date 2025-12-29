@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { TrendingUp, TrendingDown } from 'lucide-react'
+import { MerchantLogo } from '@/components/ui/merchant-logo'
 import Link from 'next/link'
 import { TransactionDetail } from './transaction-detail'
 
@@ -94,19 +94,11 @@ export function RecentTransactions({
                   className="flex cursor-pointer items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/50"
                 >
                   <div className="flex items-center gap-3">
-                    <div
-                      className={`flex h-9 w-9 items-center justify-center rounded-full ${
-                        tx.amount < 0
-                          ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
-                          : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-                      }`}
-                    >
-                      {tx.amount < 0 ? (
-                        <TrendingUp className="h-4 w-4" />
-                      ) : (
-                        <TrendingDown className="h-4 w-4" />
-                      )}
-                    </div>
+                    <MerchantLogo
+                      merchantName={tx.merchant_name || tx.name}
+                      category={tx.category}
+                      size="sm"
+                    />
                     <div className="min-w-0">
                       <p className="truncate font-medium">
                         {tx.display_name || tx.merchant_name || tx.name}

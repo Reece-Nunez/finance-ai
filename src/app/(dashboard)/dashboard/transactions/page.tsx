@@ -18,26 +18,11 @@ import {
   ChevronDown,
   X,
   Loader2,
-  Coffee,
-  Car,
-  ShoppingBag,
-  Gamepad2,
-  Zap,
-  Heart,
-  Plane,
-  Home,
-  GraduationCap,
-  Gift,
-  CreditCard,
-  Repeat,
-  Scissors,
-  PawPrint,
-  DollarSign,
-  MoreHorizontal,
   ChevronRight,
 } from 'lucide-react'
 import { formatCategory, formatCurrency } from '@/lib/format'
 import { TransactionDetail } from '@/components/dashboard/transaction-detail'
+import { MerchantLogo } from '@/components/ui/merchant-logo'
 
 interface Transaction {
   id: string
@@ -58,35 +43,6 @@ interface Account {
   name: string
   official_name: string | null
   mask: string | null
-}
-
-// Category styling - colors and icons
-const CATEGORY_STYLES: Record<string, { color: string; bg: string; icon: typeof Coffee }> = {
-  'FOOD_AND_DRINK': { color: 'text-orange-600', bg: 'bg-orange-100 dark:bg-orange-900/30', icon: Coffee },
-  'TRANSPORTATION': { color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30', icon: Car },
-  'SHOPPING': { color: 'text-pink-600', bg: 'bg-pink-100 dark:bg-pink-900/30', icon: ShoppingBag },
-  'ENTERTAINMENT': { color: 'text-purple-600', bg: 'bg-purple-100 dark:bg-purple-900/30', icon: Gamepad2 },
-  'BILLS_AND_UTILITIES': { color: 'text-yellow-600', bg: 'bg-yellow-100 dark:bg-yellow-900/30', icon: Zap },
-  'RENT_AND_UTILITIES': { color: 'text-yellow-600', bg: 'bg-yellow-100 dark:bg-yellow-900/30', icon: Zap },
-  'HEALTH': { color: 'text-red-600', bg: 'bg-red-100 dark:bg-red-900/30', icon: Heart },
-  'TRAVEL': { color: 'text-cyan-600', bg: 'bg-cyan-100 dark:bg-cyan-900/30', icon: Plane },
-  'HOME': { color: 'text-amber-600', bg: 'bg-amber-100 dark:bg-amber-900/30', icon: Home },
-  'EDUCATION': { color: 'text-indigo-600', bg: 'bg-indigo-100 dark:bg-indigo-900/30', icon: GraduationCap },
-  'GIFTS_AND_DONATIONS': { color: 'text-rose-600', bg: 'bg-rose-100 dark:bg-rose-900/30', icon: Gift },
-  'TRANSFER': { color: 'text-slate-600', bg: 'bg-slate-100 dark:bg-slate-800', icon: Repeat },
-  'TRANSFER_OUT': { color: 'text-slate-600', bg: 'bg-slate-100 dark:bg-slate-800', icon: Repeat },
-  'TRANSFER_IN': { color: 'text-slate-600', bg: 'bg-slate-100 dark:bg-slate-800', icon: Repeat },
-  'SUBSCRIPTIONS': { color: 'text-violet-600', bg: 'bg-violet-100 dark:bg-violet-900/30', icon: CreditCard },
-  'PERSONAL_CARE': { color: 'text-teal-600', bg: 'bg-teal-100 dark:bg-teal-900/30', icon: Scissors },
-  'PETS': { color: 'text-lime-600', bg: 'bg-lime-100 dark:bg-lime-900/30', icon: PawPrint },
-  'INCOME': { color: 'text-emerald-600', bg: 'bg-emerald-100 dark:bg-emerald-900/30', icon: DollarSign },
-  'FEES': { color: 'text-gray-600', bg: 'bg-gray-100 dark:bg-gray-800', icon: CreditCard },
-}
-
-function getCategoryStyle(category: string | null) {
-  if (!category) return { color: 'text-gray-500', bg: 'bg-gray-100 dark:bg-gray-800', icon: MoreHorizontal }
-  const style = CATEGORY_STYLES[category.toUpperCase()]
-  return style || { color: 'text-gray-500', bg: 'bg-gray-100 dark:bg-gray-800', icon: MoreHorizontal }
 }
 
 export default function TransactionsPage() {
@@ -347,8 +303,6 @@ export default function TransactionsPage() {
               <div className="space-y-1">
                 {txs.map((tx) => {
                   const category = tx.category || tx.ai_category
-                  const style = getCategoryStyle(category)
-                  const Icon = style.icon
                   const isIncome = tx.amount < 0 || tx.is_income
 
                   return (
@@ -357,10 +311,12 @@ export default function TransactionsPage() {
                       onClick={() => setSelectedTransaction(tx)}
                       className="w-full flex items-center gap-4 p-3 -mx-3 rounded-2xl transition-colors hover:bg-muted/50 group"
                     >
-                      {/* Category Icon */}
-                      <div className={`flex h-12 w-12 items-center justify-center rounded-full shrink-0 ${style.bg}`}>
-                        <Icon className={`h-5 w-5 ${style.color}`} />
-                      </div>
+                      {/* Merchant Logo */}
+                      <MerchantLogo
+                        merchantName={tx.merchant_name || tx.name}
+                        category={category}
+                        size="lg"
+                      />
 
                       {/* Details */}
                       <div className="flex-1 text-left min-w-0">
