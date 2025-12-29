@@ -1,22 +1,92 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useRef, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { TrendingUp } from 'lucide-react'
+import { TrendingUp, Loader2 } from 'lucide-react'
+import { SESSION_CONFIG } from '@/lib/security/session-config'
+import { toast } from 'sonner'
 
-export default function LoginPage() {
+// Session message configurations for toasts
+const SESSION_MESSAGES: Record<string, { text: string; title: string; type: 'warning' | 'info' | 'success' }> = {
+  session_timeout: {
+    title: 'Session Expired',
+    text: 'Your session has expired due to inactivity. Please sign in again.',
+    type: 'warning',
+  },
+  session_expired: {
+    title: 'Session Expired',
+    text: 'Your session has expired. Please sign in again to continue.',
+    type: 'warning',
+  },
+  session_required: {
+    title: 'Authentication Required',
+    text: 'Please sign in to access that page.',
+    type: 'info',
+  },
+  logged_out: {
+    title: 'Signed Out',
+    text: 'You have been successfully logged out.',
+    type: 'success',
+  },
+  logged_out_other_tab: {
+    title: 'Signed Out',
+    text: 'You were logged out from another tab or device.',
+    type: 'info',
+  },
+  session_error: {
+    title: 'Session Error',
+    text: 'A session error occurred. Please sign in again.',
+    type: 'warning',
+  },
+}
+
+function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
+  const toastShownRef = useRef(false)
+
+  // Clear stale session data and show appropriate message on load
+  useEffect(() => {
+    // Clear any stale session tracking data
+    try {
+      Object.values(SESSION_CONFIG.STORAGE_KEYS).forEach((key) => {
+        localStorage.removeItem(key)
+      })
+    } catch {
+      // Ignore localStorage errors
+    }
+
+    // Show session message toast if present (only once)
+    const message = searchParams.get('message')
+    if (message && SESSION_MESSAGES[message] && !toastShownRef.current) {
+      toastShownRef.current = true
+      const { title, text, type } = SESSION_MESSAGES[message]
+
+      if (type === 'warning') {
+        toast.warning(title, { description: text, duration: 5000 })
+      } else if (type === 'success') {
+        toast.success(title, { description: text, duration: 4000 })
+      } else {
+        toast.info(title, { description: text, duration: 4000 })
+      }
+
+      // Clean up URL without causing a navigation
+      const url = new URL(window.location.href)
+      url.searchParams.delete('message')
+      window.history.replaceState({}, '', url.toString())
+    }
+  }, [searchParams])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -30,10 +100,21 @@ export default function LoginPage() {
 
     if (error) {
       setError(error.message)
+      toast.error('Sign In Failed', { description: error.message })
       setLoading(false)
       return
     }
 
+    // Initialize session tracking on successful login
+    try {
+      const now = Date.now()
+      localStorage.setItem(SESSION_CONFIG.STORAGE_KEYS.LAST_ACTIVITY, now.toString())
+      localStorage.setItem(SESSION_CONFIG.STORAGE_KEYS.SESSION_START, now.toString())
+    } catch {
+      // Ignore localStorage errors
+    }
+
+    toast.success('Welcome Back!', { description: 'You have successfully signed in.' })
     router.push('/dashboard')
     router.refresh()
   }
@@ -95,5 +176,32 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+function LoginPageLoading() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-50 via-background to-teal-50 px-4 dark:from-emerald-950/20 dark:via-background dark:to-teal-950/20">
+      <Card className="w-full max-w-md border-none shadow-2xl shadow-emerald-500/10">
+        <CardHeader className="text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/25">
+            <TrendingUp className="h-6 w-6 text-white" />
+          </div>
+          <CardTitle className="text-2xl">Welcome back</CardTitle>
+          <CardDescription>Sign in to your account to continue</CardDescription>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginPageLoading />}>
+      <LoginForm />
+    </Suspense>
   )
 }

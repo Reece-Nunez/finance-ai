@@ -1,5 +1,14 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { SECURITY_HEADERS } from '@/lib/security/session-config'
+
+// Secure cookie options for auth cookies
+const SECURE_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+  path: '/',
+}
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -22,12 +31,20 @@ export async function updateSession(request: NextRequest) {
             request,
           })
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, {
+              ...options,
+              ...SECURE_COOKIE_OPTIONS,
+            })
           )
         },
       },
     }
   )
+
+  // Add security headers to response
+  Object.entries(SECURITY_HEADERS).forEach(([key, value]) => {
+    supabaseResponse.headers.set(key, value)
+  })
 
   // Refresh session if expired
   const {
@@ -43,6 +60,8 @@ export async function updateSession(request: NextRequest) {
   if (isProtectedPath && !user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    // Clear any stale session storage keys via query param
+    url.searchParams.set('message', 'session_required')
     return NextResponse.redirect(url)
   }
 

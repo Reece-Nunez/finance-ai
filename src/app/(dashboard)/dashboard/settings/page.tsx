@@ -48,6 +48,7 @@ import {
 } from 'lucide-react'
 import { Slider } from '@/components/ui/slider'
 import { useTheme } from 'next-themes'
+import { SESSION_CONFIG } from '@/lib/security/session-config'
 
 interface AlertSettings {
   enabled: boolean
@@ -539,8 +540,21 @@ export default function SettingsPage() {
   }
 
   const handleSignOut = async () => {
+    // Clear session tracking data
+    try {
+      Object.values(SESSION_CONFIG.STORAGE_KEYS).forEach((key) => {
+        localStorage.removeItem(key)
+      })
+      // Broadcast logout to other tabs
+      localStorage.setItem(
+        SESSION_CONFIG.STORAGE_KEYS.LOGOUT_EVENT,
+        JSON.stringify({ timestamp: Date.now(), reason: 'manual' })
+      )
+    } catch {
+      // Ignore localStorage errors
+    }
     await supabase.auth.signOut()
-    window.location.href = '/login'
+    window.location.href = '/login?message=logged_out'
   }
 
   if (loading) {
@@ -1677,6 +1691,26 @@ export default function SettingsPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Session Security Info */}
+          <div className="p-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+            <div className="flex items-start gap-3">
+              <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
+                  Session Security Enabled
+                </p>
+                <ul className="text-xs text-emerald-700 dark:text-emerald-300 space-y-1">
+                  <li>• Auto-logout after 5 minutes of inactivity</li>
+                  <li>• Maximum session duration of 4 hours</li>
+                  <li>• Session expires when browser/tab is closed</li>
+                  <li>• Warning displayed 1 minute before timeout</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
           <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
             <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
             <p className="text-sm text-amber-800 dark:text-amber-200">

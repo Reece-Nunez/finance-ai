@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { LogOut, User } from 'lucide-react'
 import { NotificationsDropdown } from './notifications-dropdown'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
+import { SESSION_CONFIG } from '@/lib/security/session-config'
 
 interface HeaderProps {
   user: SupabaseUser
@@ -18,8 +19,21 @@ export function Header({ user, userName }: HeaderProps) {
   const supabase = createClient()
 
   const handleSignOut = async () => {
+    // Clear session tracking data
+    try {
+      Object.values(SESSION_CONFIG.STORAGE_KEYS).forEach((key) => {
+        localStorage.removeItem(key)
+      })
+      // Broadcast logout to other tabs
+      localStorage.setItem(
+        SESSION_CONFIG.STORAGE_KEYS.LOGOUT_EVENT,
+        JSON.stringify({ timestamp: Date.now(), reason: 'manual' })
+      )
+    } catch {
+      // Ignore localStorage errors
+    }
     await supabase.auth.signOut()
-    router.push('/login')
+    router.push('/login?message=logged_out')
     router.refresh()
   }
 
