@@ -16,6 +16,8 @@ import {
   Wallet,
   Brain,
   Calendar,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -89,6 +91,7 @@ export function AISuggestions() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [analysisStatus, setAnalysisStatus] = useState<string>('')
+  const [isExpanded, setIsExpanded] = useState(false)
 
   const fetchSuggestions = useCallback(async () => {
     try {
@@ -185,10 +188,14 @@ export function AISuggestions() {
   }, [fetchSuggestions])
 
   const pendingSuggestions = suggestions.filter((s) => s.status === 'pending')
+  const hasUrgent = pendingSuggestions.some((s) => s.details.priority === 'urgent' || s.details.priority === 'high')
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader
+        className="flex flex-row items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
         <div className="flex items-center gap-2">
           <div className="rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 p-2">
             <Sparkles className="h-5 w-5 text-white" />
@@ -196,6 +203,15 @@ export function AISuggestions() {
           <div>
             <CardTitle className="flex items-center gap-2">
               AI Suggestions
+              {pendingSuggestions.length > 0 && (
+                <span className={`inline-flex items-center justify-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                  hasUrgent
+                    ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                    : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                }`}>
+                  {pendingSuggestions.length}
+                </span>
+              )}
               {context && context.patternsLearned && context.patternsLearned > 0 && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
                   <Brain className="h-3 w-3" />
@@ -204,23 +220,36 @@ export function AISuggestions() {
               )}
             </CardTitle>
             <CardDescription>
-              {context && context.patternsLearned && context.patternsLearned > 0
-                ? `Using ${context.patternsLearned} learned patterns, ${context.upcomingBillsCount || 0} upcoming bills`
+              {!isExpanded && pendingSuggestions.length > 0
+                ? `${pendingSuggestions.length} suggestion${pendingSuggestions.length > 1 ? 's' : ''} available`
+                : context && context.patternsLearned && context.patternsLearned > 0
+                ? `Using ${context.patternsLearned} learned patterns`
                 : 'Smart recommendations based on your spending'}
             </CardDescription>
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={generateSuggestions}
-          disabled={refreshing}
-          className="min-w-[100px]"
-        >
-          <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-          {refreshing ? 'Analyzing...' : 'Analyze'}
-        </Button>
+        <div className="flex items-center gap-2">
+          {isExpanded && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation()
+                generateSuggestions()
+              }}
+              disabled={refreshing}
+              className="min-w-[100px]"
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Analyzing...' : 'Analyze'}
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded) }}>
+            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </Button>
+        </div>
       </CardHeader>
+      {isExpanded && (
       <CardContent>
         {/* Analysis Progress */}
         {refreshing && analysisStatus && (
@@ -335,6 +364,7 @@ export function AISuggestions() {
           </div>
         )}
       </CardContent>
+      )}
     </Card>
   )
 }
