@@ -6,15 +6,16 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   TrendingUp,
-  TrendingDown,
   AlertTriangle,
   Calendar,
   DollarSign,
-  ChevronRight,
   RefreshCw,
   ArrowDown,
   ArrowUp,
   Info,
+  Brain,
+  Sparkles,
+  Target,
 } from 'lucide-react'
 import {
   Tooltip,
@@ -57,6 +58,17 @@ interface UpcomingRecurring {
   isIncome: boolean
 }
 
+interface LearningData {
+  usedLearnedPatterns: boolean
+  patternsCount: number
+  incomeSourcesCount: number
+  accuracyAdjustment: number | null
+  recentAccuracy: {
+    meanError: number
+    directionAccuracy: number
+  } | null
+}
+
 interface ForecastData {
   forecast: {
     currentBalance: number
@@ -73,18 +85,20 @@ interface ForecastData {
   summary: string
   dailySpendingRate: number
   upcomingRecurring: UpcomingRecurring[]
+  learning?: LearningData
 }
 
 export function CashFlowForecast() {
   const [data, setData] = useState<ForecastData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isLearning, setIsLearning] = useState(false)
 
-  const fetchForecast = async () => {
+  const fetchForecast = async (store = false) => {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch('/api/cash-flow/forecast?days=30')
+      const response = await fetch(`/api/cash-flow/forecast?days=30${store ? '&store=true' : ''}`)
       if (!response.ok) {
         throw new Error('Failed to fetch forecast')
       }
@@ -99,13 +113,69 @@ export function CashFlowForecast() {
   }
 
   useEffect(() => {
-    fetchForecast()
+    fetchForecast(true) // Store predictions on initial load
   }, [])
 
   const handleRefresh = async () => {
     toast.info('Refreshing forecast...')
-    await fetchForecast()
+    await fetchForecast(true)
     toast.success('Forecast updated')
+  }
+
+  const handleLearn = async () => {
+    setIsLearning(true)
+    try {
+      // Step 1: Analyze patterns
+      toast.info('Analyzing spending patterns...', { id: 'learning' })
+      const analyzeRes = await fetch('/api/cash-flow/learn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'analyze_patterns' }),
+      })
+      const analyzeData = await analyzeRes.json()
+
+      if (!analyzeRes.ok) {
+        throw new Error(analyzeData.error || 'Pattern analysis failed')
+      }
+
+      // Step 2: Compare predictions to actuals
+      toast.info('Comparing predictions to actual spending...', { id: 'learning' })
+      await fetch('/api/cash-flow/learn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'compare_actuals' }),
+      })
+
+      // Step 3: AI analysis of errors (if there are any to analyze)
+      toast.info('AI analyzing prediction accuracy...', { id: 'learning' })
+      await fetch('/api/cash-flow/learn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'analyze_errors' }),
+      })
+
+      // Step 4: Calculate accuracy metrics
+      await fetch('/api/cash-flow/learn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'calculate_accuracy' }),
+      })
+
+      toast.success('Learning complete!', {
+        id: 'learning',
+        description: `Learned ${analyzeData.patternsLearned} patterns from your spending history.`,
+      })
+
+      // Refresh forecast with new patterns
+      await fetchForecast(true)
+    } catch (err) {
+      toast.error('Learning failed', {
+        id: 'learning',
+        description: err instanceof Error ? err.message : 'Please try again',
+      })
+    } finally {
+      setIsLearning(false)
+    }
   }
 
   if (loading) {
@@ -145,7 +215,7 @@ export function CashFlowForecast() {
     )
   }
 
-  const { forecast, summary, dailySpendingRate, upcomingRecurring } = data
+  const { forecast, summary, dailySpendingRate, upcomingRecurring, learning } = data
   const balanceChange = forecast.projectedEndBalance - forecast.currentBalance
   const isPositiveChange = balanceChange >= 0
 
@@ -197,9 +267,36 @@ export function CashFlowForecast() {
             30-day projection based on your spending patterns
           </CardDescription>
         </div>
-        <Button variant="ghost" size="icon" onClick={handleRefresh}>
-          <RefreshCw className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLearn}
+                  disabled={isLearning}
+                  className="gap-1.5"
+                >
+                  {isLearning ? (
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Brain className="h-3.5 w-3.5" />
+                  )}
+                  {isLearning ? 'Learning...' : 'Train AI'}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="max-w-xs text-xs">
+                  Analyze your spending patterns to improve prediction accuracy
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <Button variant="ghost" size="icon" onClick={handleRefresh}>
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        </div>
       </CardHeader>
 
       <CardContent className="space-y-6">
@@ -317,6 +414,66 @@ export function CashFlowForecast() {
           </div>
           <span className="font-medium">${dailySpendingRate.toFixed(2)}/day</span>
         </div>
+
+        {/* AI Learning Status */}
+        {learning && (learning.usedLearnedPatterns || learning.patternsCount > 0) && (
+          <div className="rounded-lg border border-indigo-200 bg-indigo-50/50 p-3 dark:border-indigo-800 dark:bg-indigo-950/30">
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+              <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
+                AI-Enhanced Prediction
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="flex items-center gap-1.5">
+                <Target className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-muted-foreground">Patterns learned:</span>
+                <span className="font-medium">{learning.patternsCount}</span>
+              </div>
+              {learning.incomeSourcesCount > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <ArrowUp className="h-3.5 w-3.5 text-emerald-500" />
+                  <span className="text-muted-foreground">Income sources:</span>
+                  <span className="font-medium">{learning.incomeSourcesCount}</span>
+                </div>
+              )}
+              {learning.recentAccuracy && (
+                <>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-muted-foreground">Avg error:</span>
+                    <span className={`font-medium ${
+                      learning.recentAccuracy.meanError < 10
+                        ? 'text-emerald-600'
+                        : learning.recentAccuracy.meanError < 25
+                        ? 'text-amber-600'
+                        : 'text-red-600'
+                    }`}>
+                      {learning.recentAccuracy.meanError.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-muted-foreground">Direction accuracy:</span>
+                    <span className={`font-medium ${
+                      learning.recentAccuracy.directionAccuracy >= 0.7
+                        ? 'text-emerald-600'
+                        : learning.recentAccuracy.directionAccuracy >= 0.5
+                        ? 'text-amber-600'
+                        : 'text-red-600'
+                    }`}>
+                      {(learning.recentAccuracy.directionAccuracy * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                </>
+              )}
+              {learning.accuracyAdjustment && (
+                <div className="col-span-2 flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400">
+                  <Brain className="h-3.5 w-3.5" />
+                  <span>Self-correcting by {((learning.accuracyAdjustment - 1) * 100).toFixed(0)}%</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Upcoming Transactions */}
         {upcomingRecurring.length > 0 && (

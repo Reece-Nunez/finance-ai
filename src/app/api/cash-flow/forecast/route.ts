@@ -5,8 +5,8 @@ import {
   calculateDailySpendingRate,
   getForecastSummary,
   RecurringItem,
-  CashFlowForecast,
 } from '@/lib/cash-flow'
+import { getPredictedDailySpending, SpendingPattern } from '@/lib/spending-patterns'
 
 interface Transaction {
   id: string
@@ -162,6 +162,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const days = parseInt(searchParams.get('days') || '30', 10)
   const lowBalanceThreshold = parseFloat(searchParams.get('threshold') || '100')
+  const storePredictions = searchParams.get('store') === 'true'
 
   // Get all accounts for total balance
   const { data: accounts, error: accountsError } = await supabase
@@ -194,6 +195,28 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: txError.message }, { status: 500 })
   }
 
+  // Get learned spending patterns if available
+  const { data: learnedPatterns } = await supabase
+    .from('spending_patterns')
+    .select('*')
+    .eq('user_id', user.id)
+
+  // Get learned income patterns
+  const { data: incomePatterns } = await supabase
+    .from('income_patterns')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+
+  // Get prediction accuracy to adjust confidence
+  const { data: accuracyData } = await supabase
+    .from('prediction_accuracy')
+    .select('mean_percentage_error, direction_accuracy')
+    .eq('user_id', user.id)
+    .order('period_start', { ascending: false })
+    .limit(1)
+    .single()
+
   // Analyze recurring patterns
   const recurringPatterns = analyzeRecurringPatterns(transactions || [])
 
@@ -209,9 +232,70 @@ export async function GET(request: Request) {
     category: r.category || undefined,
   }))
 
-  // Mark recurring transactions and calculate daily spending rate
+  // Add income patterns as recurring items
+  if (incomePatterns) {
+    for (const income of incomePatterns) {
+      if (income.next_expected && new Date(income.next_expected) >= new Date()) {
+        recurringItems.push({
+          id: `income-${income.id}`,
+          name: income.source_name,
+          amount: income.average_amount,
+          frequency: income.frequency as RecurringItem['frequency'],
+          nextDate: income.next_expected,
+          isIncome: true,
+          confidence: income.confidence_score >= 0.7 ? 'high' : income.confidence_score >= 0.4 ? 'medium' : 'low',
+          category: 'Income',
+        })
+      }
+    }
+  }
+
+  // Mark recurring transactions and calculate base daily spending rate
   const markedTransactions = markRecurringTransactions(transactions || [], recurringPatterns)
-  const dailySpendingRate = calculateDailySpendingRate(markedTransactions, 30)
+  let dailySpendingRate = calculateDailySpendingRate(markedTransactions, 30)
+
+  // Enhance with learned patterns if available
+  let usedLearnedPatterns = false
+  if (learnedPatterns && learnedPatterns.length > 0) {
+    usedLearnedPatterns = true
+    // Use pattern-based prediction for a sample day to get more accurate rate
+    const today = new Date()
+    const patterns = learnedPatterns.map(p => ({
+      patternType: p.pattern_type,
+      dimensionKey: p.dimension_key,
+      category: p.category,
+      averageAmount: p.average_amount,
+      medianAmount: p.median_amount,
+      stdDeviation: p.std_deviation,
+      minAmount: p.min_amount,
+      maxAmount: p.max_amount,
+      occurrenceCount: p.occurrence_count,
+      confidenceScore: p.confidence_score,
+      weight: p.weight,
+      dataPointsUsed: p.data_points_used,
+      monthsOfData: p.months_of_data,
+    })) as SpendingPattern[]
+
+    const patternPrediction = getPredictedDailySpending(patterns, today)
+
+    // Blend historical rate with pattern prediction based on pattern confidence
+    if (patternPrediction.confidence > 0.3) {
+      const blendWeight = Math.min(patternPrediction.confidence, 0.6)
+      dailySpendingRate = (dailySpendingRate * (1 - blendWeight)) + (patternPrediction.amount * blendWeight)
+    }
+  }
+
+  // Apply accuracy-based adjustment if we have historical accuracy data
+  let accuracyAdjustment = 1.0
+  if (accuracyData && accuracyData.mean_percentage_error) {
+    // If we've been under-predicting, increase the rate slightly
+    // If we've been over-predicting, decrease it
+    const errorPercent = accuracyData.mean_percentage_error / 100
+    if (errorPercent > 0.1) {
+      accuracyAdjustment = 1 + (errorPercent * 0.5) // Partial correction
+    }
+    dailySpendingRate *= accuracyAdjustment
+  }
 
   // Generate forecast
   const forecast = generateCashFlowForecast(
@@ -225,6 +309,45 @@ export async function GET(request: Request) {
   // Get summary message
   const summary = getForecastSummary(forecast)
 
+  // Store prediction snapshots if requested
+  if (storePredictions && forecast.dailyForecasts.length > 0) {
+    // Only store predictions for the next 7 days to avoid too much data
+    const predictionsToStore = forecast.dailyForecasts.slice(0, 7).map(day => ({
+      user_id: user.id,
+      prediction_date: day.date,
+      predicted_balance: day.projectedBalance,
+      predicted_income: day.transactions
+        .filter(t => t.type === 'recurring_income')
+        .reduce((sum, t) => sum + t.amount, 0),
+      predicted_expenses: day.transactions
+        .filter(t => t.type !== 'recurring_income')
+        .reduce((sum, t) => sum + Math.abs(t.amount), 0),
+      predicted_recurring: day.transactions
+        .filter(t => t.type === 'recurring_expense')
+        .reduce((sum, t) => sum + Math.abs(t.amount), 0),
+      predicted_discretionary: day.transactions
+        .filter(t => t.type === 'projected_spending')
+        .reduce((sum, t) => sum + Math.abs(t.amount), 0),
+      confidence_score: forecast.confidence === 'high' ? 0.8 : forecast.confidence === 'medium' ? 0.5 : 0.3,
+      prediction_factors: {
+        usedLearnedPatterns,
+        accuracyAdjustment,
+        dailySpendingRate,
+        recurringItemsCount: recurringItems.length,
+      },
+    }))
+
+    // Upsert predictions (update if already exists for this date)
+    for (const pred of predictionsToStore) {
+      await supabase
+        .from('cash_flow_predictions')
+        .upsert(pred, {
+          onConflict: 'user_id,prediction_date,created_at',
+          ignoreDuplicates: true,
+        })
+    }
+  }
+
   // Get upcoming recurring transactions (next 7 days) for quick view
   const upcomingRecurring = recurringItems
     .filter((r) => {
@@ -234,6 +357,12 @@ export async function GET(request: Request) {
       return nextDate <= sevenDaysFromNow && nextDate >= new Date()
     })
     .sort((a, b) => new Date(a.nextDate).getTime() - new Date(b.nextDate).getTime())
+
+  // Get recent accuracy for display
+  const recentAccuracy = accuracyData ? {
+    meanError: accuracyData.mean_percentage_error,
+    directionAccuracy: accuracyData.direction_accuracy,
+  } : null
 
   return NextResponse.json({
     forecast,
@@ -246,5 +375,12 @@ export async function GET(request: Request) {
       balance: a.current_balance,
       type: a.subtype,
     })),
+    learning: {
+      usedLearnedPatterns,
+      patternsCount: learnedPatterns?.length || 0,
+      incomeSourcesCount: incomePatterns?.length || 0,
+      accuracyAdjustment: accuracyAdjustment !== 1.0 ? accuracyAdjustment : null,
+      recentAccuracy,
+    },
   })
 }

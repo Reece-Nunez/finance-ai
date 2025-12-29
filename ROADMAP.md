@@ -13,7 +13,7 @@ A rolling feature list for the AI-powered finance app. Check off features as the
 - [x] **Budget Management** - Create and track budgets by category
 - [x] **Session Security** - 5-min idle timeout, auto-logout, cross-tab sync, secure cookies
 - [x] **Toast Notifications** - Sonner-powered stylized alerts
-- [x] **Predictive Cash Flow** - 30-day balance forecast with recurring transaction detection, visual chart, low balance alerts, and daily spending rate analysis
+- [x] **Predictive Cash Flow** - 30-day balance forecast with recurring transaction detection, visual chart, low balance alerts, daily spending rate analysis, **and self-learning AI that improves accuracy over time**
 
 ---
 
@@ -161,6 +161,18 @@ A rolling feature list for the AI-powered finance app. Check off features as the
 - **Algorithm:** Uses recurring transaction detection to identify income/expenses, projects balance daily for 30 days
 - **Features:** Area chart visualization, low/negative balance alerts, confidence scoring based on data quality
 - **Daily spending rate:** Calculated from non-recurring transactions over last 30 days with weekend adjustment (1.3x)
+
+### Cash Flow Learning System (Dec 28, 2024)
+- **Database migration:** `supabase/migrations/011_cash_flow_learning.sql`
+- **Core files:** `src/lib/spending-patterns.ts`, `src/app/api/cash-flow/learn/route.ts`
+- **Learning capabilities:**
+  - **Pattern analysis:** Day-of-week, week-of-month, monthly, category, and seasonal spending patterns
+  - **Income tracking:** Identifies income sources with timing and frequency patterns
+  - **Prediction snapshots:** Stores daily predictions to compare against actual balances
+  - **Accuracy metrics:** Calculates MAE, MPE, RMSE, and direction accuracy
+  - **AI root cause analysis:** Uses Claude to analyze WHY predictions were wrong
+  - **Self-correction:** Adjusts predictions based on historical accuracy
+- **UI features:** "Train AI" button, learning status display, accuracy metrics, pattern counts
 
 ---
 
