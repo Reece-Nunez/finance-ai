@@ -268,31 +268,34 @@ export function CashFlowForecast() {
           </CardDescription>
         </div>
         <div className="flex items-center gap-2">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleLearn}
-                  disabled={isLearning}
-                  className="gap-1.5"
-                >
-                  {isLearning ? (
-                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Brain className="h-3.5 w-3.5" />
-                  )}
-                  {isLearning ? 'Learning...' : 'Train AI'}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="max-w-xs text-xs">
-                  Analyze your spending patterns to improve prediction accuracy
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          {/* Show retrain button only if patterns exist (indicating prior learning) */}
+          {learning && learning.patternsCount > 0 && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleLearn}
+                    disabled={isLearning}
+                    className="gap-1.5 text-muted-foreground hover:text-foreground"
+                  >
+                    {isLearning ? (
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Brain className="h-3.5 w-3.5" />
+                    )}
+                    {isLearning ? 'Analyzing...' : 'Retrain'}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="max-w-xs text-xs">
+                    Force re-analysis of spending patterns (learning happens automatically every 24 hours)
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
           <Button variant="ghost" size="icon" onClick={handleRefresh}>
             <RefreshCw className="h-4 w-4" />
           </Button>
@@ -418,10 +421,15 @@ export function CashFlowForecast() {
         {/* AI Learning Status */}
         {learning && (learning.usedLearnedPatterns || learning.patternsCount > 0) && (
           <div className="rounded-lg border border-indigo-200 bg-indigo-50/50 p-3 dark:border-indigo-800 dark:bg-indigo-950/30">
-            <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-              <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
-                AI-Enhanced Prediction
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
+                  AI-Enhanced Prediction
+                </span>
+              </div>
+              <span className="text-[10px] text-indigo-500 dark:text-indigo-400">
+                Auto-learns daily
               </span>
             </div>
             <div className="grid grid-cols-2 gap-3 text-xs">

@@ -6,7 +6,7 @@ import {
   getForecastSummary,
   RecurringItem,
 } from '@/lib/cash-flow'
-import { getPredictedDailySpending, SpendingPattern } from '@/lib/spending-patterns'
+import { getPredictedDailySpending, SpendingPattern, analyzeSpendingPatterns } from '@/lib/spending-patterns'
 
 interface Transaction {
   id: string
@@ -196,17 +196,177 @@ export async function GET(request: Request) {
   }
 
   // Get learned spending patterns if available
-  const { data: learnedPatterns } = await supabase
+  let { data: learnedPatterns } = await supabase
     .from('spending_patterns')
     .select('*')
     .eq('user_id', user.id)
 
   // Get learned income patterns
-  const { data: incomePatterns } = await supabase
+  let { data: incomePatterns } = await supabase
     .from('income_patterns')
     .select('*')
     .eq('user_id', user.id)
     .eq('is_active', true)
+
+  // =========================================================================
+  // AUTOMATIC LEARNING: Check if patterns need updating
+  // =========================================================================
+  const shouldAnalyzePatterns = (() => {
+    // No patterns exist yet
+    if (!learnedPatterns || learnedPatterns.length === 0) return true
+
+    // Check if patterns are older than 24 hours
+    const lastCalculated = learnedPatterns[0]?.last_calculated_at
+    if (!lastCalculated) return true
+
+    const hoursSinceUpdate = (Date.now() - new Date(lastCalculated).getTime()) / (1000 * 60 * 60)
+    return hoursSinceUpdate > 24
+  })()
+
+  if (shouldAnalyzePatterns && transactions && transactions.length >= 10) {
+    // Run pattern analysis automatically
+    const analysis = analyzeSpendingPatterns(transactions as Array<{
+      id: string
+      amount: number
+      date: string
+      category: string | null
+      merchant_name: string | null
+      name: string
+      is_income: boolean
+    }>)
+
+    // Store spending patterns
+    for (const pattern of analysis.spendingPatterns) {
+      await supabase
+        .from('spending_patterns')
+        .upsert({
+          user_id: user.id,
+          pattern_type: pattern.patternType,
+          dimension_key: pattern.dimensionKey,
+          category: pattern.category,
+          average_amount: pattern.averageAmount,
+          median_amount: pattern.medianAmount,
+          std_deviation: pattern.stdDeviation,
+          min_amount: pattern.minAmount,
+          max_amount: pattern.maxAmount,
+          occurrence_count: pattern.occurrenceCount,
+          confidence_score: pattern.confidenceScore,
+          weight: pattern.weight,
+          data_points_used: pattern.dataPointsUsed,
+          months_of_data: pattern.monthsOfData,
+          last_calculated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id,pattern_type,dimension_key,category',
+        })
+    }
+
+    // Store income patterns
+    for (const income of analysis.incomePatterns) {
+      await supabase
+        .from('income_patterns')
+        .upsert({
+          user_id: user.id,
+          source_name: income.sourceName,
+          source_type: income.sourceType,
+          typical_day_of_month: income.typicalDayOfMonth,
+          typical_day_of_week: income.typicalDayOfWeek,
+          frequency: income.frequency,
+          average_amount: income.averageAmount,
+          min_amount: income.minAmount,
+          max_amount: income.maxAmount,
+          variability: income.variability,
+          confidence_score: income.confidenceScore,
+          occurrences_analyzed: income.occurrencesAnalyzed,
+          last_occurrence: income.lastOccurrence,
+          next_expected: income.nextExpected,
+          is_active: true,
+        }, {
+          onConflict: 'user_id,source_name',
+        })
+    }
+
+    // Refresh the patterns after storing
+    const { data: refreshedPatterns } = await supabase
+      .from('spending_patterns')
+      .select('*')
+      .eq('user_id', user.id)
+    learnedPatterns = refreshedPatterns
+
+    const { data: refreshedIncome } = await supabase
+      .from('income_patterns')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+    incomePatterns = refreshedIncome
+  }
+
+  // =========================================================================
+  // AUTOMATIC LEARNING: Compare past predictions to actuals
+  // =========================================================================
+  const today = new Date().toISOString().split('T')[0]
+
+  // Check for predictions that need comparison (only once per session)
+  const { data: uncomaredPredictions } = await supabase
+    .from('cash_flow_predictions')
+    .select('id, prediction_date, predicted_balance')
+    .eq('user_id', user.id)
+    .lt('prediction_date', today)
+    .is('actual_balance', null)
+    .limit(7)
+
+  if (uncomaredPredictions && uncomaredPredictions.length > 0) {
+    // Calculate daily actuals from transactions
+    const predDates = uncomaredPredictions.map(p => p.prediction_date)
+    const { data: predTransactions } = await supabase
+      .from('transactions')
+      .select('date, amount, is_income')
+      .eq('user_id', user.id)
+      .in('date', predDates)
+
+    const dailyActuals: Map<string, { income: number; expenses: number }> = new Map()
+    for (const tx of predTransactions || []) {
+      if (!dailyActuals.has(tx.date)) {
+        dailyActuals.set(tx.date, { income: 0, expenses: 0 })
+      }
+      const daily = dailyActuals.get(tx.date)!
+      if (tx.is_income || tx.amount < 0) {
+        daily.income += Math.abs(tx.amount)
+      } else {
+        daily.expenses += tx.amount
+      }
+    }
+
+    // Estimate actuals and update predictions
+    let runningBalance = currentBalance
+    const sortedPreds = [...uncomaredPredictions].sort(
+      (a, b) => new Date(b.prediction_date).getTime() - new Date(a.prediction_date).getTime()
+    )
+
+    for (const pred of sortedPreds) {
+      const daily = dailyActuals.get(pred.prediction_date)
+      const actualIncome = daily?.income || 0
+      const actualExpenses = daily?.expenses || 0
+      const actualBalance = runningBalance
+      runningBalance = runningBalance + actualExpenses - actualIncome
+
+      const variance = actualBalance - pred.predicted_balance
+      const variancePercent = pred.predicted_balance !== 0
+        ? (variance / Math.abs(pred.predicted_balance)) * 100
+        : 0
+
+      await supabase
+        .from('cash_flow_predictions')
+        .update({
+          actual_balance: actualBalance,
+          actual_income: actualIncome,
+          actual_expenses: actualExpenses,
+          actual_recorded_at: new Date().toISOString(),
+          variance_amount: variance,
+          variance_percentage: variancePercent,
+        })
+        .eq('id', pred.id)
+    }
+  }
 
   // Get prediction accuracy to adjust confidence
   const { data: accuracyData } = await supabase
