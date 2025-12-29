@@ -16,6 +16,11 @@ import {
   Brain,
   Sparkles,
   Target,
+  ChevronDown,
+  ChevronUp,
+  Receipt,
+  Wallet,
+  PiggyBank,
 } from 'lucide-react'
 import {
   Tooltip,
@@ -69,6 +74,28 @@ interface LearningData {
   } | null
 }
 
+interface BreakdownItem {
+  name: string
+  amount: number
+}
+
+interface ForecastBreakdown {
+  income: {
+    total: number
+    items: BreakdownItem[]
+  }
+  recurringExpenses: {
+    total: number
+    items: BreakdownItem[]
+  }
+  discretionarySpending: {
+    total: number
+    dailyAverage: number
+    description: string
+  }
+  netChange: number
+}
+
 interface ForecastData {
   forecast: {
     currentBalance: number
@@ -85,6 +112,7 @@ interface ForecastData {
   summary: string
   dailySpendingRate: number
   upcomingRecurring: UpcomingRecurring[]
+  breakdown?: ForecastBreakdown
   learning?: LearningData
 }
 
@@ -93,6 +121,7 @@ export function CashFlowForecast() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isLearning, setIsLearning] = useState(false)
+  const [showBreakdown, setShowBreakdown] = useState(false)
 
   const fetchForecast = async (store = false) => {
     setLoading(true)
@@ -339,8 +368,16 @@ export function CashFlowForecast() {
               ${forecast.projectedEndBalance.toLocaleString()}
             </p>
           </div>
-          <div className="rounded-lg bg-muted/50 p-3">
-            <p className="text-xs text-muted-foreground">Change</p>
+          <div
+            className="rounded-lg bg-muted/50 p-3 cursor-pointer hover:bg-muted/70 transition-colors"
+            onClick={() => setShowBreakdown(!showBreakdown)}
+          >
+            <p className="text-xs text-muted-foreground flex items-center justify-between">
+              Change
+              <span className="text-blue-600 dark:text-blue-400 text-[10px] font-medium">
+                {showBreakdown ? 'Hide' : 'Why?'}
+              </span>
+            </p>
             <p className={`text-lg font-semibold flex items-center gap-1 ${isPositiveChange ? 'text-emerald-600' : 'text-red-600'}`}>
               {isPositiveChange ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
               ${Math.abs(balanceChange).toLocaleString()}
@@ -353,6 +390,105 @@ export function CashFlowForecast() {
             </p>
           </div>
         </div>
+
+        {/* Breakdown Section */}
+        {showBreakdown && data.breakdown && (
+          <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-medium flex items-center gap-2">
+                <Receipt className="h-4 w-4" />
+                30-Day Projection Breakdown
+              </h4>
+              <Button variant="ghost" size="sm" onClick={() => setShowBreakdown(false)}>
+                <ChevronUp className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Income */}
+            {data.breakdown.income.total > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                    <ArrowUp className="h-4 w-4" />
+                    Expected Income
+                  </span>
+                  <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                    +${data.breakdown.income.total.toLocaleString()}
+                  </span>
+                </div>
+                <div className="pl-6 space-y-1">
+                  {data.breakdown.income.items.map((item, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{item.name}</span>
+                      <span>+${item.amount.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Recurring Expenses */}
+            {data.breakdown.recurringExpenses.total > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                    <Wallet className="h-4 w-4" />
+                    Recurring Bills & Subscriptions
+                  </span>
+                  <span className="font-medium text-red-600 dark:text-red-400">
+                    -${data.breakdown.recurringExpenses.total.toLocaleString()}
+                  </span>
+                </div>
+                <div className="pl-6 space-y-1 max-h-32 overflow-y-auto">
+                  {data.breakdown.recurringExpenses.items.slice(0, 10).map((item, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span className="truncate mr-2">{item.name}</span>
+                      <span className="shrink-0">-${item.amount.toLocaleString()}</span>
+                    </div>
+                  ))}
+                  {data.breakdown.recurringExpenses.items.length > 10 && (
+                    <div className="text-xs text-muted-foreground italic">
+                      +{data.breakdown.recurringExpenses.items.length - 10} more...
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Discretionary Spending */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                  <PiggyBank className="h-4 w-4" />
+                  Projected Daily Spending
+                </span>
+                <span className="font-medium text-amber-600 dark:text-amber-400">
+                  -${data.breakdown.discretionarySpending.total.toLocaleString()}
+                </span>
+              </div>
+              <p className="pl-6 text-xs text-muted-foreground">
+                {data.breakdown.discretionarySpending.description}
+                <br />
+                <span className="text-[10px]">(30 days × ${data.breakdown.discretionarySpending.dailyAverage.toFixed(2)}/day)</span>
+              </p>
+            </div>
+
+            {/* Net Change Summary */}
+            <div className="border-t pt-3 mt-3">
+              <div className="flex items-center justify-between text-sm font-medium">
+                <span>Net Change</span>
+                <span className={data.breakdown.netChange >= 0 ? 'text-emerald-600' : 'text-red-600'}>
+                  {data.breakdown.netChange >= 0 ? '+' : ''}{data.breakdown.netChange.toLocaleString()}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                = ${data.breakdown.income.total.toLocaleString()} income
+                − ${data.breakdown.recurringExpenses.total.toLocaleString()} bills
+                − ${data.breakdown.discretionarySpending.total.toLocaleString()} daily spending
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Chart */}
         <div className="h-[180px] w-full">

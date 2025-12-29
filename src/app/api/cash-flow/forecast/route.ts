@@ -524,11 +524,57 @@ export async function GET(request: Request) {
     directionAccuracy: accuracyData.direction_accuracy,
   } : null
 
+  // =========================================================================
+  // BUILD DETAILED BREAKDOWN
+  // =========================================================================
+  const incomeBySource: Record<string, number> = {}
+  const expensesByName: Record<string, number> = {}
+  let totalDiscretionary = 0
+
+  for (const day of forecast.dailyForecasts) {
+    for (const tx of day.transactions) {
+      if (tx.type === 'recurring_income') {
+        incomeBySource[tx.name] = (incomeBySource[tx.name] || 0) + tx.amount
+      } else if (tx.type === 'recurring_expense') {
+        expensesByName[tx.name] = (expensesByName[tx.name] || 0) + Math.abs(tx.amount)
+      } else if (tx.type === 'projected_spending') {
+        totalDiscretionary += Math.abs(tx.amount)
+      }
+    }
+  }
+
+  // Sort by amount (highest first)
+  const incomeBreakdown = Object.entries(incomeBySource)
+    .map(([name, amount]) => ({ name, amount: Math.round(amount * 100) / 100 }))
+    .sort((a, b) => b.amount - a.amount)
+
+  const expenseBreakdown = Object.entries(expensesByName)
+    .map(([name, amount]) => ({ name, amount: Math.round(amount * 100) / 100 }))
+    .sort((a, b) => b.amount - a.amount)
+
+  const breakdown = {
+    income: {
+      total: forecast.totalIncome,
+      items: incomeBreakdown,
+    },
+    recurringExpenses: {
+      total: Math.round((forecast.totalExpenses - totalDiscretionary) * 100) / 100,
+      items: expenseBreakdown,
+    },
+    discretionarySpending: {
+      total: Math.round(totalDiscretionary * 100) / 100,
+      dailyAverage: dailySpendingRate,
+      description: `Based on your average daily spending of $${dailySpendingRate.toFixed(2)}`,
+    },
+    netChange: forecast.netCashFlow,
+  }
+
   return NextResponse.json({
     forecast,
     summary,
     dailySpendingRate: Math.round(dailySpendingRate * 100) / 100,
     upcomingRecurring,
+    breakdown,
     accounts: (accounts || []).filter((a) => a.type === 'depository').map((a) => ({
       id: a.id,
       name: a.name,
