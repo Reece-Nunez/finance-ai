@@ -12,7 +12,11 @@ import {
   Sparkles,
   X,
   ArrowRightLeft,
-  ExternalLink,
+  PiggyBank,
+  Receipt,
+  Wallet,
+  Brain,
+  Calendar,
 } from 'lucide-react'
 
 interface Suggestion {
@@ -58,13 +62,30 @@ function getTypeIcon(type: string) {
       return <ArrowRightLeft className="h-5 w-5" />
     case 'alert':
       return <AlertTriangle className="h-5 w-5" />
-    default:
+    case 'budget_warning':
+      return <Wallet className="h-5 w-5" />
+    case 'bill_reminder':
+      return <Calendar className="h-5 w-5" />
+    case 'savings_opportunity':
+      return <PiggyBank className="h-5 w-5" />
+    case 'tip':
       return <Lightbulb className="h-5 w-5" />
+    default:
+      return <Brain className="h-5 w-5" />
   }
+}
+
+interface SuggestionContext {
+  avgDailySpending?: number
+  lowBalanceThreshold?: number
+  upcomingBillsCount?: number
+  budgetsTracked?: number
+  patternsLearned?: number
 }
 
 export function AISuggestions() {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
+  const [context, setContext] = useState<SuggestionContext | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
@@ -86,6 +107,9 @@ export function AISuggestions() {
       const response = await fetch('/api/ai/suggestions', { method: 'POST' })
       const data = await response.json()
       setSuggestions(data.suggestions || [])
+      if (data.context) {
+        setContext(data.context)
+      }
     } catch (error) {
       console.error('Error generating suggestions:', error)
     } finally {
@@ -127,8 +151,20 @@ export function AISuggestions() {
             <Sparkles className="h-5 w-5 text-white" />
           </div>
           <div>
-            <CardTitle>AI Suggestions</CardTitle>
-            <CardDescription>Smart recommendations to protect your accounts</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              AI Suggestions
+              {context && context.patternsLearned && context.patternsLearned > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                  <Brain className="h-3 w-3" />
+                  Personalized
+                </span>
+              )}
+            </CardTitle>
+            <CardDescription>
+              {context && context.patternsLearned && context.patternsLearned > 0
+                ? `Using ${context.patternsLearned} learned patterns, ${context.upcomingBillsCount || 0} upcoming bills`
+                : 'Smart recommendations based on your spending'}
+            </CardDescription>
           </div>
         </div>
         <Button
