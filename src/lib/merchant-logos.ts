@@ -481,13 +481,14 @@ export function getMerchantDomain(merchantName: string | null): string | null {
   return null
 }
 
-// Get logo URL using Clearbit
+// Get logo URL - uses Google's favicon service which is reliable and free
 export function getMerchantLogoUrl(merchantName: string | null, size: number = 80): string | null {
   const domain = getMerchantDomain(merchantName)
   if (!domain) return null
 
-  // Use Clearbit Logo API
-  return `https://logo.clearbit.com/${domain}?size=${size}`
+  // Google Favicon API - reliable, no auth needed, supports sizes up to 256
+  // The sz parameter gets the best available icon up to that size
+  return `https://www.google.com/s2/favicons?domain=${domain}&sz=${Math.min(size, 256)}`
 }
 
 // Alternative: Google Favicon (works for more sites but lower quality)

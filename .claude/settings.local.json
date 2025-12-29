@@ -10,7 +10,8 @@
       "Bash(git remote add:*)",
       "Bash(git push:*)",
       "Bash(git commit:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "WebFetch(domain:logo.clearbit.com)"
     ]
   }
 }

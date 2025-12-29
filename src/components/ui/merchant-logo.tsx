@@ -1,7 +1,6 @@
 'use client'
 
-import { useState } from 'react'
-import Image from 'next/image'
+import { useState, useEffect } from 'react'
 import {
   ShoppingBag,
   Coffee,
@@ -187,12 +186,25 @@ export function MerchantLogo({
   const CategoryIcon = getCategoryIcon(category || null)
   const categoryColor = getCategoryColor(category || null)
 
+  // Debug logging in development
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development' && merchantName) {
+      console.log(`[MerchantLogo] "${merchantName}" -> ${logoUrl || 'no domain found'}`)
+    }
+  }, [merchantName, logoUrl])
+
+  // Reset state when merchantName changes
+  useEffect(() => {
+    setImageError(false)
+    setImageLoaded(false)
+  }, [merchantName])
+
   // If no logo URL or image failed to load, show category icon
   if (!logoUrl || imageError) {
     return (
       <div
         className={cn(
-          'flex items-center justify-center rounded-full',
+          'flex items-center justify-center rounded-full shrink-0',
           sizeClasses[size],
           categoryColor,
           className
@@ -206,7 +218,7 @@ export function MerchantLogo({
   return (
     <div
       className={cn(
-        'relative flex items-center justify-center rounded-full overflow-hidden bg-white dark:bg-gray-800',
+        'relative flex items-center justify-center rounded-full overflow-hidden bg-white dark:bg-gray-800 shrink-0',
         sizeClasses[size],
         className
       )}
@@ -223,7 +235,8 @@ export function MerchantLogo({
         </div>
       )}
 
-      <Image
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
         src={logoUrl}
         alt={merchantName || 'Merchant'}
         width={imageSizes[size]}
@@ -234,7 +247,6 @@ export function MerchantLogo({
         )}
         onLoad={() => setImageLoaded(true)}
         onError={() => setImageError(true)}
-        unoptimized // External images from Clearbit
       />
     </div>
   )
