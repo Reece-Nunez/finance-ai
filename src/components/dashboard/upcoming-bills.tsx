@@ -3,13 +3,14 @@
 import { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight, Calendar, DollarSign, CreditCard } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Calendar, DollarSign } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { MerchantLogo } from '@/components/ui/merchant-logo'
 
 interface Transaction {
   id: string
@@ -295,9 +296,12 @@ export function UpcomingBills({ transactions }: UpcomingBillsProps) {
                         {bills.slice(0, 4).map((bill, idx) => (
                           <Tooltip key={idx}>
                             <TooltipTrigger>
-                              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
-                                <CreditCard className="h-3 w-3 text-red-600 dark:text-red-400" />
-                              </div>
+                              <MerchantLogo
+                                merchantName={bill.name}
+                                category={bill.category}
+                                size="sm"
+                                className="h-5 w-5"
+                              />
                             </TooltipTrigger>
                             <TooltipContent>
                               <p className="font-medium">{bill.name}</p>
@@ -324,8 +328,8 @@ export function UpcomingBills({ transactions }: UpcomingBillsProps) {
           {/* Legend */}
           <div className="mt-4 flex items-center gap-4 text-xs text-muted-foreground">
             <div className="flex items-center gap-1.5">
-              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
-                <CreditCard className="h-3 w-3 text-red-600 dark:text-red-400" />
+              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
+                <span className="text-[8px]">$</span>
               </div>
               <span>Bill due</span>
             </div>
@@ -350,9 +354,11 @@ export function UpcomingBills({ transactions }: UpcomingBillsProps) {
                     className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2.5 text-sm"
                   >
                     <div className="flex items-center gap-2">
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
-                        <CreditCard className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
-                      </div>
+                      <MerchantLogo
+                        merchantName={bill.name}
+                        category={bill.category}
+                        size="sm"
+                      />
                       <span className="truncate">{bill.name}</span>
                     </div>
                     <div className="flex items-center gap-3">

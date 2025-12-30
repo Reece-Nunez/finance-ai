@@ -179,41 +179,26 @@ export function MerchantLogo({
   size = 'md',
   className,
 }: MerchantLogoProps) {
-  const [currentSource, setCurrentSource] = useState<'clearbit' | 'google' | 'none'>('clearbit')
+  const [imageError, setImageError] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
 
   const domain = getMerchantDomain(merchantName)
   const CategoryIcon = getCategoryIcon(category || null)
   const categoryColor = getCategoryColor(category || null)
 
-  // Get logo URL based on current source
-  const logoUrl = domain ? (
-    currentSource === 'clearbit'
-      ? `https://logo.clearbit.com/${domain}?size=${imageSizes[size] * 2}`
-      : currentSource === 'google'
-        ? `https://www.google.com/s2/favicons?domain=${domain}&sz=${Math.min(imageSizes[size] * 2, 256)}`
-        : null
-  ) : null
+  // Always request 128px from Google for crisp icons at any display size
+  const logoUrl = domain
+    ? `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
+    : null
 
   // Reset state when merchantName changes
   useEffect(() => {
-    setCurrentSource('clearbit')
+    setImageError(false)
     setImageLoaded(false)
   }, [merchantName])
 
-  const handleImageError = () => {
-    if (currentSource === 'clearbit') {
-      // Try Google as fallback
-      setCurrentSource('google')
-      setImageLoaded(false)
-    } else {
-      // Both failed, show category icon
-      setCurrentSource('none')
-    }
-  }
-
-  // If no domain or all sources failed, show category icon
-  if (!domain || currentSource === 'none') {
+  // If no domain or image failed, show category icon
+  if (!domain || imageError) {
     return (
       <div
         className={cn(
@@ -259,7 +244,7 @@ export function MerchantLogo({
           imageLoaded ? 'opacity-100' : 'opacity-0'
         )}
         onLoad={() => setImageLoaded(true)}
-        onError={handleImageError}
+        onError={() => setImageError(true)}
       />
     </div>
   )

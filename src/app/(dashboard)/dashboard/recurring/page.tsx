@@ -569,13 +569,19 @@ function CalendarTab({
                       {day.items.slice(0, 2).map((item) => (
                         <div
                           key={item.id}
-                          className={`truncate rounded px-1.5 py-0.5 text-xs ${
+                          className={`flex items-center gap-1 truncate rounded px-1 py-0.5 text-xs ${
                             item.isIncome
                               ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300'
                               : 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300'
                           }`}
                         >
-                          {item.displayName}
+                          <MerchantLogo
+                            merchantName={item.displayName || item.name}
+                            category={item.category}
+                            size="sm"
+                            className="h-4 w-4 shrink-0"
+                          />
+                          <span className="truncate">{item.displayName}</span>
                         </div>
                       ))}
                       {day.items.length > 2 && (

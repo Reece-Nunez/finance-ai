@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { formatCategory } from '@/lib/format'
 
 export async function GET() {
   try {
@@ -138,7 +139,7 @@ export async function GET() {
 
     if (categoriesOverBudget.length > 0) {
       suggestions.push({
-        text: `Why am I over budget on ${categoriesOverBudget[0]}?`,
+        text: `Why am I over budget on ${formatCategory(categoriesOverBudget[0])}?`,
         priority: 'high',
         type: 'budget_alert'
       })
@@ -162,7 +163,7 @@ export async function GET() {
 
     if (topCategory.amount > currentSpending * 0.4) {
       suggestions.push({
-        text: `How can I reduce my ${topCategory.name} spending?`,
+        text: `How can I reduce my ${formatCategory(topCategory.name)} spending?`,
         priority: 'medium',
         type: 'top_category'
       })
@@ -229,7 +230,7 @@ export async function GET() {
 
     insights.push({
       title: 'Top Category',
-      value: topCategory.name.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' '),
+      value: formatCategory(topCategory.name),
       trend: 'neutral',
       subtitle: `$${topCategory.amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} spent`
     })

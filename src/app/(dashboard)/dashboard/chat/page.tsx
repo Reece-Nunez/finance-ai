@@ -28,8 +28,11 @@ import {
   ChevronRight,
   Wallet,
   BarChart3,
+  HelpCircle,
+  X,
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
+import { formatCategory } from '@/lib/format'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -71,6 +74,7 @@ interface InsightsData {
     totalBalance: number
     budgetRemaining: number
     budgetPercentUsed: number
+    spendingChange: number
     topCategory: { name: string; amount: number }
     categoriesOverBudget: string[]
   }
@@ -123,8 +127,18 @@ function QuickActionCard({
   )
 }
 
-// Health Score Ring
-function HealthScoreRing({ score, status }: { score: number; status: string }) {
+// Health Score Ring with explanation
+function HealthScoreRing({ score, status, stats }: {
+  score: number
+  status: string
+  stats?: {
+    budgetPercentUsed: number
+    netCashFlow: number
+    spendingChange: number
+    categoriesOverBudget: string[]
+  }
+}) {
+  const [showInfo, setShowInfo] = useState(false)
   const radius = 40
   const circumference = 2 * Math.PI * radius
   const strokeDashoffset = circumference - (score / 100) * circumference
@@ -146,36 +160,147 @@ function HealthScoreRing({ score, status }: { score: number; status: string }) {
     }
   }
 
+  // Calculate improvement tips based on what's hurting the score
+  const getImprovementTips = () => {
+    const tips: { issue: string; impact: string; tip: string }[] = []
+    if (!stats) return tips
+
+    if (stats.budgetPercentUsed > 100) {
+      tips.push({
+        issue: 'Over budget',
+        impact: '-30 points',
+        tip: 'Try to reduce spending to stay within your budgets'
+      })
+    } else if (stats.budgetPercentUsed > 80) {
+      tips.push({
+        issue: 'Near budget limit',
+        impact: '-15 points',
+        tip: 'You\'re approaching your budget limits'
+      })
+    }
+
+    if (stats.netCashFlow < 0) {
+      tips.push({
+        issue: 'Negative cash flow',
+        impact: '-25 points',
+        tip: 'Your spending exceeds income this month'
+      })
+    }
+
+    if (stats.spendingChange > 30) {
+      tips.push({
+        issue: 'Spending spike',
+        impact: '-15 points',
+        tip: 'Spending is 30%+ higher than last month'
+      })
+    }
+
+    if (stats.categoriesOverBudget.length > 0) {
+      tips.push({
+        issue: `${stats.categoriesOverBudget.length} over-budget ${stats.categoriesOverBudget.length === 1 ? 'category' : 'categories'}`,
+        impact: `-${10 * Math.min(stats.categoriesOverBudget.length, 3)} points`,
+        tip: `Review: ${stats.categoriesOverBudget.slice(0, 3).map(c => formatCategory(c)).join(', ')}`
+      })
+    }
+
+    return tips
+  }
+
+  const tips = getImprovementTips()
+
   return (
-    <div className="relative flex items-center justify-center">
-      <svg width="100" height="100" viewBox="0 0 100 100">
-        <circle
-          cx="50"
-          cy="50"
-          r={radius}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="8"
-          className="text-muted/20"
-        />
-        <circle
-          cx="50"
-          cy="50"
-          r={radius}
-          fill="none"
-          stroke={getColor()}
-          strokeWidth="8"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          transform="rotate(-90 50 50)"
-          className="transition-all duration-500"
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold">{score}</span>
-        <span className="text-xs text-muted-foreground">{getStatusText()}</span>
-      </div>
+    <div className="relative">
+      <button
+        onClick={() => setShowInfo(!showInfo)}
+        className="relative flex items-center justify-center group"
+      >
+        <svg width="100" height="100" viewBox="0 0 100 100">
+          <circle
+            cx="50"
+            cy="50"
+            r={radius}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="8"
+            className="text-muted/20"
+          />
+          <circle
+            cx="50"
+            cy="50"
+            r={radius}
+            fill="none"
+            stroke={getColor()}
+            strokeWidth="8"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            transform="rotate(-90 50 50)"
+            className="transition-all duration-500"
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-2xl font-bold">{score}</span>
+          <span className="text-xs text-muted-foreground">{getStatusText()}</span>
+        </div>
+        <HelpCircle className="absolute -top-1 -right-1 h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+      </button>
+
+      {/* Info Panel */}
+      {showInfo && (
+        <div className="absolute top-full right-0 mt-2 z-50 w-80 bg-card border rounded-lg shadow-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-semibold">Financial Health Score</h4>
+            <button onClick={() => setShowInfo(false)} className="text-muted-foreground hover:text-foreground">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <p className="text-sm text-muted-foreground mb-3">
+            Your score reflects your current financial habits. It starts at 100 and adjusts based on:
+          </p>
+
+          <div className="space-y-2 text-sm mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-500" />
+              <span>85-100: Excellent</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-blue-500" />
+              <span>70-84: Good</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-amber-500" />
+              <span>50-69: Fair</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-red-500" />
+              <span>0-49: Needs Attention</span>
+            </div>
+          </div>
+
+          {tips.length > 0 ? (
+            <>
+              <h5 className="font-medium text-sm mb-2">How to improve:</h5>
+              <div className="space-y-2">
+                {tips.map((tip, idx) => (
+                  <div key={idx} className="text-sm bg-muted/50 rounded p-2">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="font-medium">{tip.issue}</span>
+                      <Badge variant="outline" className="text-xs">{tip.impact}</Badge>
+                    </div>
+                    <p className="text-muted-foreground text-xs">{tip.tip}</p>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 dark:bg-green-950/30 rounded p-2">
+              <CheckCircle className="h-4 w-4" />
+              <span>Great job! Keep up the good financial habits.</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -349,7 +474,11 @@ export default function ChatPage() {
           </p>
         </div>
         {insights && (
-          <HealthScoreRing score={insights.healthScore} status={insights.healthStatus} />
+          <HealthScoreRing
+            score={insights.healthScore}
+            status={insights.healthStatus}
+            stats={insights.stats}
+          />
         )}
       </div>
 
@@ -439,13 +568,13 @@ export default function ChatPage() {
                   <p className="font-medium">Budget Alert</p>
                   <p className="text-sm text-muted-foreground">
                     You're over budget in {insights.stats.categoriesOverBudget.length} {insights.stats.categoriesOverBudget.length === 1 ? 'category' : 'categories'}:{' '}
-                    {insights.stats.categoriesOverBudget.slice(0, 3).join(', ')}
+                    {insights.stats.categoriesOverBudget.slice(0, 3).map(c => formatCategory(c)).join(', ')}
                   </p>
                   <Button
                     size="sm"
                     variant="outline"
                     className="mt-2"
-                    onClick={() => sendMessage(`Help me understand why I'm over budget on ${insights.stats.categoriesOverBudget[0]} and how to get back on track`)}
+                    onClick={() => sendMessage(`Help me understand why I'm over budget on ${formatCategory(insights.stats.categoriesOverBudget[0])} and how to get back on track`)}
                   >
                     Get Help
                   </Button>
