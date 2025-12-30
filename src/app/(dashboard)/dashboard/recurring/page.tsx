@@ -73,14 +73,20 @@ function formatCurrency(amount: number) {
 }
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-US', {
+  // Parse date parts to avoid timezone issues
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  return date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
   })
 }
 
 function formatFullDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-US', {
+  // Parse date parts to avoid timezone issues
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  return date.toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
@@ -102,7 +108,9 @@ function getFrequencyLabel(frequency: string): string {
 function getDaysUntil(dateStr: string): number {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const target = new Date(dateStr)
+  // Parse date parts to avoid timezone issues
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const target = new Date(year, month - 1, day)
   target.setHours(0, 0, 0, 0)
   return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 }
@@ -113,14 +121,40 @@ function RecurringItem({
   onViewDetails,
   onViewHistory,
   onRemove,
+  showAsCharged = false,
 }: {
   item: RecurringTransaction
   onViewDetails: () => void
   onViewHistory: () => void
   onRemove: () => void
+  showAsCharged?: boolean
 }) {
   const daysUntil = getDaysUntil(item.nextDate)
   const isOverdue = daysUntil < 0
+  const daysSinceCharged = Math.abs(daysUntil)
+
+  // Format the timing text based on context
+  const getTimingText = () => {
+    if (showAsCharged || isOverdue) {
+      // Show as already charged
+      if (daysSinceCharged === 0) {
+        return <span className="text-emerald-600">Charged today</span>
+      } else if (daysSinceCharged === 1) {
+        return <span className="text-muted-foreground">Charged yesterday</span>
+      } else {
+        return <span className="text-muted-foreground">Charged {daysSinceCharged} days ago</span>
+      }
+    } else {
+      // Show as upcoming
+      if (daysUntil === 0) {
+        return <span className="text-amber-600">Due today</span>
+      } else if (daysUntil === 1) {
+        return <span className="text-muted-foreground">Tomorrow</span>
+      } else {
+        return <span className="text-muted-foreground">in {daysUntil} days</span>
+      }
+    }
+  }
 
   return (
     <div className="flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/50">
@@ -136,17 +170,7 @@ function RecurringItem({
             <Badge variant="outline" className="text-xs">
               {getFrequencyLabel(item.frequency)}
             </Badge>
-            <span>
-              {isOverdue ? (
-                <span className="text-amber-600">Expected {Math.abs(daysUntil)} days ago</span>
-              ) : daysUntil === 0 ? (
-                <span className="text-emerald-600">Due today</span>
-              ) : daysUntil === 1 ? (
-                'Tomorrow'
-              ) : (
-                `in ${daysUntil} days`
-              )}
-            </span>
+            {getTimingText()}
           </div>
         </div>
       </div>
@@ -203,10 +227,18 @@ function UpcomingTab({
   onViewHistory: (item: RecurringTransaction) => void
   onRemove: (item: RecurringTransaction) => void
 }) {
-  const next7Days = recurring.filter((r) => {
-    const days = getDaysUntil(r.nextDate)
-    return days >= 0 && days <= 7
-  })
+  // Recently charged (overdue items - already happened)
+  const recentlyCharged = recurring
+    .filter((r) => getDaysUntil(r.nextDate) < 0)
+    .sort((a, b) => getDaysUntil(b.nextDate) - getDaysUntil(a.nextDate)) // Most recent first
+
+  // Coming up in the next 7 days
+  const next7Days = recurring
+    .filter((r) => {
+      const days = getDaysUntil(r.nextDate)
+      return days >= 0 && days <= 7
+    })
+    .sort((a, b) => getDaysUntil(a.nextDate) - getDaysUntil(b.nextDate)) // Soonest first
 
   const comingLater = recurring.filter((r) => {
     const days = getDaysUntil(r.nextDate)
@@ -219,6 +251,35 @@ function UpcomingTab({
 
   return (
     <div className="space-y-6">
+      {/* Recently Charged Section */}
+      {recentlyCharged.length > 0 && (
+        <div>
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold">Recently Charged</h3>
+              <p className="text-sm text-muted-foreground">
+                {recentlyCharged.length} recent {recentlyCharged.length === 1 ? 'charge' : 'charges'}
+              </p>
+            </div>
+            <Badge variant="outline" className="text-lg px-3 py-1">
+              {recentlyCharged.length}
+            </Badge>
+          </div>
+          <div className="space-y-2">
+            {recentlyCharged.map((item) => (
+              <RecurringItem
+                key={item.id}
+                item={item}
+                onViewDetails={() => onViewDetails(item)}
+                onViewHistory={() => onViewHistory(item)}
+                onRemove={() => onRemove(item)}
+                showAsCharged={true}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Next 7 Days Section */}
       <div>
         <div className="mb-4 flex items-center justify-between">
@@ -242,7 +303,7 @@ function UpcomingTab({
             <CardContent className="flex flex-col items-center justify-center py-8 text-center">
               <CalendarIcon className="h-12 w-12 text-muted-foreground/50" />
               <p className="mt-2 text-muted-foreground">
-                No recurring transactions in the next 7 days
+                No upcoming transactions in the next 7 days
               </p>
             </CardContent>
           </Card>
@@ -353,19 +414,34 @@ function AllRecurringTab({
   }, [recurring, search, sortBy])
 
   const subscriptionCount = recurring.filter((r) => !r.isIncome).length
+  const incomeCount = recurring.filter((r) => r.isIncome).length
 
   return (
     <div className="space-y-6">
       {/* Header Stats */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30">
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/30 dark:to-orange-950/30">
           <CardContent className="flex items-center gap-4 p-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/20">
-              <CreditCard className="h-6 w-6 text-emerald-600" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/20">
+              <CreditCard className="h-6 w-6 text-red-600" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Subscriptions</p>
               <p className="text-2xl font-bold">{subscriptionCount}</p>
+              <p className="text-xs text-muted-foreground">bills & expenses</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30">
+          <CardContent className="flex items-center gap-4 p-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-500/20">
+              <DollarSign className="h-6 w-6 text-green-600" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Recurring Income</p>
+              <p className="text-2xl font-bold">{incomeCount}</p>
+              <p className="text-xs text-muted-foreground">paychecks & deposits</p>
             </div>
           </CardContent>
         </Card>
@@ -378,6 +454,7 @@ function AllRecurringTab({
             <div>
               <p className="text-sm text-muted-foreground">Yearly Spend</p>
               <p className="text-2xl font-bold">{formatCurrency(yearlySpend)}</p>
+              <p className="text-xs text-muted-foreground">on subscriptions</p>
             </div>
           </CardContent>
         </Card>
@@ -471,22 +548,11 @@ function CalendarTab({
     // Add each day of the month
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day)
-      const dateStr = date.toISOString().split('T')[0]
+      // Use local date format to avoid timezone issues
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 
-      // Find recurring items for this day
-      const items = recurring.filter((r) => {
-        const nextDate = new Date(r.nextDate)
-        // Check if this day matches the recurring pattern
-        if (dateStr === r.nextDate) return true
-
-        // For monthly recurring, check if it's the same day of month
-        if (r.frequency === 'monthly') {
-          const nextDay = nextDate.getDate()
-          return day === nextDay && date >= new Date()
-        }
-
-        return false
-      })
+      // Find recurring items for this day - only exact date match
+      const items = recurring.filter((r) => r.nextDate === dateStr)
 
       days.push({ date, items })
     }
@@ -857,6 +923,144 @@ function DetailModal({
   )
 }
 
+// Patterns Breakdown Modal
+function PatternsBreakdownModal({
+  open,
+  onOpenChange,
+  recurring,
+  onViewDetails,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  recurring: RecurringTransaction[]
+  onViewDetails: (item: RecurringTransaction) => void
+}) {
+  const subscriptions = recurring.filter((r) => !r.isIncome)
+  const income = recurring.filter((r) => r.isIncome)
+
+  const frequencyGroups = {
+    weekly: recurring.filter((r) => r.frequency === 'weekly'),
+    'bi-weekly': recurring.filter((r) => r.frequency === 'bi-weekly'),
+    monthly: recurring.filter((r) => r.frequency === 'monthly'),
+    quarterly: recurring.filter((r) => r.frequency === 'quarterly'),
+    yearly: recurring.filter((r) => r.frequency === 'yearly'),
+  }
+
+  const confidenceGroups = {
+    high: recurring.filter((r) => r.confidence === 'high'),
+    medium: recurring.filter((r) => r.confidence === 'medium'),
+    low: recurring.filter((r) => r.confidence === 'low'),
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-emerald-500" />
+            AI-Detected Patterns
+          </SheetTitle>
+          <p className="text-sm text-muted-foreground">
+            {recurring.length} recurring patterns found in your transactions
+          </p>
+        </SheetHeader>
+
+        <div className="mt-6 space-y-6">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-lg border bg-red-50 dark:bg-red-950/30 p-3">
+              <p className="text-sm text-muted-foreground">Subscriptions</p>
+              <p className="text-2xl font-bold text-red-600">{subscriptions.length}</p>
+              <p className="text-xs text-muted-foreground">bills & expenses</p>
+            </div>
+            <div className="rounded-lg border bg-green-50 dark:bg-green-950/30 p-3">
+              <p className="text-sm text-muted-foreground">Income</p>
+              <p className="text-2xl font-bold text-green-600">{income.length}</p>
+              <p className="text-xs text-muted-foreground">recurring deposits</p>
+            </div>
+          </div>
+
+          {/* By Frequency */}
+          <div>
+            <h4 className="font-medium mb-3">By Frequency</h4>
+            <div className="space-y-2">
+              {Object.entries(frequencyGroups).map(([freq, items]) => {
+                if (items.length === 0) return null
+                return (
+                  <div key={freq} className="flex items-center justify-between rounded-lg bg-muted/50 p-3">
+                    <span className="capitalize">{freq.replace('-', ' ')}</span>
+                    <span className="font-medium">{items.length}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* By Confidence */}
+          <div>
+            <h4 className="font-medium mb-3">Detection Confidence</h4>
+            <div className="space-y-2">
+              {Object.entries(confidenceGroups).map(([conf, items]) => {
+                if (items.length === 0) return null
+                const colors = {
+                  high: 'bg-green-100 text-green-700 dark:bg-green-900/30',
+                  medium: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30',
+                  low: 'bg-gray-100 text-gray-700 dark:bg-gray-900/30',
+                }
+                return (
+                  <div key={conf} className={`flex items-center justify-between rounded-lg p-3 ${colors[conf as keyof typeof colors]}`}>
+                    <span className="capitalize">{conf} confidence</span>
+                    <span className="font-medium">{items.length}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* All Patterns List */}
+          <div>
+            <h4 className="font-medium mb-3">All Detected Patterns</h4>
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              {recurring.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    onViewDetails(item)
+                    onOpenChange(false)
+                  }}
+                  className="w-full flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <MerchantLogo
+                      merchantName={item.displayName || item.name}
+                      category={item.category}
+                      size="sm"
+                    />
+                    <div className="text-left">
+                      <p className="font-medium text-sm">{item.displayName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {getFrequencyLabel(item.frequency)} • {item.confidence} confidence
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className={`font-medium ${item.isIncome ? 'text-green-600' : ''}`}>
+                      {item.isIncome ? '+' : '-'}{formatCurrency(item.averageAmount)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.isIncome ? 'Income' : 'Expense'}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
 // Main Page Component
 export default function RecurringPage() {
   const [recurring, setRecurring] = useState<RecurringTransaction[]>([])
@@ -869,6 +1073,7 @@ export default function RecurringPage() {
   const [historyItem, setHistoryItem] = useState<RecurringTransaction | null>(null)
   const [calendarDayDate, setCalendarDayDate] = useState<Date | null>(null)
   const [calendarDayItems, setCalendarDayItems] = useState<RecurringTransaction[]>([])
+  const [showPatternsBreakdown, setShowPatternsBreakdown] = useState(false)
 
   useEffect(() => {
     const fetchRecurring = async () => {
@@ -923,12 +1128,15 @@ export default function RecurringPage() {
             AI-detected recurring bills and subscriptions
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <button
+          onClick={() => setShowPatternsBreakdown(true)}
+          className="flex items-center gap-2 rounded-lg border px-3 py-2 hover:bg-muted/50 transition-colors"
+        >
           <Sparkles className="h-5 w-5 text-emerald-500" />
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm font-medium">
             {recurring.length} patterns detected
           </span>
-        </div>
+        </button>
       </div>
 
       {/* Tabs */}
@@ -993,6 +1201,13 @@ export default function RecurringPage() {
         items={calendarDayItems}
         onViewHistory={setHistoryItem}
         onRemove={handleRemove}
+      />
+
+      <PatternsBreakdownModal
+        open={showPatternsBreakdown}
+        onOpenChange={setShowPatternsBreakdown}
+        recurring={recurring}
+        onViewDetails={setDetailItem}
       />
     </div>
   )

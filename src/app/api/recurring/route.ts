@@ -106,7 +106,10 @@ function analyzeRecurringPatterns(transactions: Transaction[]): RecurringTransac
 
     // Calculate next expected date
     const lastTx = sorted[sorted.length - 1]
-    const lastDate = new Date(lastTx.date)
+    // Parse date parts to avoid timezone issues
+    const [year, month, day] = lastTx.date.split('-').map(Number)
+    const lastDate = new Date(year, month - 1, day) // month is 0-indexed
+
     let daysToAdd = 30 // default monthly
     if (frequency === 'weekly') daysToAdd = 7
     else if (frequency === 'bi-weekly') daysToAdd = 14
@@ -121,6 +124,9 @@ function analyzeRecurringPatterns(transactions: Transaction[]): RecurringTransac
     const firstTx = sorted[0]
     const displayName = firstTx.display_name || firstTx.merchant_name || firstTx.name
 
+    // Format next date as YYYY-MM-DD in local time
+    const nextDateStr = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}-${String(nextDate.getDate()).padStart(2, '0')}`
+
     recurring.push({
       id: firstTx.id,
       name: firstTx.name,
@@ -128,7 +134,7 @@ function analyzeRecurringPatterns(transactions: Transaction[]): RecurringTransac
       amount: lastTx.amount,
       averageAmount: avgAmount,
       frequency,
-      nextDate: nextDate.toISOString().split('T')[0],
+      nextDate: nextDateStr,
       lastDate: lastTx.date,
       category: firstTx.category,
       accountId: firstTx.plaid_account_id,
