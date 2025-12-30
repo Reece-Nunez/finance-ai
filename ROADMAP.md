@@ -14,6 +14,10 @@ A rolling feature list for the AI-powered finance app. Check off features as the
 - [x] **Session Security** - 5-min idle timeout, auto-logout, cross-tab sync, secure cookies
 - [x] **Toast Notifications** - Sonner-powered stylized alerts
 - [x] **Predictive Cash Flow** - 30-day balance forecast with recurring transaction detection, visual chart, low balance alerts, daily spending rate analysis, **and self-learning AI that improves accuracy over time**
+- [x] **Smart Anomaly Detection** - Real-time unusual transaction alerts, subscription price increase detection, duplicate charge flagging, merchant average comparison
+- [x] **Financial Health Score** - Dynamic 0-100 score with gamified improvement tips, clickable breakdown showing what's helping/hurting score
+- [x] **Subscription Intelligence (Recurring Transactions)** - Auto-detects subscriptions and recurring income, calendar view, yearly cost calculation, patterns breakdown modal, "Recently Charged" tracking
+- [x] **Merchant Logos** - Google Favicon API integration showing merchant icons (McDonald's, Netflix, etc.) throughout the app with category-based fallback icons
 
 ---
 
