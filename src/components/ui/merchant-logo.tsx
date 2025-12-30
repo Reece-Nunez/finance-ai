@@ -29,7 +29,7 @@ import {
   Baby,
   Sparkles,
 } from 'lucide-react'
-import { getMerchantLogoUrl } from '@/lib/merchant-logos'
+import { getMerchantDomain } from '@/lib/merchant-logos'
 import { cn } from '@/lib/utils'
 
 interface MerchantLogoProps {
@@ -179,28 +179,41 @@ export function MerchantLogo({
   size = 'md',
   className,
 }: MerchantLogoProps) {
-  const [imageError, setImageError] = useState(false)
+  const [currentSource, setCurrentSource] = useState<'clearbit' | 'google' | 'none'>('clearbit')
   const [imageLoaded, setImageLoaded] = useState(false)
 
-  const logoUrl = getMerchantLogoUrl(merchantName, imageSizes[size] * 2) // 2x for retina
+  const domain = getMerchantDomain(merchantName)
   const CategoryIcon = getCategoryIcon(category || null)
   const categoryColor = getCategoryColor(category || null)
 
-  // Debug logging in development
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development' && merchantName) {
-      console.log(`[MerchantLogo] "${merchantName}" -> ${logoUrl || 'no domain found'}`)
-    }
-  }, [merchantName, logoUrl])
+  // Get logo URL based on current source
+  const logoUrl = domain ? (
+    currentSource === 'clearbit'
+      ? `https://logo.clearbit.com/${domain}?size=${imageSizes[size] * 2}`
+      : currentSource === 'google'
+        ? `https://www.google.com/s2/favicons?domain=${domain}&sz=${Math.min(imageSizes[size] * 2, 256)}`
+        : null
+  ) : null
 
   // Reset state when merchantName changes
   useEffect(() => {
-    setImageError(false)
+    setCurrentSource('clearbit')
     setImageLoaded(false)
   }, [merchantName])
 
-  // If no logo URL or image failed to load, show category icon
-  if (!logoUrl || imageError) {
+  const handleImageError = () => {
+    if (currentSource === 'clearbit') {
+      // Try Google as fallback
+      setCurrentSource('google')
+      setImageLoaded(false)
+    } else {
+      // Both failed, show category icon
+      setCurrentSource('none')
+    }
+  }
+
+  // If no domain or all sources failed, show category icon
+  if (!domain || currentSource === 'none') {
     return (
       <div
         className={cn(
@@ -223,7 +236,7 @@ export function MerchantLogo({
         className
       )}
     >
-      {/* Show category icon while loading or as fallback */}
+      {/* Show category icon while loading */}
       {!imageLoaded && (
         <div
           className={cn(
@@ -237,7 +250,7 @@ export function MerchantLogo({
 
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={logoUrl}
+        src={logoUrl!}
         alt={merchantName || 'Merchant'}
         width={imageSizes[size]}
         height={imageSizes[size]}
@@ -246,7 +259,7 @@ export function MerchantLogo({
           imageLoaded ? 'opacity-100' : 'opacity-0'
         )}
         onLoad={() => setImageLoaded(true)}
-        onError={() => setImageError(true)}
+        onError={handleImageError}
       />
     </div>
   )
