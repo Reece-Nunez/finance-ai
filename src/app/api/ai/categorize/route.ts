@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { categorizeTransactions } from '@/lib/ai-categorize'
+import { getUserSubscription, canAccessFeature } from '@/lib/subscription'
 
 export async function POST(request: Request) {
   try {
@@ -9,6 +10,15 @@ export async function POST(request: Request) {
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check subscription for AI categorization access
+    const subscription = await getUserSubscription(user.id)
+    if (!canAccessFeature(subscription, 'ai_categorization')) {
+      return NextResponse.json(
+        { error: 'upgrade_required', message: 'AI Categorization requires a Pro subscription' },
+        { status: 403 }
+      )
     }
 
     let transactionIds: string[] | undefined

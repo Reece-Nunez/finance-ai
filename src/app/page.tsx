@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, TrendingUp, Brain, Shield, PieChart, Sparkles, Zap } from 'lucide-react'
+import { ArrowRight, Brain, Shield, PieChart, Sparkles, Zap } from 'lucide-react'
 
 export default function Home() {
   return (
@@ -8,19 +8,16 @@ export default function Home() {
       {/* Header */}
       <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/25">
-              <TrendingUp className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-              FinanceAI
+          <div className="flex items-center">
+            <span className="text-3xl font-semibold text-slate-800 dark:text-white font-[family-name:var(--font-serif)]">
+              Sterling
             </span>
           </div>
           <div className="flex items-center gap-4">
             <Button variant="ghost" asChild>
               <Link href="/login">Sign in</Link>
             </Button>
-            <Button asChild className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-lg shadow-emerald-500/25">
+            <Button asChild className="bg-gradient-to-r from-slate-500 to-slate-700 hover:from-slate-600 hover:to-slate-800 shadow-lg shadow-slate-500/25">
               <Link href="/signup">Get started</Link>
             </Button>
           </div>
@@ -31,26 +28,26 @@ export default function Home() {
       <main className="flex-1">
         <section className="relative overflow-hidden">
           {/* Background gradient */}
-          <div className="absolute inset-0 -z-10 bg-gradient-to-b from-emerald-50 to-transparent dark:from-emerald-950/20" />
-          <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-100 via-transparent to-transparent opacity-50 dark:from-emerald-900/30" />
+          <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-50 to-transparent dark:from-slate-950/20" />
+          <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-100 via-transparent to-transparent opacity-50 dark:from-slate-800/30" />
 
           <div className="mx-auto max-w-7xl px-4 py-24 text-center lg:py-32">
-            <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-1.5 text-sm font-medium text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
+            <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1.5 text-sm font-medium text-slate-700 dark:bg-slate-800/50 dark:text-slate-300">
               <Sparkles className="h-4 w-4" />
               AI-Powered Financial Intelligence
             </div>
             <h1 className="mx-auto mt-6 max-w-4xl text-5xl font-bold tracking-tight lg:text-6xl">
-              Your money, managed by{' '}
-              <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-                artificial intelligence
+              All your finances.{' '}
+              <span className="bg-gradient-to-r from-slate-600 to-slate-800 bg-clip-text text-transparent">
+                One smart view.
               </span>
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
-              Connect your bank accounts, get personalized insights, and let AI help you
-              make smarter financial decisions. Budget better, save more, stress less.
+              Connect your accounts and get instant clarity. AI surfaces the insights
+              you need to make smarter decisions—no searching required.
             </p>
             <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
-              <Button size="lg" asChild className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-lg shadow-emerald-500/25">
+              <Button size="lg" asChild className="bg-gradient-to-r from-slate-500 to-slate-700 hover:from-slate-600 hover:to-slate-800 shadow-lg shadow-slate-500/25">
                 <Link href="/signup">
                   Start for free
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -64,15 +61,15 @@ export default function Home() {
             {/* Trust badges */}
             <div className="mt-12 flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
-                <Shield className="h-4 w-4 text-emerald-600" />
+                <Shield className="h-4 w-4 text-slate-600" />
                 Bank-level security
               </div>
               <div className="flex items-center gap-2">
-                <Zap className="h-4 w-4 text-emerald-600" />
+                <Zap className="h-4 w-4 text-slate-600" />
                 Real-time sync
               </div>
               <div className="flex items-center gap-2">
-                <Brain className="h-4 w-4 text-emerald-600" />
+                <Brain className="h-4 w-4 text-slate-600" />
                 Claude AI powered
               </div>
             </div>
@@ -91,9 +88,9 @@ export default function Home() {
               </p>
             </div>
             <div className="mt-16 grid gap-8 md:grid-cols-3">
-              <div className="group relative overflow-hidden rounded-2xl border bg-card p-8 transition-all hover:shadow-lg hover:shadow-emerald-500/10">
-                <div className="absolute inset-0 -z-10 bg-gradient-to-br from-emerald-500/5 to-teal-500/5 opacity-0 transition-opacity group-hover:opacity-100" />
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/25">
+              <div className="group relative overflow-hidden rounded-2xl border bg-card p-8 transition-all hover:shadow-lg hover:shadow-slate-500/10">
+                <div className="absolute inset-0 -z-10 bg-gradient-to-br from-slate-500/5 to-slate-600/5 opacity-0 transition-opacity group-hover:opacity-100" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-slate-500 to-slate-700 shadow-lg shadow-slate-500/25">
                   <Brain className="h-6 w-6 text-white" />
                 </div>
                 <h3 className="mt-6 text-xl font-semibold">AI-Powered Insights</h3>
@@ -102,9 +99,9 @@ export default function Home() {
                   recommendations to help you save more money.
                 </p>
               </div>
-              <div className="group relative overflow-hidden rounded-2xl border bg-card p-8 transition-all hover:shadow-lg hover:shadow-emerald-500/10">
-                <div className="absolute inset-0 -z-10 bg-gradient-to-br from-emerald-500/5 to-teal-500/5 opacity-0 transition-opacity group-hover:opacity-100" />
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/25">
+              <div className="group relative overflow-hidden rounded-2xl border bg-card p-8 transition-all hover:shadow-lg hover:shadow-slate-500/10">
+                <div className="absolute inset-0 -z-10 bg-gradient-to-br from-slate-500/5 to-slate-600/5 opacity-0 transition-opacity group-hover:opacity-100" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-slate-500 to-slate-700 shadow-lg shadow-slate-500/25">
                   <PieChart className="h-6 w-6 text-white" />
                 </div>
                 <h3 className="mt-6 text-xl font-semibold">Smart Budgeting</h3>
@@ -113,9 +110,9 @@ export default function Home() {
                   real-time updates and intelligent alerts.
                 </p>
               </div>
-              <div className="group relative overflow-hidden rounded-2xl border bg-card p-8 transition-all hover:shadow-lg hover:shadow-emerald-500/10">
-                <div className="absolute inset-0 -z-10 bg-gradient-to-br from-emerald-500/5 to-teal-500/5 opacity-0 transition-opacity group-hover:opacity-100" />
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/25">
+              <div className="group relative overflow-hidden rounded-2xl border bg-card p-8 transition-all hover:shadow-lg hover:shadow-slate-500/10">
+                <div className="absolute inset-0 -z-10 bg-gradient-to-br from-slate-500/5 to-slate-600/5 opacity-0 transition-opacity group-hover:opacity-100" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-slate-500 to-slate-700 shadow-lg shadow-slate-500/25">
                   <Shield className="h-6 w-6 text-white" />
                 </div>
                 <h3 className="mt-6 text-xl font-semibold">Bank-Level Security</h3>
@@ -131,14 +128,14 @@ export default function Home() {
         {/* CTA */}
         <section className="border-t py-24">
           <div className="mx-auto max-w-7xl px-4 text-center">
-            <div className="mx-auto max-w-2xl rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 p-12 shadow-2xl shadow-emerald-500/25">
+            <div className="mx-auto max-w-2xl rounded-3xl bg-gradient-to-br from-slate-600 to-slate-800 p-12 shadow-2xl shadow-slate-500/25">
               <h2 className="text-3xl font-bold text-white">
                 Ready to take control of your finances?
               </h2>
-              <p className="mt-4 text-lg text-emerald-100">
+              <p className="mt-4 text-lg text-slate-200">
                 Join thousands of users who are already saving more with AI-powered insights.
               </p>
-              <Button size="lg" asChild className="mt-8 bg-white text-emerald-600 hover:bg-emerald-50">
+              <Button size="lg" asChild className="mt-8 bg-white text-slate-700 hover:bg-slate-50">
                 <Link href="/signup">
                   Get started for free
                   <ArrowRight className="ml-2 h-4 w-4" />

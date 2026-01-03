@@ -45,7 +45,11 @@ import {
   TrendingUp as Growth,
   CircleDollarSign,
   Receipt,
+  CreditCard,
+  Crown,
+  ExternalLink,
 } from 'lucide-react'
+import { useSubscription } from '@/hooks/useSubscription'
 import { Slider } from '@/components/ui/slider'
 import { useTheme } from 'next-themes'
 import { SESSION_CONFIG } from '@/lib/security/session-config'
@@ -144,6 +148,22 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [openingPortal, setOpeningPortal] = useState(false)
+  const { isPro, isTrialing, currentPeriodEnd, refresh: refreshSubscription } = useSubscription()
+
+  const handleManageSubscription = async () => {
+    setOpeningPortal(true)
+    try {
+      const response = await fetch('/api/stripe/portal', { method: 'POST' })
+      const data = await response.json()
+      if (data.url) {
+        window.location.href = data.url
+      }
+    } catch (error) {
+      console.error('Failed to open billing portal:', error)
+    }
+    setOpeningPortal(false)
+  }
 
   const DEFAULT_ALERT: AlertSettings = { enabled: true, email: true, push: true, sms: false }
   const DEFAULT_NOTIFICATION_PREFS: NotificationPreferences = {
@@ -702,7 +722,7 @@ export default function SettingsPage() {
           <Button
             onClick={handleSaveProfile}
             disabled={saving}
-            className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
+            className="w-full bg-gradient-to-r from-slate-500 to-slate-700 hover:from-slate-600 hover:to-slate-800"
           >
             {saving ? (
               <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
@@ -712,6 +732,83 @@ export default function SettingsPage() {
               'Save Profile'
             )}
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Subscription */}
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-3">
+          <div className="rounded-lg bg-gradient-to-br from-slate-500 to-slate-700 p-2.5">
+            <CreditCard className="h-5 w-5 text-white" />
+          </div>
+          <div className="flex-1">
+            <CardTitle>Subscription</CardTitle>
+            <CardDescription>Manage your Sterling subscription</CardDescription>
+          </div>
+          {isPro && (
+            <Badge className="bg-gradient-to-r from-slate-500 to-slate-700 text-white border-0 gap-1">
+              <Crown className="h-3 w-3" />
+              {isTrialing ? 'Trial' : 'Pro'}
+            </Badge>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isPro ? (
+            <>
+              <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-900/50 border">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium">Sterling Pro</span>
+                  <span className="text-sm text-muted-foreground">
+                    {isTrialing ? 'Trial Period' : 'Active'}
+                  </span>
+                </div>
+                {currentPeriodEnd && (
+                  <p className="text-sm text-muted-foreground">
+                    {isTrialing ? 'Trial ends' : 'Next billing date'}:{' '}
+                    {new Date(currentPeriodEnd).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Button
+                  variant="outline"
+                  onClick={handleManageSubscription}
+                  disabled={openingPortal}
+                  className="w-full"
+                >
+                  {openingPortal ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Opening...</>
+                  ) : (
+                    <><ExternalLink className="mr-2 h-4 w-4" /> Manage Subscription</>
+                  )}
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  Update payment method, view invoices, or cancel your subscription
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="p-4 rounded-lg bg-muted/50 border">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium">Free Plan</span>
+                  <Badge variant="outline">Current</Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Limited features. Upgrade to Pro to unlock AI insights, anomaly detection, and more.
+                </p>
+              </div>
+              <Button
+                asChild
+                className="w-full bg-gradient-to-r from-slate-500 to-slate-700 hover:from-slate-600 hover:to-slate-800"
+              >
+                <a href="/dashboard/settings/billing">
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Upgrade to Pro
+                </a>
+              </Button>
+            </>
+          )}
         </CardContent>
       </Card>
 

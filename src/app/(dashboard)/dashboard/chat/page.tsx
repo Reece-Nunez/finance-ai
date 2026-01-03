@@ -30,9 +30,13 @@ import {
   BarChart3,
   HelpCircle,
   X,
+  Lock,
+  Crown,
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { formatCategory } from '@/lib/format'
+import { useSubscription } from '@/hooks/useSubscription'
+import { UpgradeModal } from '@/components/subscription/upgrade-modal'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -326,6 +330,8 @@ function InsightCard({ insight }: { insight: Insight }) {
 }
 
 export default function ChatPage() {
+  const { isPro, isLoading: subscriptionLoading } = useSubscription()
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -718,6 +724,70 @@ export default function ChatPage() {
     </div>
   )
 
+  // Show loading state while checking subscription
+  if (subscriptionLoading) {
+    return (
+      <div className="flex h-[calc(100vh-4rem)] items-center justify-center p-4">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  // Show paywall for free users
+  if (!isPro) {
+    return (
+      <>
+        <div className="flex h-[calc(100vh-4rem)] items-center justify-center p-4">
+          <Card className="max-w-lg w-full">
+            <CardContent className="flex flex-col items-center py-12 text-center">
+              <div className="rounded-full bg-gradient-to-br from-slate-500 to-slate-700 p-4 shadow-lg shadow-slate-500/25">
+                <Lock className="h-8 w-8 text-white" />
+              </div>
+              <h2 className="mt-6 text-2xl font-bold">AI Chat is a Pro Feature</h2>
+              <p className="mt-3 text-muted-foreground max-w-md">
+                Get personalized financial advice from your AI advisor. Upgrade to Pro to unlock
+                AI Chat, smart insights, anomaly detection, and more.
+              </p>
+              <div className="mt-6 flex flex-col sm:flex-row gap-3">
+                <Button
+                  onClick={() => setShowUpgradeModal(true)}
+                  className="bg-gradient-to-r from-slate-500 to-slate-700 hover:from-slate-600 hover:to-slate-800"
+                >
+                  <Crown className="mr-2 h-4 w-4" />
+                  Upgrade to Pro
+                </Button>
+              </div>
+              <div className="mt-8 grid gap-3 text-left w-full">
+                <div className="flex items-center gap-3 rounded-lg border p-3">
+                  <Sparkles className="h-5 w-5 text-slate-500" />
+                  <div>
+                    <p className="font-medium text-sm">AI Financial Advisor</p>
+                    <p className="text-xs text-muted-foreground">Get personalized advice 24/7</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 rounded-lg border p-3">
+                  <Heart className="h-5 w-5 text-slate-500" />
+                  <div>
+                    <p className="font-medium text-sm">Financial Health Score</p>
+                    <p className="text-xs text-muted-foreground">Track your financial wellness</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 rounded-lg border p-3">
+                  <Target className="h-5 w-5 text-slate-500" />
+                  <div>
+                    <p className="font-medium text-sm">Smart Suggestions</p>
+                    <p className="text-xs text-muted-foreground">AI-powered money-saving tips</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        <UpgradeModal open={showUpgradeModal} onOpenChange={setShowUpgradeModal} />
+      </>
+    )
+  }
+
   return (
     <div className="flex h-[calc(100vh-4rem)] gap-4 p-4">
       {/* Sidebar - Chat History */}
@@ -726,7 +796,7 @@ export default function ChatPage() {
           <div className="border-b p-3">
             <Button
               onClick={startNewChat}
-              className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
+              className="w-full bg-gradient-to-r from-slate-500 to-slate-700 hover:from-slate-600 hover:to-slate-800"
               size="sm"
             >
               <Plus className="mr-2 h-4 w-4" />
@@ -751,7 +821,7 @@ export default function ChatPage() {
                     onClick={() => loadSession(session.id)}
                     className={`group flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
                       currentSessionId === session.id
-                        ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100'
+                        ? 'bg-slate-100 text-slate-900 dark:bg-slate-900/30 dark:text-slate-100'
                         : 'hover:bg-muted'
                     }`}
                   >

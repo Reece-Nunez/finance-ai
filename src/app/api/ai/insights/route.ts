@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { formatCategory } from '@/lib/format'
+import { getUserSubscription, canAccessFeature } from '@/lib/subscription'
 
 export async function GET() {
   try {
@@ -9,6 +10,15 @@ export async function GET() {
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check subscription for health score access
+    const subscription = await getUserSubscription(user.id)
+    if (!canAccessFeature(subscription, 'health_score')) {
+      return NextResponse.json(
+        { error: 'upgrade_required', message: 'Financial Health Score requires a Pro subscription' },
+        { status: 403 }
+      )
     }
 
     // Fetch user's AI preferences

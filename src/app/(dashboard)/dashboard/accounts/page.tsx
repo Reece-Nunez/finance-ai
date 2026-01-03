@@ -4,12 +4,57 @@ import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PlaidLinkButton } from '@/components/plaid/plaid-link-button'
-import { Building2, CreditCard, Wallet, PiggyBank, RefreshCw } from 'lucide-react'
+import {
+  Building2,
+  CreditCard,
+  Wallet,
+  PiggyBank,
+  RefreshCw,
+  Trash2,
+  AlertTriangle,
+  Eye,
+  EyeOff,
+  MoreHorizontal,
+  Pencil,
+  Clock,
+  CheckCircle,
+  XCircle,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Switch } from '@/components/ui/switch'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 interface Account {
   id: string
   name: string
+  display_name: string | null
   official_name: string | null
   type: string
   subtype: string | null
@@ -17,6 +62,7 @@ interface Account {
   current_balance: number | null
   available_balance: number | null
   plaid_item_id: string
+  hidden: boolean
 }
 
 interface PlaidItem {
@@ -24,6 +70,7 @@ interface PlaidItem {
   item_id: string
   institution_name: string
   status: string
+  updated_at: string
 }
 
 function getAccountIcon(type: string) {
@@ -47,11 +94,32 @@ function formatCurrency(amount: number | null) {
   }).format(amount)
 }
 
+function formatTimeAgo(dateStr: string) {
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMins / 60)
+  const diffDays = Math.floor(diffHours / 24)
+
+  if (diffMins < 1) return 'Just now'
+  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays < 7) return `${diffDays}d ago`
+  return date.toLocaleDateString()
+}
+
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [plaidItems, setPlaidItems] = useState<PlaidItem[]>([])
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<PlaidItem | null>(null)
+  const [editAccount, setEditAccount] = useState<Account | null>(null)
+  const [editName, setEditName] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [showHidden, setShowHidden] = useState(false)
   const supabase = createClient()
 
   const fetchData = useCallback(async () => {
@@ -83,7 +151,56 @@ export default function AccountsPage() {
     }
   }
 
-  const totalBalance = accounts.reduce((sum, acc) => {
+  const handleDelete = async (item: PlaidItem) => {
+    setDeleting(true)
+    try {
+      const response = await fetch('/api/plaid/disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item_id: item.item_id }),
+      })
+      if (response.ok) {
+        await fetchData()
+      }
+    } finally {
+      setDeleting(false)
+      setDeleteConfirm(null)
+    }
+  }
+
+  const handleToggleHidden = async (account: Account) => {
+    const newHidden = !account.hidden
+    await supabase
+      .from('accounts')
+      .update({ hidden: newHidden })
+      .eq('id', account.id)
+    setAccounts(prev => prev.map(a => a.id === account.id ? { ...a, hidden: newHidden } : a))
+  }
+
+  const handleSaveAccount = async () => {
+    if (!editAccount) return
+    setSaving(true)
+    try {
+      await supabase
+        .from('accounts')
+        .update({ display_name: editName || null })
+        .eq('id', editAccount.id)
+      setAccounts(prev => prev.map(a => a.id === editAccount.id ? { ...a, display_name: editName || null } : a))
+      setEditAccount(null)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const openEditDialog = (account: Account) => {
+    setEditAccount(account)
+    setEditName(account.display_name || account.name)
+  }
+
+  const visibleAccounts = showHidden ? accounts : accounts.filter(a => !a.hidden)
+  const hiddenCount = accounts.filter(a => a.hidden).length
+
+  const totalBalance = visibleAccounts.reduce((sum, acc) => {
     if (acc.type === 'credit') {
       return sum - (acc.current_balance || 0)
     }
@@ -109,16 +226,29 @@ export default function AccountsPage() {
       </div>
 
       {/* Total Net Worth Card */}
-      <Card className="border-none bg-gradient-to-br from-emerald-500 to-teal-600 text-white">
+      <Card className="border-none bg-gradient-to-br from-slate-500 to-slate-700 text-white">
         <CardHeader>
-          <CardDescription className="text-emerald-100">Total Net Balance</CardDescription>
+          <CardDescription className="text-slate-200">Total Net Balance</CardDescription>
           <CardTitle className="text-4xl font-bold">{formatCurrency(totalBalance)}</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-emerald-100">
-            Across {accounts.length} account{accounts.length !== 1 ? 's' : ''} at{' '}
-            {plaidItems.length} institution{plaidItems.length !== 1 ? 's' : ''}
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-slate-200">
+              Across {visibleAccounts.length} account{visibleAccounts.length !== 1 ? 's' : ''} at{' '}
+              {plaidItems.length} institution{plaidItems.length !== 1 ? 's' : ''}
+            </p>
+            {hiddenCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowHidden(!showHidden)}
+                className="text-slate-200 hover:text-white hover:bg-slate-600"
+              >
+                {showHidden ? <EyeOff className="h-4 w-4 mr-1" /> : <Eye className="h-4 w-4 mr-1" />}
+                {hiddenCount} hidden
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -135,7 +265,8 @@ export default function AccountsPage() {
         </Card>
       ) : (
         plaidItems.map((item) => {
-          const itemAccounts = accounts.filter((a) => a.plaid_item_id === item.item_id)
+          const itemAccounts = (showHidden ? accounts : visibleAccounts).filter((a) => a.plaid_item_id === item.item_id)
+          if (itemAccounts.length === 0 && !showHidden) return null
           return (
             <Card key={item.id}>
               <CardHeader className="flex flex-row items-center justify-between">
@@ -145,18 +276,46 @@ export default function AccountsPage() {
                   </div>
                   <div>
                     <CardTitle className="text-lg">{item.institution_name}</CardTitle>
-                    <CardDescription>{itemAccounts.length} accounts</CardDescription>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <CardDescription>{itemAccounts.length} accounts</CardDescription>
+                      <span className="text-muted-foreground">•</span>
+                      <span className="flex items-center text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3 mr-1" />
+                        {formatTimeAgo(item.updated_at)}
+                      </span>
+                      {item.status === 'active' ? (
+                        <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50 text-[10px] px-1.5 py-0">
+                          <CheckCircle className="h-3 w-3 mr-0.5" />
+                          Connected
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50 text-[10px] px-1.5 py-0">
+                          <XCircle className="h-3 w-3 mr-0.5" />
+                          Error
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleSync(item.item_id)}
-                  disabled={syncing}
-                >
-                  <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-                  Sync
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleSync(item.item_id)}
+                    disabled={syncing}
+                  >
+                    <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+                    Sync
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDeleteConfirm(item)}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
@@ -195,6 +354,32 @@ export default function AccountsPage() {
           )
         })
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              Disconnect {deleteConfirm?.institution_name}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove all accounts from {deleteConfirm?.institution_name} and delete all
+              associated transaction history. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteConfirm && handleDelete(deleteConfirm)}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleting ? 'Disconnecting...' : 'Disconnect'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

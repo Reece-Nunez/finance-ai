@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { plaidClient } from '@/lib/plaid'
+import { getUserSubscription, getAccountLimit } from '@/lib/subscription'
 
 export async function POST(request: Request) {
   try {
@@ -9,6 +10,29 @@ export async function POST(request: Request) {
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check subscription for account limits
+    const subscription = await getUserSubscription(user.id)
+    const accountLimit = getAccountLimit(subscription)
+
+    // Count existing plaid items (connected banks)
+    const { count: existingBanks } = await supabase
+      .from('plaid_items')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+
+    if (existingBanks !== null && existingBanks >= accountLimit) {
+      return NextResponse.json(
+        {
+          error: 'account_limit_reached',
+          message: `Free accounts are limited to ${accountLimit} bank connection. Upgrade to Pro for unlimited bank accounts.`,
+          limit: accountLimit,
+          current: existingBanks,
+        },
+        { status: 403 }
+      )
     }
 
     const { public_token, metadata } = await request.json()

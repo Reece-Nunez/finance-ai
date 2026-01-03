@@ -9,6 +9,7 @@ import {
   getMerchantBaselines,
   Transaction,
 } from '@/lib/anomaly-detection'
+import { getUserSubscription, canAccessFeature } from '@/lib/subscription'
 
 // GET - Fetch pending anomalies for the user
 export async function GET(request: NextRequest) {
@@ -18,6 +19,15 @@ export async function GET(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check subscription for anomaly detection access
+    const subscription = await getUserSubscription(user.id)
+    if (!canAccessFeature(subscription, 'anomaly_detection')) {
+      return NextResponse.json(
+        { error: 'upgrade_required', message: 'Anomaly Detection requires a Pro subscription' },
+        { status: 403 }
+      )
     }
 
     const { searchParams } = new URL(request.url)
@@ -86,6 +96,15 @@ export async function POST(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check subscription for anomaly detection access
+    const subscription = await getUserSubscription(user.id)
+    if (!canAccessFeature(subscription, 'anomaly_detection')) {
+      return NextResponse.json(
+        { error: 'upgrade_required', message: 'Anomaly Detection requires a Pro subscription' },
+        { status: 403 }
+      )
     }
 
     // Parse request body for options

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { TrendingUp, User, Mail, Phone, Lock, Eye, EyeOff, CheckCircle, ArrowRight, ArrowLeft } from 'lucide-react'
+import { User, Mail, Phone, Lock, Eye, EyeOff, CheckCircle, ArrowRight, ArrowLeft } from 'lucide-react'
 
 export default function SignupPage() {
   const [step, setStep] = useState(1)
@@ -153,11 +153,11 @@ export default function SignupPage() {
   const { strength, label } = passwordStrength()
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-50 via-background to-teal-50 px-4 dark:from-emerald-950/20 dark:via-background dark:to-teal-950/20">
-      <Card className="w-full max-w-md border-none shadow-2xl shadow-emerald-500/10">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-background to-slate-100 px-4 dark:from-slate-950/20 dark:via-background dark:to-slate-900/20">
+      <Card className="w-full max-w-md border-none shadow-2xl shadow-slate-500/10">
         <CardHeader className="text-center">
-          <Link href="/" className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/25">
-            <TrendingUp className="h-6 w-6 text-white" />
+          <Link href="/" className="mx-auto mb-4 block">
+            <span className="text-4xl font-semibold text-slate-800 dark:text-white font-[family-name:var(--font-serif)]">Sterling</span>
           </Link>
           <CardTitle className="text-2xl">Create your account</CardTitle>
           <CardDescription>
@@ -167,13 +167,13 @@ export default function SignupPage() {
           {/* Progress Steps */}
           <div className="flex items-center justify-center gap-2 pt-4">
             <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${
-              step >= 1 ? 'bg-emerald-500 text-white' : 'bg-muted text-muted-foreground'
+              step >= 1 ? 'bg-slate-600 text-white' : 'bg-muted text-muted-foreground'
             }`}>
               {step > 1 ? <CheckCircle className="h-5 w-5" /> : '1'}
             </div>
-            <div className={`h-1 w-12 rounded ${step >= 2 ? 'bg-emerald-500' : 'bg-muted'}`} />
+            <div className={`h-1 w-12 rounded ${step >= 2 ? 'bg-slate-600' : 'bg-muted'}`} />
             <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${
-              step >= 2 ? 'bg-emerald-500 text-white' : 'bg-muted text-muted-foreground'
+              step >= 2 ? 'bg-slate-600 text-white' : 'bg-muted text-muted-foreground'
             }`}>
               2
             </div>
@@ -242,7 +242,7 @@ export default function SignupPage() {
 
                 <Button
                   type="submit"
-                  className="h-11 w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-lg shadow-emerald-500/25"
+                  className="h-11 w-full bg-gradient-to-r from-slate-500 to-slate-700 hover:from-slate-600 hover:to-slate-800 shadow-lg shadow-slate-500/25"
                 >
                   Continue
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -355,7 +355,7 @@ export default function SignupPage() {
                   </Button>
                   <Button
                     type="submit"
-                    className="h-11 flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-lg shadow-emerald-500/25"
+                    className="h-11 flex-1 bg-gradient-to-r from-slate-500 to-slate-700 hover:from-slate-600 hover:to-slate-800 shadow-lg shadow-slate-500/25"
                     disabled={loading}
                   >
                     {loading ? 'Creating account...' : 'Create account'}
@@ -374,7 +374,7 @@ export default function SignupPage() {
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Already have an account?{' '}
-            <Link href="/login" className="font-medium text-emerald-600 hover:text-emerald-700 dark:text-emerald-400">
+            <Link href="/login" className="font-medium text-slate-600 hover:text-slate-700 dark:text-slate-400">
               Sign in
             </Link>
           </p>

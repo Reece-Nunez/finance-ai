@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { anthropic } from '@/lib/ai'
+import { getUserSubscription, canAccessFeature } from '@/lib/subscription'
 
 const SUGGESTION_SYSTEM_PROMPT = `You are an intelligent financial advisor with deep insight into this specific user's spending patterns, upcoming cash flow, and financial goals. You provide highly personalized, actionable suggestions based on comprehensive data analysis.
 
@@ -55,6 +56,15 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Check subscription for AI suggestions access
+    const subscription = await getUserSubscription(user.id)
+    if (!canAccessFeature(subscription, 'ai_suggestions')) {
+      return NextResponse.json(
+        { error: 'upgrade_required', message: 'AI Suggestions requires a Pro subscription' },
+        { status: 403 }
+      )
+    }
+
     // Get only pending suggestions
     const { data: suggestions } = await supabase
       .from('ai_actions')
@@ -76,6 +86,15 @@ export async function POST() {
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check subscription for AI suggestions access
+    const subscription = await getUserSubscription(user.id)
+    if (!canAccessFeature(subscription, 'ai_suggestions')) {
+      return NextResponse.json(
+        { error: 'upgrade_required', message: 'AI Suggestions requires a Pro subscription' },
+        { status: 403 }
+      )
     }
 
     // =========================================================================

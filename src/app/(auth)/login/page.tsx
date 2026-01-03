@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { TrendingUp, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { SESSION_CONFIG } from '@/lib/security/session-config'
 import { toast } from 'sonner'
 
@@ -120,11 +120,11 @@ function LoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-50 via-background to-teal-50 px-4 dark:from-emerald-950/20 dark:via-background dark:to-teal-950/20">
-      <Card className="w-full max-w-md border-none shadow-2xl shadow-emerald-500/10">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-background to-slate-100 px-4 dark:from-slate-950/20 dark:via-background dark:to-slate-900/20">
+      <Card className="w-full max-w-md border-none shadow-2xl shadow-slate-500/10">
         <CardHeader className="text-center">
-          <Link href="/" className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/25">
-            <TrendingUp className="h-6 w-6 text-white" />
+          <Link href="/" className="mx-auto mb-4 block">
+            <span className="text-4xl font-semibold text-slate-800 dark:text-white font-[family-name:var(--font-serif)]">Sterling</span>
           </Link>
           <CardTitle className="text-2xl">Welcome back</CardTitle>
           <CardDescription>Sign in to your account to continue</CardDescription>
@@ -161,7 +161,7 @@ function LoginForm() {
             )}
             <Button
               type="submit"
-              className="h-11 w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-lg shadow-emerald-500/25"
+              className="h-11 w-full bg-gradient-to-r from-slate-500 to-slate-700 hover:from-slate-600 hover:to-slate-800 shadow-lg shadow-slate-500/25"
               disabled={loading}
             >
               {loading ? 'Signing in...' : 'Sign in'}
@@ -169,7 +169,7 @@ function LoginForm() {
           </form>
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Don&apos;t have an account?{' '}
-            <Link href="/signup" className="font-medium text-emerald-600 hover:text-emerald-700 dark:text-emerald-400">
+            <Link href="/signup" className="font-medium text-slate-600 hover:text-slate-700 dark:text-slate-400">
               Sign up
             </Link>
           </p>
@@ -181,17 +181,17 @@ function LoginForm() {
 
 function LoginPageLoading() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-50 via-background to-teal-50 px-4 dark:from-emerald-950/20 dark:via-background dark:to-teal-950/20">
-      <Card className="w-full max-w-md border-none shadow-2xl shadow-emerald-500/10">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-background to-slate-100 px-4 dark:from-slate-950/20 dark:via-background dark:to-slate-900/20">
+      <Card className="w-full max-w-md border-none shadow-2xl shadow-slate-500/10">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/25">
-            <TrendingUp className="h-6 w-6 text-white" />
+          <div className="mx-auto mb-4">
+            <span className="text-4xl font-semibold text-slate-800 dark:text-white font-[family-name:var(--font-serif)]">Sterling</span>
           </div>
           <CardTitle className="text-2xl">Welcome back</CardTitle>
           <CardDescription>Sign in to your account to continue</CardDescription>
         </CardHeader>
         <CardContent className="flex items-center justify-center py-8">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+          <Loader2 className="h-8 w-8 animate-spin text-slate-600" />
         </CardContent>
       </Card>
     </div>

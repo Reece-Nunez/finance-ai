@@ -40,6 +40,7 @@ interface DashboardClientProps {
   spending: number
   lastSynced: string | null
   hasAccounts: boolean
+  isPro: boolean
 }
 
 export function DashboardClient({
@@ -50,6 +51,7 @@ export function DashboardClient({
   spending,
   lastSynced,
   hasAccounts,
+  isPro,
 }: DashboardClientProps) {
   const [syncing, setSyncing] = useState(false)
 
@@ -88,14 +90,19 @@ export function DashboardClient({
         />
       </div>
 
-      {/* AI Suggestions */}
-      <AISuggestions />
+      {/* Pro Features */}
+      {isPro && (
+        <>
+          {/* AI Suggestions */}
+          <AISuggestions />
 
-      {/* Anomaly Detection */}
-      <AnomalyAlerts />
+          {/* Anomaly Detection */}
+          <AnomalyAlerts />
 
-      {/* Cash Flow Forecast */}
-      <CashFlowForecast />
+          {/* Cash Flow Forecast */}
+          <CashFlowForecast />
+        </>
+      )}
 
       {/* Middle Row: Recent Transactions + Upcoming Bills */}
       <div className="grid gap-6 lg:grid-cols-2">

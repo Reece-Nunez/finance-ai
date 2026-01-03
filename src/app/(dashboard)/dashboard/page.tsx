@@ -4,13 +4,14 @@ import { Button } from '@/components/ui/button'
 import { Plus, Sparkles, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 import { DashboardClient } from '@/components/dashboard/dashboard-client'
+import { getUserSubscription } from '@/lib/subscription'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Fetch all data in parallel including user profile
-  const [accountsRes, transactionsRes, recentTransactionsRes, plaidItemsRes, profileRes] = await Promise.all([
+  // Fetch all data in parallel including user profile and subscription
+  const [accountsRes, transactionsRes, recentTransactionsRes, plaidItemsRes, profileRes, subscription] = await Promise.all([
     supabase.from('accounts').select('*'),
     supabase
       .from('transactions')
@@ -24,7 +25,10 @@ export default async function DashboardPage() {
       .limit(10),
     supabase.from('plaid_items').select('updated_at').order('updated_at', { ascending: false }).limit(1),
     user ? supabase.from('user_profiles').select('first_name, last_name').eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null, error: null }),
+    user ? getUserSubscription(user.id) : Promise.resolve({ tier: 'free' as const, status: 'none' as const }),
   ])
+
+  const isPro = subscription.tier === 'pro' && (subscription.status === 'active' || subscription.status === 'trialing')
 
   const accounts = accountsRes.data || []
   const allTransactions = transactionsRes.data || []
@@ -69,7 +73,7 @@ export default async function DashboardPage() {
         {!hasAccounts && (
           <Button
             asChild
-            className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-lg shadow-emerald-500/25"
+            className="bg-gradient-to-r from-slate-500 to-slate-700 hover:from-slate-600 hover:to-slate-800 shadow-lg shadow-slate-500/25"
           >
             <Link href="/dashboard/accounts">
               <Plus className="mr-2 h-4 w-4" />
@@ -83,12 +87,12 @@ export default async function DashboardPage() {
       {!hasAccounts ? (
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Welcome Card */}
-          <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 dark:border-emerald-800 dark:from-emerald-950/50 dark:to-teal-950/50 lg:col-span-2">
+          <Card className="border-slate-200 bg-gradient-to-br from-slate-50 to-slate-100 dark:border-slate-700 dark:from-slate-900/50 dark:to-slate-800/50 lg:col-span-2">
             <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 p-4 shadow-lg shadow-emerald-500/25">
+              <div className="rounded-full bg-gradient-to-br from-slate-500 to-slate-700 p-4 shadow-lg shadow-slate-500/25">
                 <TrendingUp className="h-8 w-8 text-white" />
               </div>
-              <h3 className="mt-6 text-xl font-semibold">Welcome to FinanceAI</h3>
+              <h3 className="mt-6 text-xl font-semibold">Welcome to Sterling</h3>
               <p className="mt-2 max-w-md text-muted-foreground">
                 Connect your bank accounts to get started with AI-powered financial insights,
                 automatic transaction tracking, and personalized recommendations.
@@ -96,7 +100,7 @@ export default async function DashboardPage() {
               <div className="mt-8 flex flex-wrap justify-center gap-4">
                 <Button
                   asChild
-                  className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
+                  className="bg-gradient-to-r from-slate-500 to-slate-700 hover:from-slate-600 hover:to-slate-800"
                 >
                   <Link href="/dashboard/accounts">
                     <Plus className="mr-2 h-4 w-4" />
@@ -112,34 +116,34 @@ export default async function DashboardPage() {
               </div>
               <div className="mt-8 grid gap-4 text-left sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-lg bg-white/60 p-4 dark:bg-black/20">
-                  <h4 className="font-medium text-emerald-900 dark:text-emerald-100">
+                  <h4 className="font-medium text-slate-900 dark:text-slate-100">
                     Track Spending
                   </h4>
-                  <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-300">
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                     See where your money goes automatically
                   </p>
                 </div>
                 <div className="rounded-lg bg-white/60 p-4 dark:bg-black/20">
-                  <h4 className="font-medium text-emerald-900 dark:text-emerald-100">
+                  <h4 className="font-medium text-slate-900 dark:text-slate-100">
                     Bill Reminders
                   </h4>
-                  <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-300">
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                     Never miss a payment with smart alerts
                   </p>
                 </div>
                 <div className="rounded-lg bg-white/60 p-4 dark:bg-black/20">
-                  <h4 className="font-medium text-emerald-900 dark:text-emerald-100">
+                  <h4 className="font-medium text-slate-900 dark:text-slate-100">
                     AI Insights
                   </h4>
-                  <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-300">
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                     Get personalized financial advice
                   </p>
                 </div>
                 <div className="rounded-lg bg-white/60 p-4 dark:bg-black/20">
-                  <h4 className="font-medium text-emerald-900 dark:text-emerald-100">
+                  <h4 className="font-medium text-slate-900 dark:text-slate-100">
                     Budget Goals
                   </h4>
-                  <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-300">
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                     Set and track your savings goals
                   </p>
                 </div>
@@ -156,6 +160,7 @@ export default async function DashboardPage() {
           spending={spending}
           lastSynced={lastSynced}
           hasAccounts={hasAccounts}
+          isPro={isPro}
         />
       )}
     </div>

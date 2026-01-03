@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { anthropic, FINANCIAL_ADVISOR_SYSTEM_PROMPT, formatFinancialContext } from '@/lib/ai'
+import { getUserSubscription, canAccessFeature } from '@/lib/subscription'
 
 export async function GET(request: Request) {
   try {
@@ -45,6 +46,15 @@ export async function POST(request: Request) {
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check subscription for AI chat access
+    const subscription = await getUserSubscription(user.id)
+    if (!canAccessFeature(subscription, 'ai_chat')) {
+      return NextResponse.json(
+        { error: 'upgrade_required', message: 'AI Chat requires a Pro subscription' },
+        { status: 403 }
+      )
     }
 
     const { messages, session_id } = await request.json()

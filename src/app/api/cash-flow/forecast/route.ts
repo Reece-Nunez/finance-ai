@@ -7,6 +7,7 @@ import {
   RecurringItem,
 } from '@/lib/cash-flow'
 import { getPredictedDailySpending, SpendingPattern, analyzeSpendingPatterns } from '@/lib/spending-patterns'
+import { getUserSubscription, canAccessFeature } from '@/lib/subscription'
 
 interface Transaction {
   id: string
@@ -156,6 +157,15 @@ export async function GET(request: Request) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Check subscription for cash flow predictions access
+  const subscription = await getUserSubscription(user.id)
+  if (!canAccessFeature(subscription, 'cash_flow')) {
+    return NextResponse.json(
+      { error: 'upgrade_required', message: 'Cash Flow Predictions requires a Pro subscription' },
+      { status: 403 }
+    )
   }
 
   // Parse query params

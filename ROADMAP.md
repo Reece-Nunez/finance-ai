@@ -1,4 +1,4 @@
-# FinanceAI Feature Roadmap
+# Sterling Feature Roadmap
 
 A rolling feature list for the AI-powered finance app. Check off features as they're completed.
 
@@ -18,6 +18,8 @@ A rolling feature list for the AI-powered finance app. Check off features as the
 - [x] **Financial Health Score** - Dynamic 0-100 score with gamified improvement tips, clickable breakdown showing what's helping/hurting score
 - [x] **Subscription Intelligence (Recurring Transactions)** - Auto-detects subscriptions and recurring income, calendar view, yearly cost calculation, patterns breakdown modal, "Recently Charged" tracking
 - [x] **Merchant Logos** - Google Favicon API integration showing merchant icons (McDonald's, Netflix, etc.) throughout the app with category-based fallback icons
+- [x] **Natural Language Transaction Search** - AI-powered search using Claude tool use to parse queries like "How much did I spend on Amazon?", with summary, comparison, and transaction list results
+- [x] **Stripe Subscription & Paywall** - Freemium model with Pro tier ($9.99/mo or $79.99/yr), 14-day trial, Stripe Checkout, Customer Portal, webhook handling, feature gating
 
 ---
 
@@ -27,47 +29,17 @@ A rolling feature list for the AI-powered finance app. Check off features as the
 
 ---
 
-## Immediate High-Value (Priority 1)
+## Immediate Priority (Monetization)
 
-- [ ] **Smart Anomaly Detection**
-  - Real-time alerts for unusual transactions (potential fraud)
-  - Detects subscription price increases
-  - Flags duplicate charges
-  - Compares merchant charges to historical averages
-
-- [ ] **Subscription Intelligence**
-  - Auto-detects all subscriptions from transaction data
-  - Dashboard showing all active subscriptions with annual cost
-  - Usage tracking: "You've used Hulu 2 times in 3 months"
-  - Cancellation reminders for unused services
-
-- [ ] **Financial Health Score**
-  - Dynamic score (0-100) for overall financial wellness
-  - Factors: savings rate, debt ratio, emergency fund, spending consistency
-  - AI explains what's helping/hurting your score
-  - Historical trend tracking
+- [ ] **Mobile App (React Native/Expo)**
+  - Cross-platform iOS & Android
+  - Share business logic with web app
+  - In-app purchases via Stripe
+  - Push notifications
 
 ---
 
-## Medium-Term Differentiators (Priority 2)
-
-- [ ] **Natural Language Transaction Search**
-  - "How much did I spend on Amazon in December?"
-  - "Show all transactions over $100 this year"
-  - "What's my average grocery spending?"
-  - "Compare my food spending this month vs last month"
-
-- [ ] **Receipt OCR & Attachment**
-  - Snap photos of receipts via mobile
-  - AI extracts merchant, amount, date, line items
-  - Auto-matches to existing transactions
-  - Stores for warranty tracking and tax purposes
-
-- [ ] **Tax Preparation Mode**
-  - AI categorizes tax-deductible expenses throughout the year
-  - Generates year-end tax summary reports
-  - Flags commonly missed deductions
-  - Export data for tax software (TurboTax, etc.)
+## Future Features
 
 - [ ] **Smart Savings Goals**
   - AI analyzes spending and suggests realistic savings goals
@@ -75,67 +47,29 @@ A rolling feature list for the AI-powered finance app. Check off features as the
   - Identifies specific cuts: "Switching coffee shops saves $47/month"
   - Progress tracking with projections
 
----
-
-## Unique AI-Native Features (Priority 3)
-
 - [ ] **Financial Scenarios ("What-If" Analysis)**
   - "What if I got a 10% raise?"
   - "What if I paid off my car loan early?"
-  - "What if I moved to a cheaper apartment?"
   - Interactive simulations with AI-generated insights
 
 - [ ] **Spending Challenges**
   - AI-generated weekly micro-challenges based on spending patterns
-  - "This week: Keep dining out under $50"
   - Progress tracking with streaks and achievements
-  - Gamification elements (badges, leaderboards for shared accounts)
+  - Gamification elements (badges, leaderboards)
 
 - [ ] **Bill Negotiation Coach**
-  - Identifies bills that could be negotiated (cable, insurance, phone)
+  - Identifies bills that could be negotiated
   - Provides AI-generated negotiation scripts
   - Tracks negotiation attempts and savings
-  - Suggests timing for renegotiation
 
 - [ ] **Merchant Intelligence**
-  - Context about merchants (hours, location, category)
   - Finds deals and cashback opportunities
   - Suggests alternatives: "Save 15% at competitor nearby"
-  - Price comparison for common purchases
-
----
-
-## Future Enhancements (Priority 4)
-
-- [ ] **Voice Interface**
-  - Voice commands for quick balance checks
-  - "Hey, what's my checking balance?"
-  - Add transactions via voice
-  - Voice-enabled AI chat
-
-- [ ] **Multi-Currency Support**
-  - Track accounts in different currencies
-  - Automatic conversion with live rates
-  - Travel spending tracking
-  - Crypto portfolio integration
-
-- [ ] **Family/Shared Finances**
-  - Multiple users per household
-  - Shared budgets and goals
-  - Individual vs shared spending views
-  - AI insights for household spending
 
 - [ ] **Smart Alert Learning**
   - AI learns your notification preferences
   - Reduces noise, surfaces important alerts
-  - Context-aware timing (not during meetings)
   - Priority scoring for alerts
-
-- [ ] **Investment Portfolio Analysis**
-  - Connect brokerage accounts via Plaid
-  - AI analysis of portfolio performance
-  - Diversification recommendations
-  - Tax-loss harvesting suggestions
 
 - [ ] **Debt Payoff Optimizer**
   - Track all debts in one place
@@ -147,14 +81,9 @@ A rolling feature list for the AI-powered finance app. Check off features as the
 
 ## Technical Improvements
 
-- [ ] **Mobile App (React Native)**
 - [ ] **Push Notifications**
-- [ ] **Offline Mode**
 - [ ] **Data Export (CSV, PDF reports)**
 - [ ] **Two-Factor Authentication**
-- [ ] **Biometric Login (mobile)**
-- [ ] **Widget Support (iOS/Android)**
-- [ ] **Apple/Google Wallet Integration**
 
 ---
 
@@ -178,6 +107,17 @@ A rolling feature list for the AI-powered finance app. Check off features as the
   - **Self-correction:** Adjusts predictions based on historical accuracy
 - **UI features:** "Train AI" button, learning status display, accuracy metrics, pattern counts
 
+### Natural Language Transaction Search (Jan 3, 2026)
+- **Files added:** `src/types/search.ts`, `src/lib/search-parser.ts`, `src/app/api/ai/search/route.ts`, `src/components/dashboard/nl-transaction-search.tsx`
+- **Architecture:** Uses Claude tool use to parse natural language queries into structured filters
+- **Result types:** Transactions (list), Summary (totals/averages with category breakdown), Comparison (period vs period)
+- **Features:**
+  - AI-powered query parsing with structured filter extraction
+  - Date range, amount, merchant, category, and transaction type filters
+  - Aggregation support (sum, average, count)
+  - Period comparison with percentage change calculation
+  - Integrated on transactions page with example query suggestions
+
 ---
 
-**Last Updated:** December 28, 2024
+**Last Updated:** January 3, 2026

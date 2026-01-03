@@ -23,6 +23,8 @@ import {
 import { formatCategory, formatCurrency } from '@/lib/format'
 import { TransactionDetail } from '@/components/dashboard/transaction-detail'
 import { MerchantLogo } from '@/components/ui/merchant-logo'
+import { NLTransactionSearch } from '@/components/dashboard/nl-transaction-search'
+import { SearchTransaction } from '@/types/search'
 
 interface Transaction {
   id: string
@@ -173,6 +175,29 @@ export default function TransactionsPage() {
     }
   }
 
+  const handleSearchTransactionClick = (tx: SearchTransaction) => {
+    // Find the full transaction from our loaded list, or use the search result
+    const fullTransaction = transactions.find(t => t.id === tx.id)
+    if (fullTransaction) {
+      setSelectedTransaction(fullTransaction)
+    } else {
+      // Use the search result data
+      setSelectedTransaction({
+        id: tx.id,
+        name: tx.name,
+        display_name: tx.display_name,
+        merchant_name: tx.merchant_name,
+        amount: tx.amount,
+        date: tx.date,
+        category: tx.category,
+        ai_category: tx.ai_category,
+        pending: tx.pending,
+        is_income: tx.is_income,
+        plaid_account_id: tx.plaid_account_id,
+      })
+    }
+  }
+
   const formatDateHeader = (dateStr: string) => {
     const date = new Date(dateStr)
     const today = new Date()
@@ -200,7 +225,10 @@ export default function TransactionsPage() {
         <h1 className="text-3xl font-bold tracking-tight">Transactions</h1>
       </div>
 
-      {/* Search */}
+      {/* AI-Powered Natural Language Search */}
+      <NLTransactionSearch onTransactionClick={handleSearchTransactionClick} />
+
+      {/* Regular Search */}
       <div className="relative mb-6">
         <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
         <Input
