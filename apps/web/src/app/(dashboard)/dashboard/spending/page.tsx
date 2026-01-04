@@ -224,7 +224,7 @@ function DonutChart({
           className="relative"
           onMouseMove={handleMouseMove}
         >
-          <svg width="360" height="360" viewBox="0 0 300 300">
+          <svg className="w-full max-w-[280px] md:max-w-[360px] h-auto" viewBox="0 0 300 300">
             {segments.map((segment, idx) => {
               const isHovered = hoveredIndex === idx
               return (
@@ -459,8 +459,8 @@ function CategoryList({
 }) {
   return (
     <div className="space-y-1">
-      {/* Header */}
-      <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs font-medium text-muted-foreground border-b">
+      {/* Header - hidden on mobile */}
+      <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-2 text-xs font-medium text-muted-foreground border-b">
         <div className="col-span-5">Category</div>
         <div className="col-span-2 text-right">% Spend</div>
         <div className="col-span-3 text-center">Change</div>
@@ -474,18 +474,29 @@ function CategoryList({
           <button
             key={cat.category}
             onClick={() => onCategoryClick(cat.category)}
-            className="grid grid-cols-12 gap-4 px-4 py-3 w-full text-left hover:bg-muted/50 rounded-lg transition-colors"
+            className="flex md:grid md:grid-cols-12 gap-3 md:gap-4 px-3 md:px-4 py-3 w-full text-left hover:bg-muted/50 rounded-lg transition-colors items-center"
           >
-            <div className="col-span-5 flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+            {/* Mobile: Simple flex layout */}
+            <div className="flex items-center gap-3 flex-1 md:col-span-5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted flex-shrink-0">
                 <Icon className="h-4 w-4 text-muted-foreground" />
               </div>
-              <span className="font-medium truncate">{formatCategory(cat.category)}</span>
+              <div className="min-w-0 flex-1">
+                <span className="font-medium truncate block">{formatCategory(cat.category)}</span>
+                {/* Mobile: show percentage and change inline */}
+                <span className="md:hidden text-xs text-muted-foreground">
+                  {cat.percentage}% •
+                  <span className={cat.change > 0 ? 'text-red-500' : cat.change < 0 ? 'text-green-500' : ''}>
+                    {cat.change > 0 ? '↑' : cat.change < 0 ? '↓' : ''}{Math.abs(cat.change)}%
+                  </span>
+                </span>
+              </div>
             </div>
-            <div className="col-span-2 text-right text-sm text-muted-foreground">
-              {cat.percentage}% of spend
+            {/* Desktop: grid columns */}
+            <div className="hidden md:block col-span-2 text-right text-sm text-muted-foreground">
+              {cat.percentage}%
             </div>
-            <div className="col-span-3 flex items-center justify-center">
+            <div className="hidden md:flex col-span-3 items-center justify-center">
               <span
                 className={`flex items-center gap-1 text-sm ${
                   cat.change > 0 ? 'text-red-500' : cat.change < 0 ? 'text-green-500' : 'text-muted-foreground'
@@ -499,8 +510,8 @@ function CategoryList({
                 {Math.abs(cat.change)}%
               </span>
             </div>
-            <div className="col-span-2 text-right font-semibold">
-              {formatCurrency(cat.amount)}
+            <div className="text-right font-semibold md:col-span-2 flex-shrink-0">
+              {formatCompactCurrency(cat.amount)}
             </div>
           </button>
         )
@@ -572,17 +583,17 @@ export default function SpendingPage() {
       })
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Spending</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h1 className="text-xl md:text-2xl font-bold">Spending</h1>
 
         {/* Period Tabs */}
         <Tabs value={period} onValueChange={setPeriod}>
-          <TabsList>
-            <TabsTrigger value="last_month">Last Month</TabsTrigger>
-            <TabsTrigger value="this_month">This Month</TabsTrigger>
-            <TabsTrigger value="last_90_days">Custom</TabsTrigger>
+          <TabsList className="w-full sm:w-auto">
+            <TabsTrigger value="last_month" className="flex-1 sm:flex-none text-xs sm:text-sm">Last Month</TabsTrigger>
+            <TabsTrigger value="this_month" className="flex-1 sm:flex-none text-xs sm:text-sm">This Month</TabsTrigger>
+            <TabsTrigger value="last_90_days" className="flex-1 sm:flex-none text-xs sm:text-sm">Custom</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -595,9 +606,9 @@ export default function SpendingPage() {
       />
 
       {/* Main Content Grid */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 md:gap-6 lg:grid-cols-3">
         {/* Left Column - Spending Breakdown */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4 md:space-y-6">
           {/* Spending Breakdown Card */}
           <Card>
             <CardHeader className="pb-2">
@@ -629,7 +640,7 @@ export default function SpendingPage() {
         </div>
 
         {/* Right Column - Summary & Insights */}
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
           {/* Needs Categorization */}
           {data.uncategorizedCount > 0 && (
             <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">

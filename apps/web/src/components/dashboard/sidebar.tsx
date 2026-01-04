@@ -12,6 +12,8 @@ import {
   Settings,
   Repeat,
   Receipt,
+  Smartphone,
+  AlertCircle,
 } from 'lucide-react'
 import { SubscriptionBadge } from '@/components/subscription/subscription-badge'
 import { useSubscription } from '@/hooks/useSubscription'
@@ -43,14 +45,23 @@ export function Sidebar() {
   const { isPro, isLoading } = useSubscription()
 
   return (
-    <aside className="flex w-64 flex-col border-r bg-card">
+    <aside className="hidden md:flex w-64 flex-col border-r bg-card">
       {/* Logo */}
       <div className="flex flex-col items-center gap-3 bg-slate-800 px-6 py-4">
-        <div className="flex items-start gap-1">
-          <span className="text-3xl font-semibold text-white font-[family-name:var(--font-serif)]">
-            Sterling
-          </span>
-          <PlanBadge />
+        <div className="flex items-center gap-3">
+          <Image
+            src="/logo.png"
+            alt="Sterling"
+            width={40}
+            height={40}
+            className="h-10 w-10 object-contain"
+          />
+          <div className="flex items-start gap-1">
+            <span className="text-2xl font-semibold text-white font-[family-name:var(--font-serif)]">
+              Sterling
+            </span>
+            <PlanBadge />
+          </div>
         </div>
         <SubscriptionBadge />
       </div>
@@ -103,12 +114,30 @@ export function Sidebar() {
           <Wallet className="h-4 w-4" />
           Manage Accounts
         </Link>
-        <div className="rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 p-4 dark:from-slate-800/50 dark:to-slate-900/50">
-          <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-            AI Insights Ready
+
+        {/* Mobile app notice */}
+        <div className="rounded-xl bg-gradient-to-br from-blue-50 to-indigo-100 p-3 dark:from-blue-900/20 dark:to-indigo-900/20">
+          <div className="flex items-center gap-2">
+            <Smartphone className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <p className="text-xs font-medium text-blue-900 dark:text-blue-100">
+              Mobile Apps Coming Soon
+            </p>
+          </div>
+          <p className="mt-1 text-[10px] text-blue-700 dark:text-blue-300">
+            iOS & Android apps in development
           </p>
-          <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
-            Your AI is learning from your financial patterns
+        </div>
+
+        {/* Limited bank access notice */}
+        <div className="rounded-xl bg-gradient-to-br from-amber-50 to-orange-100 p-3 dark:from-amber-900/20 dark:to-orange-900/20">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <p className="text-xs font-medium text-amber-900 dark:text-amber-100">
+              Bank Access Expanding
+            </p>
+          </div>
+          <p className="mt-1 text-[10px] text-amber-700 dark:text-amber-300">
+            Chase, BofA, Wells Fargo coming soon
           </p>
         </div>
       </div>

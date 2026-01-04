@@ -219,10 +219,10 @@ export default function TransactionsPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
+    <div className="max-w-3xl mx-auto py-2 md:py-6">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">Transactions</h1>
+      <div className="mb-4 md:mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Transactions</h1>
       </div>
 
       {/* AI-Powered Natural Language Search */}
@@ -248,13 +248,13 @@ export default function TransactionsPage() {
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex items-center gap-2 mb-6">
-        <div className="flex bg-muted/50 rounded-xl p-1">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4 md:mb-6">
+        <div className="flex bg-muted/50 rounded-xl p-1 w-full sm:w-auto">
           {(['all', 'income', 'expenses'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 activeTab === tab
                   ? 'bg-white dark:bg-slate-800 shadow-sm text-foreground'
                   : 'text-muted-foreground hover:text-foreground'
@@ -265,11 +265,11 @@ export default function TransactionsPage() {
           ))}
         </div>
 
-        <div className="flex-1" />
+        <div className="hidden sm:block flex-1" />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="gap-2 rounded-xl">
+            <Button variant="outline" className="gap-2 rounded-xl w-full sm:w-auto justify-between sm:justify-center">
               {dateFilter}
               <ChevronDown className="h-4 w-4" />
             </Button>
