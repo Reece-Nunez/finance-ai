@@ -1,14 +1,24 @@
 import Stripe from 'stripe'
 
+export function getStripeEnv() {
+  return {
+    secretKey: process.env.STRIPE_SECRET_KEY,
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+    proMonthlyPriceId: process.env.STRIPE_PRO_MONTHLY_PRICE_ID,
+    proYearlyPriceId: process.env.STRIPE_PRO_YEARLY_PRICE_ID,
+  }
+}
+
 // Lazy initialization to avoid build-time errors
 let _stripe: Stripe | null = null
 
 export function getStripe(): Stripe {
   if (!_stripe) {
-    if (!process.env.STRIPE_SECRET_KEY) {
+    const { secretKey } = getStripeEnv()
+    if (!secretKey) {
       throw new Error('STRIPE_SECRET_KEY is not set')
     }
-    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    _stripe = new Stripe(secretKey, {
       apiVersion: '2025-12-15.clover',
       typescript: true,
     })

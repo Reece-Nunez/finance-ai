@@ -1,16 +1,19 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { plaidClient } from '@/lib/plaid'
+import { plaidClient, getPlaidEnv } from '@/lib/plaid'
 import { Products, CountryCode, PlaidError } from 'plaid'
 
 export async function POST() {
   try {
-    // Debug: Check if env vars are available
-    console.log('PLAID_ENV:', process.env.PLAID_ENV)
-    console.log('PLAID_CLIENT_ID exists:', !!process.env.PLAID_CLIENT_ID)
-    console.log('PLAID_SECRET exists:', !!process.env.PLAID_SECRET)
+    // Get Plaid env vars (from serverRuntimeConfig or process.env)
+    const { clientId, secret, env } = getPlaidEnv()
 
-    if (!process.env.PLAID_CLIENT_ID || !process.env.PLAID_SECRET) {
+    // Debug: Check if env vars are available
+    console.log('PLAID_ENV:', env)
+    console.log('PLAID_CLIENT_ID exists:', !!clientId)
+    console.log('PLAID_SECRET exists:', !!secret)
+
+    if (!clientId || !secret) {
       console.error('Missing Plaid credentials in environment')
       return NextResponse.json(
         { error: 'Plaid credentials not configured', code: 'MISSING_ENV' },

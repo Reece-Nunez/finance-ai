@@ -3,15 +3,23 @@ import { Configuration, PlaidApi, PlaidEnvironments } from 'plaid'
 // Lazy initialization to avoid build-time errors
 let _plaidClient: PlaidApi | null = null
 
+export function getPlaidEnv() {
+  return {
+    clientId: process.env.PLAID_CLIENT_ID,
+    secret: process.env.PLAID_SECRET,
+    env: process.env.PLAID_ENV || 'sandbox',
+  }
+}
+
 export function getPlaidClient(): PlaidApi {
   if (!_plaidClient) {
-    const env = process.env.PLAID_ENV || 'sandbox'
+    const { clientId, secret, env } = getPlaidEnv()
     const configuration = new Configuration({
       basePath: PlaidEnvironments[env as keyof typeof PlaidEnvironments],
       baseOptions: {
         headers: {
-          'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID,
-          'PLAID-SECRET': process.env.PLAID_SECRET,
+          'PLAID-CLIENT-ID': clientId,
+          'PLAID-SECRET': secret,
         },
       },
     })

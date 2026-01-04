@@ -1,7 +1,22 @@
 import Anthropic from '@anthropic-ai/sdk'
 
-export const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+// Lazy initialization to avoid build-time errors
+let _anthropic: Anthropic | null = null
+
+export function getAnthropic(): Anthropic {
+  if (!_anthropic) {
+    _anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    })
+  }
+  return _anthropic
+}
+
+// Backward compatible export
+export const anthropic = new Proxy({} as Anthropic, {
+  get(_, prop) {
+    return getAnthropic()[prop as keyof Anthropic]
+  },
 })
 
 export const FINANCIAL_ADVISOR_SYSTEM_PROMPT = `You are a helpful AI financial advisor assistant that learns and adapts to the user's preferences over time. You have access to the user's financial data including their bank accounts, transactions, spending patterns, and history of past interactions.
