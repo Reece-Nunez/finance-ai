@@ -3,29 +3,33 @@ import { NextResponse } from 'next/server'
 import { getUserSubscription, canAccessFeature } from '@/lib/subscription'
 import { anthropic } from '@/lib/ai'
 
-const AI_RECURRING_PROMPT = `You are a financial analyst specializing in detecting recurring transactions and bills from bank transaction data.
+const AI_RECURRING_PROMPT = `You are a financial analyst specializing in detecting recurring BILLS and SUBSCRIPTIONS from bank transaction data.
 
-Analyze the provided transactions and identify ALL recurring patterns, including:
-1. **Fixed recurring bills** - Same amount, same merchant, monthly (rent, subscriptions, memberships)
-2. **Variable recurring bills** - Same merchant but varying amounts (utilities, credit card payments, phone bills)
-3. **Bi-weekly patterns** - Paychecks, some loan payments
-4. **Annual/Quarterly** - Insurance, annual subscriptions, property taxes
-5. **Income sources** - Regular paychecks, recurring deposits
+## WHAT TO INCLUDE (True Recurring Bills):
+1. **Subscriptions** - Netflix, Spotify, gym memberships, software subscriptions (fixed amount, same day monthly)
+2. **Utility bills** - Electric, water, gas, internet, phone (variable amounts, roughly same day monthly)
+3. **Loan/Financing payments** - Car payments, mortgage, personal loans, boat/RV payments (fixed amount, monthly)
+4. **Insurance** - Auto, home, health, life (monthly/quarterly/annual)
+5. **Rent/Mortgage** - Housing payments
+6. **Credit card auto-payments** - If there's a pattern of paying the same card monthly
+7. **Paychecks** - Regular income deposits (bi-weekly or monthly)
 
-For each recurring item, determine:
-- The merchant/source name (cleaned up, human-readable)
-- Whether it's income or an expense
-- The billing frequency (weekly, bi-weekly, monthly, quarterly, annual)
-- The typical day of month (or day of week for weekly/bi-weekly)
-- The average/typical amount
-- A confidence score (0-100) based on how certain you are this is recurring
-- The next expected date
+## WHAT TO EXCLUDE (Not Bills - Just Frequent Shopping):
+- **Gas stations** - Even if you go weekly, buying gas is shopping, not a bill
+- **Grocery stores** - Walmart, Target, Costco, Braum's, Dollar General, etc.
+- **Restaurants/Fast food** - Even if you go frequently
+- **General retail** - Amazon (unless it's Prime subscription), Staples, etc.
+- **Convenience stores** - 7-Eleven, etc.
 
-Be smart about:
-- Grouping transactions from the same merchant even if names vary slightly (e.g., "NETFLIX.COM" and "NETFLIX" are the same)
-- Identifying utility bills that vary in amount but are clearly monthly
-- Recognizing payroll deposits even if amounts vary slightly
-- Distinguishing one-time purchases from recurring ones
+The key distinction: A BILL is something you OWE and must pay. Frequent shopping is optional discretionary spending.
+
+## Detection Rules:
+- Look for transactions that happen at roughly the same time each month (within ~5 days)
+- Bills usually have consistent amounts (subscriptions) OR consistent timing with variable amounts (utilities)
+- If the amounts vary wildly AND the dates are random, it's probably shopping, not a bill
+- If someone pays a merchant like "Lakeview Boat & RV" monthly with similar amounts, that's likely a loan payment
+- Utility keywords: "utility", "electric", "water", "gas", "internet", "phone", "mobile"
+- Subscription keywords: "subscription", "membership", "premium", "monthly"
 
 Respond with a JSON object:
 {
@@ -40,14 +44,15 @@ Respond with a JSON object:
       "amount_range": { "min": 15.99, "max": 15.99 },
       "confidence": 95,
       "next_expected_date": "2025-01-15",
-      "category": "ENTERTAINMENT",
-      "transaction_ids": ["id1", "id2", "id3"]
+      "category": "ENTERTAINMENT" | "UTILITIES" | "SUBSCRIPTIONS" | "HOUSING" | "TRANSPORTATION" | "INSURANCE" | "INCOME",
+      "transaction_ids": ["id1", "id2", "id3"],
+      "bill_type": "subscription" | "utility" | "loan" | "insurance" | "rent" | "income" | "other"
     }
   ],
   "insights": "Brief summary of what you found"
 }
 
-Only include items with confidence >= 60. Sort by confidence descending.`
+Only include items with confidence >= 70. Sort by confidence descending. Be CONSERVATIVE - when in doubt, exclude it.`
 
 interface Transaction {
   id: string

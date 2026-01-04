@@ -22,7 +22,16 @@ import {
   EyeOff,
   ThumbsUp,
   ThumbsDown,
+  MessageSquare,
+  Sparkles,
 } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { toast } from 'sonner'
 
 interface Anomaly {
@@ -145,6 +154,16 @@ function formatTimeAgo(dateString: string) {
   return date.toLocaleDateString()
 }
 
+// Quick explanation options for common scenarios
+const EXPLANATION_OPTIONS = [
+  { label: 'Insurance payout/claim', value: 'insurance', icon: '🏥' },
+  { label: 'One-time contractor payment', value: 'contractor', icon: '🔧' },
+  { label: 'Gift or special occasion', value: 'gift', icon: '🎁' },
+  { label: 'Emergency expense', value: 'emergency', icon: '🚨' },
+  { label: 'Refund or reimbursement', value: 'refund', icon: '💰' },
+  { label: 'Annual/quarterly payment', value: 'periodic', icon: '📅' },
+]
+
 export function AnomalyAlerts() {
   const [anomalies, setAnomalies] = useState<Anomaly[]>([])
   const [loading, setLoading] = useState(true)
@@ -153,6 +172,10 @@ export function AnomalyAlerts() {
   const [stats, setStats] = useState<AnomalyStats | null>(null)
   const [isExpanded, setIsExpanded] = useState(false)
   const [showDismissed, setShowDismissed] = useState(false)
+  const [explainAnomaly, setExplainAnomaly] = useState<Anomaly | null>(null)
+  const [explanation, setExplanation] = useState('')
+  const [selectedOption, setSelectedOption] = useState<string | null>(null)
+  const [submittingExplanation, setSubmittingExplanation] = useState(false)
 
   const fetchAnomalies = useCallback(async () => {
     try {
@@ -245,6 +268,64 @@ export function AnomalyAlerts() {
     } catch (error) {
       console.error('Error updating anomaly:', error)
       toast.error('Failed to update')
+    }
+  }
+
+  const submitExplanation = async () => {
+    if (!explainAnomaly) return
+
+    const fullExplanation = selectedOption
+      ? `${EXPLANATION_OPTIONS.find(o => o.value === selectedOption)?.label}${explanation ? `: ${explanation}` : ''}`
+      : explanation
+
+    if (!fullExplanation.trim()) {
+      toast.error('Please provide an explanation')
+      return
+    }
+
+    setSubmittingExplanation(true)
+
+    try {
+      // Update the anomaly with explanation and mark as one-time/exceptional
+      await fetch('/api/anomalies', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: explainAnomaly.id,
+          status: 'resolved',
+          user_feedback: 'exceptional',
+          feedback_note: fullExplanation,
+        }),
+      })
+
+      // If there's a transaction_id, mark it as exceptional so it won't affect baselines
+      if (explainAnomaly.transaction_id) {
+        await fetch('/api/transactions', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: explainAnomaly.transaction_id,
+            is_exceptional: true,
+            notes: fullExplanation,
+          }),
+        })
+      }
+
+      setAnomalies(anomalies.filter(a => a.id !== explainAnomaly.id))
+      toast.success('Got it! This transaction won\'t affect your spending patterns.', {
+        description: 'The AI has learned from your feedback.',
+        icon: <Sparkles className="h-4 w-4" />,
+      })
+
+      // Reset dialog state
+      setExplainAnomaly(null)
+      setExplanation('')
+      setSelectedOption(null)
+    } catch (error) {
+      console.error('Error submitting explanation:', error)
+      toast.error('Failed to save explanation')
+    } finally {
+      setSubmittingExplanation(false)
     }
   }
 
@@ -441,6 +522,19 @@ export function AnomalyAlerts() {
                       <Button
                         size="sm"
                         variant="outline"
+                        className="border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-950"
+                        onClick={() => {
+                          setExplainAnomaly(anomaly)
+                          setExplanation('')
+                          setSelectedOption(null)
+                        }}
+                      >
+                        <MessageSquare className="mr-2 h-4 w-4" />
+                        Explain This
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
                         className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-950"
                         onClick={() => updateAnomaly(anomaly.id, 'resolved', 'expected')}
                       >
@@ -484,6 +578,98 @@ export function AnomalyAlerts() {
           )}
         </CardContent>
       )}
+
+      {/* Explanation Dialog */}
+      <Dialog open={!!explainAnomaly} onOpenChange={(open) => !open && setExplainAnomaly(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-blue-500" />
+              Help me understand this transaction
+            </DialogTitle>
+            <DialogDescription>
+              Your explanation helps the AI learn and won&apos;t flag similar transactions in the future.
+            </DialogDescription>
+          </DialogHeader>
+
+          {explainAnomaly && (
+            <div className="space-y-4">
+              {/* Transaction Summary */}
+              <div className="rounded-lg border bg-muted/50 p-3">
+                <div className="font-medium">{explainAnomaly.merchant_name}</div>
+                {explainAnomaly.amount && (
+                  <div className="text-lg font-semibold">{formatCurrency(explainAnomaly.amount)}</div>
+                )}
+                <div className="text-sm text-muted-foreground mt-1">{explainAnomaly.description}</div>
+              </div>
+
+              {/* Quick Options */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">What was this for?</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {EXPLANATION_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`flex items-center gap-2 rounded-lg border p-3 text-left text-sm transition-colors hover:bg-muted ${
+                        selectedOption === option.value
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
+                          : 'border-border'
+                      }`}
+                      onClick={() => setSelectedOption(
+                        selectedOption === option.value ? null : option.value
+                      )}
+                    >
+                      <span className="text-lg">{option.icon}</span>
+                      <span>{option.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Explanation */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  {selectedOption ? 'Add more details (optional)' : 'Or describe in your own words'}
+                </label>
+                <textarea
+                  value={explanation}
+                  onChange={(e) => setExplanation(e.target.value)}
+                  placeholder="e.g., Paid contractor with insurance money from house repairs..."
+                  className="w-full rounded-lg border bg-background p-3 text-sm min-h-[80px] resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Submit */}
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setExplainAnomaly(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={submitExplanation}
+                  disabled={submittingExplanation || (!selectedOption && !explanation.trim())}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {submittingExplanation ? (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Teach AI
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }

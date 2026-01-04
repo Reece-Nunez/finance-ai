@@ -116,14 +116,16 @@ export async function POST(request: NextRequest) {
     const preferences = await getAnomalyPreferences(user.id)
 
     // Fetch all transactions for baseline calculation (last 6 months)
+    // Exclude exceptional (one-time) transactions from baseline calculations
     const sixMonthsAgo = new Date()
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
 
     const { data: allTransactionsData, error: txnError } = await supabase
       .from('transactions')
-      .select('id, user_id, amount, date, merchant_name, category, account_id')
+      .select('id, user_id, amount, date, merchant_name, category, account_id, is_exceptional')
       .eq('user_id', user.id)
       .gte('date', sixMonthsAgo.toISOString().split('T')[0])
+      .or('is_exceptional.is.null,is_exceptional.eq.false') // Exclude exceptional transactions
       .order('date', { ascending: false })
       .limit(1000)
 

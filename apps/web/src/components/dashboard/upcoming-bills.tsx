@@ -77,15 +77,46 @@ function parseLocalDate(dateStr: string): Date {
   return new Date(year, month - 1, day)
 }
 
+// Common shopping/retail merchants that should NOT be considered bills
+const SHOPPING_KEYWORDS = [
+  'walmart', 'target', 'costco', 'amazon', 'dollar general', 'dollar tree',
+  'family dollar', 'walgreens', 'cvs', 'rite aid', 'grocery', 'market',
+  'food', 'restaurant', 'cafe', 'coffee', 'pizza', 'burger', 'taco',
+  'mcdonald', 'wendys', 'subway', 'chipotle', 'starbucks', 'dunkin',
+  'gas', 'shell', 'exxon', 'chevron', 'bp', 'phillips', 'conoco', 'qt', 'quiktrip',
+  'circle k', '7-eleven', 'wawa', 'sheetz', 'oncue', 'loves', 'pilot',
+  'staples', 'office depot', 'best buy', 'home depot', 'lowes', 'menards',
+  'braums', 'sonic', 'arbys', 'chick-fil-a', 'popeyes', 'kfc',
+  'hobby lobby', 'michaels', 'joann', 'petsmart', 'petco',
+  'ross', 'marshalls', 'tjmaxx', 'burlington', 'goodwill',
+]
+
+// Categories that are typically shopping, not bills
+const SHOPPING_CATEGORIES = [
+  'FOOD_AND_DRINK', 'SHOPPING', 'TRANSPORTATION', // gas is transportation
+  'PERSONAL_CARE', 'ENTERTAINMENT', // unless it's a subscription
+]
+
 function detectRecurringBills(transactions: Transaction[]): RecurringBill[] {
   // Group transactions by merchant/name
-  const merchantMap: Record<string, { amounts: number[]; dates: string[]; category: string | null }> = {}
+  const merchantMap: Record<string, { amounts: number[]; dates: string[]; category: string | null; name: string }> = {}
 
   transactions.forEach((tx) => {
     if (tx.amount <= 0) return // Skip income
-    const key = tx.display_name || tx.merchant_name || tx.name
+    const key = (tx.display_name || tx.merchant_name || tx.name).toLowerCase()
+    const displayName = tx.display_name || tx.merchant_name || tx.name
+
+    // Skip common shopping/retail merchants
+    if (SHOPPING_KEYWORDS.some(keyword => key.includes(keyword))) return
+
+    // Skip shopping categories (but allow subscriptions and utilities)
+    if (tx.category && SHOPPING_CATEGORIES.includes(tx.category)) {
+      // Exception: allow if amount is exactly the same (likely a subscription)
+      // Check later in the grouping logic
+    }
+
     if (!merchantMap[key]) {
-      merchantMap[key] = { amounts: [], dates: [], category: tx.category }
+      merchantMap[key] = { amounts: [], dates: [], category: tx.category, name: displayName }
     }
     merchantMap[key].amounts.push(tx.amount)
     merchantMap[key].dates.push(tx.date)
@@ -93,19 +124,35 @@ function detectRecurringBills(transactions: Transaction[]): RecurringBill[] {
 
   const recurring: RecurringBill[] = []
 
-  Object.entries(merchantMap).forEach(([name, data]) => {
+  Object.entries(merchantMap).forEach(([, data]) => {
     if (data.amounts.length >= 2) {
-      // Check if amounts are similar (within 10%)
+      // Check if amounts are similar (within 10% for potential bills)
       const avgAmount = data.amounts.reduce((a, b) => a + b, 0) / data.amounts.length
       const allSimilar = data.amounts.every(
         (a) => Math.abs(a - avgAmount) / avgAmount < 0.1
       )
 
+      // For shopping categories, require EXACT same amount (subscription)
+      const isShoppingCategory = data.category && SHOPPING_CATEGORIES.includes(data.category)
+      const allExact = data.amounts.every((a) => Math.abs(a - data.amounts[0]) < 0.01)
+
+      // Skip if it's a shopping category and amounts aren't exactly the same
+      if (isShoppingCategory && !allExact) return
+
       if (allSimilar) {
-        // Extract day of month from most recent transaction
+        // Check if dates are roughly monthly (within same week each month)
+        const sortedDates = data.dates.map(d => parseLocalDate(d)).sort((a, b) => b.getTime() - a.getTime())
+        if (sortedDates.length >= 2) {
+          const days = sortedDates.map(d => d.getDate())
+          const dayVariance = Math.max(...days) - Math.min(...days)
+
+          // If day of month varies by more than 10 days, probably not a bill
+          if (dayVariance > 10) return
+        }
+
         const lastDate = parseLocalDate(data.dates[0])
         recurring.push({
-          name,
+          name: data.name,
           amount: avgAmount,
           dayOfMonth: lastDate.getDate(),
           category: data.category,
