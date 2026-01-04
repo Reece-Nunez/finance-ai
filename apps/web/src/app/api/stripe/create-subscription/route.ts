@@ -15,11 +15,13 @@ export async function POST(request: Request) {
 
     const { priceId, paymentMethodId, promoCodeId } = await request.json()
 
+    console.log('Create subscription request:', { priceId, paymentMethodId: !!paymentMethodId, promoCodeId })
+
     // Basic validation - ensure it looks like a Stripe price ID
     // Stripe will validate the actual price exists when creating subscription
     if (!priceId || typeof priceId !== 'string' || !priceId.startsWith('price_')) {
-      console.error('Invalid price ID format:', priceId)
-      return NextResponse.json({ error: 'Invalid price ID' }, { status: 400 })
+      console.error('Invalid price ID format:', priceId, 'Type:', typeof priceId)
+      return NextResponse.json({ error: `Invalid price ID: ${priceId || 'undefined'}` }, { status: 400 })
     }
 
     if (!paymentMethodId) {

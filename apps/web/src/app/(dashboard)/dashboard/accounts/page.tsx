@@ -50,6 +50,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { toast } from 'sonner'
 
 interface Account {
   id: string
@@ -139,13 +140,37 @@ export default function AccountsPage() {
 
   const handleSync = async (itemId: string) => {
     setSyncing(true)
+
+    const toastId = toast.loading('Syncing account...', {
+      description: 'This may take a moment, especially for first-time syncs.',
+    })
+
     try {
-      await fetch('/api/plaid/sync-transactions', {
+      const response = await fetch('/api/plaid/sync-transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ item_id: itemId }),
       })
+
+      if (response.ok) {
+        const data = await response.json()
+        toast.success('Sync complete!', {
+          id: toastId,
+          description: `Added ${data.added}, updated ${data.modified}, removed ${data.removed} transactions.`,
+        })
+      } else {
+        toast.error('Sync failed', {
+          id: toastId,
+          description: 'Please try again later.',
+        })
+      }
+
       await fetchData()
+    } catch (error) {
+      toast.error('Sync failed', {
+        id: toastId,
+        description: 'Network error. Please check your connection.',
+      })
     } finally {
       setSyncing(false)
     }

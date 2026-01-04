@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { AccountsOverview } from './accounts-overview'
 import { UpcomingBills } from './upcoming-bills'
 import { SpendingTrend } from './spending-trend'
@@ -57,17 +58,43 @@ export function DashboardClient({
 
   const handleSync = async () => {
     setSyncing(true)
+
+    // Show loading toast
+    const toastId = toast.loading('Syncing your accounts...', {
+      description: 'This may take a moment, especially for first-time syncs.',
+    })
+
     try {
-      // Get plaid items and sync each one
       const response = await fetch('/api/plaid/sync-transactions', {
         method: 'POST',
       })
+
       if (response.ok) {
-        // Refresh the page to get new data
-        window.location.reload()
+        const data = await response.json()
+        const isFirstSync = data.isFirstSync
+
+        toast.success('Sync complete!', {
+          id: toastId,
+          description: isFirstSync
+            ? `Added ${data.added} transactions. Run sync again for AI categorization.`
+            : `Added ${data.added}, updated ${data.modified}, removed ${data.removed} transactions.`,
+        })
+
+        // Brief delay to let user see the success message
+        setTimeout(() => window.location.reload(), 1000)
+      } else {
+        const error = await response.json().catch(() => ({}))
+        toast.error('Sync failed', {
+          id: toastId,
+          description: error.error || 'Please try again later.',
+        })
       }
     } catch (error) {
       console.error('Sync failed:', error)
+      toast.error('Sync failed', {
+        id: toastId,
+        description: 'Network error. Please check your connection.',
+      })
     } finally {
       setSyncing(false)
     }

@@ -53,12 +53,32 @@ export function PlaidLinkButton({ onSuccess }: PlaidLinkButtonProps) {
 
         if (response.ok) {
           const data = await response.json()
+
+          // Show syncing toast
+          const syncToastId = toast.loading('Syncing transactions...', {
+            description: 'Importing your transaction history. This may take a moment.',
+          })
+
           // Sync transactions after connecting
-          await fetch('/api/plaid/sync-transactions', {
+          const syncResponse = await fetch('/api/plaid/sync-transactions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ item_id: data.item_id }),
           })
+
+          if (syncResponse.ok) {
+            const syncData = await syncResponse.json()
+            toast.success('Account connected!', {
+              id: syncToastId,
+              description: `Imported ${syncData.added} transactions. Welcome to Sterling!`,
+            })
+          } else {
+            toast.error('Sync issue', {
+              id: syncToastId,
+              description: 'Account connected but transactions sync had an issue. Try syncing again.',
+            })
+          }
+
           onSuccess?.()
         }
       } catch (error) {
