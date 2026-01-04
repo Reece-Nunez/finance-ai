@@ -5,6 +5,19 @@ import { Products, CountryCode, PlaidError } from 'plaid'
 
 export async function POST() {
   try {
+    // Debug: Check if env vars are available
+    console.log('PLAID_ENV:', process.env.PLAID_ENV)
+    console.log('PLAID_CLIENT_ID exists:', !!process.env.PLAID_CLIENT_ID)
+    console.log('PLAID_SECRET exists:', !!process.env.PLAID_SECRET)
+
+    if (!process.env.PLAID_CLIENT_ID || !process.env.PLAID_SECRET) {
+      console.error('Missing Plaid credentials in environment')
+      return NextResponse.json(
+        { error: 'Plaid credentials not configured', code: 'MISSING_ENV' },
+        { status: 500 }
+      )
+    }
+
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
