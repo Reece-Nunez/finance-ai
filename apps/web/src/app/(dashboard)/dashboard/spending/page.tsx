@@ -221,10 +221,10 @@ function DonutChart({
         {/* Chart Container */}
         <div
           ref={containerRef}
-          className="relative"
+          className="relative w-[320px] sm:w-[380px] md:w-[500px] lg:w-[580px] xl:w-[450px]"
           onMouseMove={handleMouseMove}
         >
-          <svg className="w-full max-w-[320px] sm:max-w-[380px] md:max-w-[500px] lg:max-w-[580px] xl:max-w-[640px] h-auto mx-auto" viewBox="0 0 300 300">
+          <svg className="w-full h-auto" viewBox="0 0 300 300">
             {segments.map((segment, idx) => {
               const isHovered = hoveredIndex === idx
               return (
