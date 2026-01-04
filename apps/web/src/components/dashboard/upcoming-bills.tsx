@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight, Calendar, DollarSign } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { ChevronLeft, ChevronRight, Calendar, DollarSign, Sparkles, Loader2 } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -30,10 +31,27 @@ interface RecurringBill {
   dayOfMonth: number
   category: string | null
   isPayday?: boolean
+  confidence?: number
+  frequency?: string
+  amountVaries?: boolean
+  aiDetected?: boolean
+}
+
+interface AIRecurringItem {
+  name: string
+  type: 'expense' | 'income'
+  frequency: string
+  typical_day: number
+  amount: number
+  amount_varies: boolean
+  confidence: number
+  next_expected_date: string
+  category: string
 }
 
 interface UpcomingBillsProps {
   transactions: Transaction[]
+  isPro?: boolean
 }
 
 function formatCurrency(amount: number) {
@@ -131,12 +149,67 @@ function detectPaydays(transactions: Transaction[]): number[] {
     .map(([day]) => parseInt(day))
 }
 
-export function UpcomingBills({ transactions }: UpcomingBillsProps) {
+export function UpcomingBills({ transactions, isPro = false }: UpcomingBillsProps) {
   const router = useRouter()
   const [weekOffset, setWeekOffset] = useState(0)
+  const [aiRecurringBills, setAiRecurringBills] = useState<RecurringBill[]>([])
+  const [aiPaydays, setAiPaydays] = useState<number[]>([])
+  const [loadingAI, setLoadingAI] = useState(false)
+  const [usingAI, setUsingAI] = useState(false)
 
-  const recurringBills = useMemo(() => detectRecurringBills(transactions), [transactions])
-  const paydays = useMemo(() => detectPaydays(transactions), [transactions])
+  // Fetch AI-detected recurring bills for Pro users
+  useEffect(() => {
+    if (!isPro) return
+
+    const fetchAIRecurring = async () => {
+      setLoadingAI(true)
+      try {
+        const response = await fetch('/api/recurring/detect')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.aiPowered && data.recurring?.length > 0) {
+            // Convert AI results to RecurringBill format
+            const bills: RecurringBill[] = []
+            const paydays: number[] = []
+
+            data.recurring.forEach((item: AIRecurringItem) => {
+              if (item.type === 'income') {
+                paydays.push(item.typical_day)
+              } else {
+                bills.push({
+                  name: item.name,
+                  amount: item.amount,
+                  dayOfMonth: item.typical_day,
+                  category: item.category,
+                  confidence: item.confidence,
+                  frequency: item.frequency,
+                  amountVaries: item.amount_varies,
+                  aiDetected: true,
+                })
+              }
+            })
+
+            setAiRecurringBills(bills)
+            setAiPaydays(paydays)
+            setUsingAI(true)
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch AI recurring:', error)
+      } finally {
+        setLoadingAI(false)
+      }
+    }
+
+    fetchAIRecurring()
+  }, [isPro])
+
+  // Use AI results if available, otherwise fall back to basic pattern matching
+  const basicRecurringBills = useMemo(() => detectRecurringBills(transactions), [transactions])
+  const basicPaydays = useMemo(() => detectPaydays(transactions), [transactions])
+
+  const recurringBills = usingAI ? aiRecurringBills : basicRecurringBills
+  const paydays = usingAI ? aiPaydays : basicPaydays
 
   // Get the week's dates
   const today = new Date()
@@ -212,7 +285,18 @@ export function UpcomingBills({ transactions }: UpcomingBillsProps) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <div>
-            <CardTitle className="text-lg">Upcoming</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-lg">Upcoming</CardTitle>
+              {loadingAI && (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              )}
+              {usingAI && !loadingAI && (
+                <Badge variant="secondary" className="text-xs gap-1 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                  <Sparkles className="h-3 w-3" />
+                  AI Enhanced
+                </Badge>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground">
               {upcomingCount > 0
                 ? `${upcomingCount} bill${upcomingCount > 1 ? 's' : ''} due this week totaling ${formatCurrency(totalUpcoming)}`
@@ -355,6 +439,7 @@ export function UpcomingBills({ transactions }: UpcomingBillsProps) {
             <div className="mt-4 flex-1 space-y-2">
               <p className="text-xs font-medium text-muted-foreground">
                 Detected Recurring Bills ({recurringBills.length})
+                {usingAI && <span className="ml-1 text-purple-600">- AI Powered</span>}
               </p>
               <div className="max-h-[400px] space-y-1.5 overflow-y-auto">
                 {recurringBills.map((bill, idx) => (
@@ -363,20 +448,37 @@ export function UpcomingBills({ transactions }: UpcomingBillsProps) {
                     onClick={() => router.push(`/dashboard/recurring?highlight=${encodeURIComponent(bill.name)}`)}
                     className="flex w-full items-center justify-between rounded-lg bg-muted/50 px-3 py-2.5 text-sm hover:bg-muted transition-colors cursor-pointer"
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
                       <MerchantLogo
                         merchantName={bill.name}
                         category={bill.category}
                         size="sm"
                       />
-                      <span className="truncate">{bill.name}</span>
+                      <div className="flex flex-col items-start min-w-0">
+                        <span className="truncate">{bill.name}</span>
+                        {bill.aiDetected && (
+                          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                            {bill.frequency && (
+                              <span className="capitalize">{bill.frequency}</span>
+                            )}
+                            {bill.amountVaries && (
+                              <span className="text-amber-600">~varies</span>
+                            )}
+                            {bill.confidence && (
+                              <span className={bill.confidence >= 90 ? 'text-green-600' : bill.confidence >= 75 ? 'text-amber-600' : 'text-muted-foreground'}>
+                                {bill.confidence}% sure
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 shrink-0">
                       <span className="text-xs text-muted-foreground">
                         {bill.dayOfMonth}{getOrdinalSuffix(bill.dayOfMonth)}
                       </span>
                       <span className="font-semibold text-red-600 dark:text-red-400">
-                        {formatCurrency(bill.amount)}
+                        {bill.amountVaries ? '~' : ''}{formatCurrency(bill.amount)}
                       </span>
                     </div>
                   </button>
