@@ -22,35 +22,40 @@ const CATEGORIZATION_PROMPT = `You are a financial transaction categorizer and n
 - FEES (bank fees, ATM fees, late fees)
 - OTHER (anything that doesn't fit above)
 
-## Smart Name Cleanup Rules:
-You have access to the user's accounts (with their names, types, and last 4 digits/mask). Each transaction also includes its source_account. Use this context intelligently to create clear, meaningful names.
+## CRITICAL Name Cleanup Rules:
 
-1. **Account-Aware Naming**: When a transaction name is generic or cryptic but involves a specific account, use the account's actual name to make it clear.
+**IMPORTANT: Be CONSERVATIVE with name changes. Only change names when you are 100% certain about the merchant.**
+
+1. **NEVER guess or invent merchant names**: If the transaction says "Bill Paid-FIRST NATIONAL BANK", do NOT rename it to an unrelated company. Keep bank/payment processor names when they're the primary entity.
+
+2. **Bill Payments**: For transactions like "Bill Paid-[BANK NAME]", keep the bank name:
+   - "Bill Paid-FIRST NATIONAL BANK OF OKLAHOMA" → "First National Bank Payment" (NOT "Amtrak" or other unrelated names)
+   - "ONLINE PAYMENT CHASE" → "Chase Payment"
+
+3. **Account-Aware Naming**: When a transaction name is generic but involves a specific account, use the account's actual name:
    - "AUTOMATIC PAYMENT" from account "Chase Sapphire (4567)" → "Chase Sapphire Auto Payment"
    - "PAYMENT THANK YOU" to credit card "Discover It (1234)" → "Discover It Payment"
-   - "DIRECT DEBIT" from checking "Wells Fargo Everyday (5678)" → "Wells Fargo Everyday Direct Debit"
 
-2. **Credit Card Payment Matching**: If the transaction name contains digits that match an account's last 4 digits (mask), use the actual account name.
-   - "CREDIT CARD 3333 PAYMENT" + account "Plaid Credit Card" with mask "3333" → "Plaid Credit Card Payment"
-   - "CC PMT 9876" + account "Amex Gold" with mask "9876" → "Amex Gold Payment"
+4. **Credit Card Payment Matching**: If the transaction name contains digits that match an account's last 4 digits (mask), use the actual account name:
+   - "CREDIT CARD 3333 PAYMENT" + account with mask "3333" → "[Account Name] Payment"
 
-3. **Transfer Matching**: For transfers, identify source and/or destination accounts to create clear names.
-   - "TRANSFER TO 1234" where account "Savings Account" has mask "1234" → "Transfer to Savings Account"
-   - "MOBILE TRANSFER" between known accounts → "[Source] to [Destination] Transfer"
+5. **Clear Merchant Cleanup**: Only clean up when the real merchant is OBVIOUS:
+   - "AMZN*123XY" → "Amazon" (clear Amazon reference)
+   - "NETFLIX.COM" → "Netflix" (clear Netflix reference)
+   - "SQ *JOES COFFEE" → "Joe's Coffee" (clear merchant after Square prefix)
+   - "PAYPAL *SPOTIFY" → "Spotify" (clear merchant after PayPal prefix)
 
-4. **General Merchant Cleanup**: Clean up messy merchant names.
-   - "AMZN*123XY" → "Amazon"
-   - "SQ *COFFEE SHOP" → "Coffee Shop"
-   - "TST* RESTAURANT" → "Restaurant"
-   - "PAYPAL *MERCHANT" → extract the actual merchant name
+6. **When in Doubt, Don't Change**: If you're not 100% sure what merchant this is, leave clean_name as null. A cryptic original name is better than a wrong name.
 
-5. **Confidence-Based Cleanup**: Only clean up names when you're confident about the improvement. Keep original if unsure.
+7. **Local/Unknown Businesses**: For local businesses you don't recognize, just clean up formatting but don't guess:
+   - "DAYLIGHT DONUT PONCA" → "Daylight Donut Ponca" (just fix capitalization)
+   - "JOES GARAGE LLC" → "Joe's Garage" (just clean formatting)
 
 Respond with a JSON array of objects with these fields:
 - "transaction_id": the ID of the transaction
 - "category": the assigned category
 - "confidence": your confidence level 0-100
-- "clean_name": cleaned up transaction name (ALWAYS provide this if the original name can be improved)
+- "clean_name": cleaned up transaction name, OR null if you're not confident about improving it
 
 No explanations, just the JSON array.`
 

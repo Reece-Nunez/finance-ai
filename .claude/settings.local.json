@@ -16,7 +16,20 @@
       "Bash(npx shadcn@latest add:*)",
       "Bash(npm run build:web:*)",
       "Bash(npx create-expo-app@latest mobile --template blank-typescript --no-install)",
-      "Bash(npm view:*)"
+      "Bash(npm view:*)",
+      "Bash(npx expo start:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(npx expo run:android)",
+      "Bash(npx expo prebuild:*)",
+      "Bash(cmd //c \"mklink /J C:\\\\fin C:\\\\Users\\\\reece\\\\Documents\\\\NunezDev\\\\finance-ai\")",
+      "Bash(cmd //c \"rmdir C:\\\\fin\")",
+      "Bash(subst F: \"C:\\\\Users\\\\reece\\\\Documents\\\\NunezDev\\\\finance-ai\")",
+      "Bash(amplify status:*)",
+      "Bash(amplify env:*)",
+      "Bash(aws amplify:*)",
+      "Bash(git restore:*)"
     ]
   }
 }

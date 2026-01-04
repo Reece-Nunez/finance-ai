@@ -185,6 +185,7 @@ export const MERCHANT_DOMAINS: Record<string, string> = {
 
   // Gas Stations
   'shell': 'shell.com',
+  'oncue': 'oncueexpress.com',
   'exxon': 'exxon.com',
   'exxonmobil': 'exxon.com',
   'mobil': 'exxon.com',
@@ -215,6 +216,14 @@ export const MERCHANT_DOMAINS: Record<string, string> = {
   'flyingj': 'pilotflyingj.com',
   'buccees': 'buc-ees.com',
   'buc-ees': 'buc-ees.com',
+  'phillips66': 'phillips66.com',
+  'phillips 66': 'phillips66.com',
+  'conoco': 'conocophillips.com',
+  '76': '76.com',
+  'valero': 'valero.com',
+  'murphyusa': 'murphyusa.com',
+  'murphy usa': 'murphyusa.com',
+  'murphyexpress': 'murphyusa.com',
 
   // Pharmacies & Health
   'cvs': 'cvs.com',
@@ -228,6 +237,11 @@ export const MERCHANT_DOMAINS: Record<string, string> = {
   'apple': 'apple.com',
   'microsoft': 'microsoft.com',
   'google': 'google.com',
+  'googleworkspace': 'google.com',
+  'google workspace': 'google.com',
+  'workspace': 'google.com',
+  'gsuite': 'google.com',
+  'g suite': 'google.com',
   'samsung': 'samsung.com',
   'dell': 'dell.com',
   'hp': 'hp.com',
@@ -313,6 +327,9 @@ export const MERCHANT_DOMAINS: Record<string, string> = {
   'flyfrontier': 'flyfrontier.com',
   'allegiant': 'allegiantair.com',
   'hawaiian': 'hawaiianairlines.com',
+  'amtrak': 'amtrak.com',
+  'greyhound': 'greyhound.com',
+  'flixbus': 'flixbus.com',
   'airbnb': 'airbnb.com',
   'vrbo': 'vrbo.com',
   'booking': 'booking.com',
@@ -420,16 +437,28 @@ export const MERCHANT_DOMAINS: Record<string, string> = {
   'notion': 'notion.so',
   'slack': 'slack.com',
   'zoom': 'zoom.us',
+  'life360': 'life360.com',
+  'life 360': 'life360.com',
+  'rocketmoney': 'rocketmoney.com',
+  'rocket money': 'rocketmoney.com',
+  'anthropic': 'anthropic.com',
 
   // Food Delivery Apps
   'seamless': 'seamless.com',
   'caviar': 'trycaviar.com',
   'gopuff': 'gopuff.com',
 
+  // Auto Services & Parts
+  'pepboys': 'pepboys.com',
+  'autozone': 'autozone.com',
+  'napaauto': 'napaonline.com',
+  'napa auto': 'napaonline.com',
+  'carquest': 'carquest.com',
+  'o reilly': 'oreillyauto.com',
+  'kelle '
+
   // Other Common
   'costcowholesale': 'costco.com',
-  'autozone': 'autozone.com',
-  'oreillyauto': 'oreillyauto.com',
   'advanceautoparts': 'advanceautoparts.com',
   'jiffy lube': 'jiffylube.com',
   'jiffylube': 'jiffylube.com',
@@ -458,22 +487,42 @@ export function getMerchantDomain(merchantName: string | null): string | null {
 
   const normalized = normalizeMerchantName(merchantName)
 
-  // Direct lookup
+  // Direct lookup first (highest priority)
   if (MERCHANT_DOMAINS[normalized]) {
     return MERCHANT_DOMAINS[normalized]
   }
 
-  // Try partial matches - check if normalized name starts with or contains a known merchant
-  for (const [key, domain] of Object.entries(MERCHANT_DOMAINS)) {
-    if (normalized.startsWith(key) || normalized.includes(key)) {
+  // Try startsWith matches (second priority)
+  // Sort by key length descending so longer matches take priority
+  const sortedEntries = Object.entries(MERCHANT_DOMAINS).sort((a, b) => b[0].length - a[0].length)
+
+  for (const [key, domain] of sortedEntries) {
+    if (normalized.startsWith(key)) {
+      return domain
+    }
+  }
+
+  // Try contains matches only for keys with 5+ characters to avoid false positives
+  // (avoids "td" matching "daylight donut", "ross" matching "crossroads", etc.)
+  for (const [key, domain] of sortedEntries) {
+    if (key.length >= 5 && normalized.includes(key)) {
       return domain
     }
   }
 
   // Try to guess the domain from merchant name
-  // Only for single-word or well-formatted names
+  // Only for single-word names with 5+ characters that aren't common words
   const words = merchantName.toLowerCase().replace(/[^a-z\s]/g, '').trim().split(/\s+/)
-  if (words.length === 1 && words[0].length >= 3) {
+
+  // Common words that shouldn't be guessed as domains
+  const commonWords = new Set([
+    'life', 'home', 'shop', 'store', 'mart', 'food', 'auto', 'bank', 'card',
+    'cash', 'bill', 'pay', 'paid', 'payment', 'transfer', 'deposit', 'check',
+    'direct', 'online', 'mobile', 'service', 'services', 'plus', 'prime',
+    'supermag', 'metaslot', 'meta', // Block AI-generated erroneous names
+  ])
+
+  if (words.length === 1 && words[0].length >= 5 && !commonWords.has(words[0])) {
     // Single word, might be a company name - try as domain
     return `${words[0]}.com`
   }
