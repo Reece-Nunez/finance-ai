@@ -26,10 +26,14 @@ applications:
             - printenv | grep -E "^(PLAID_|SUPABASE_|STRIPE_|ANTHROPIC_|NEXT_PUBLIC_)" > .env.local
             - echo "Created .env.local with $(wc -l < .env.local) variables"
             - npm run build --prefix ../..
+            - cp .env.local .next/
+            - cp .env.local .next/standalone/ 2>/dev/null || true
+            - cp .env.local .next/standalone/apps/web/ 2>/dev/null || true
       artifacts:
         baseDirectory: .next
         files:
           - '**/*'
+          - '../.env.local'
       cache:
         paths:
           - ../../node_modules/**/*
