@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { plaidClient } from '@/lib/plaid'
 import { generateNotifications, checkUnusualSpending } from '@/lib/notifications'
 import { categorizeTransactions } from '@/lib/ai-categorize'
+import { getUserSubscription, canAccessFeature } from '@/lib/subscription'
 
 interface TransactionRule {
   id: string
@@ -228,8 +229,15 @@ export async function POST(request: Request) {
 
     // Skip AI categorization if explicitly requested or if this is first sync (no cursor existed)
     const isFirstSync = plaidItems.some(item => !item.transaction_cursor)
+
+    // Check if user has Pro subscription for AI features
+    const subscription = await getUserSubscription(user.id)
+    const canUseAI = canAccessFeature(subscription, 'ai_categorization')
+
     if (skipAI || isFirstSync) {
       console.log('[sync-transactions] Skipping AI categorization (skipAI:', skipAI, 'isFirstSync:', isFirstSync, ')')
+    } else if (!canUseAI) {
+      console.log('[sync-transactions] Skipping AI categorization (user is not Pro)')
     } else if (totalAdded > 0) {
       console.log('[sync-transactions] Running AI categorization...')
       try {
@@ -255,7 +263,7 @@ export async function POST(request: Request) {
 
           aiReportId = report?.id || null
 
-          // Create notification if AI did something
+          // Create notification if AI did something (only for Pro users)
           if (result.categorized > 0 || (result.skipped_items && result.skipped_items.length > 0)) {
             const skippedCount = result.skipped_items?.length || 0
             let message = `AI categorized ${result.categorized} transaction${result.categorized !== 1 ? 's' : ''}`

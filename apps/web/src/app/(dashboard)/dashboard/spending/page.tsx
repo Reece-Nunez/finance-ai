@@ -224,7 +224,7 @@ function DonutChart({
           className="relative"
           onMouseMove={handleMouseMove}
         >
-          <svg className="w-full max-w-[280px] md:max-w-[480px] lg:max-w-[560px] h-auto" viewBox="0 0 300 300">
+          <svg className="w-full max-w-[320px] sm:max-w-[380px] md:max-w-[500px] lg:max-w-[580px] xl:max-w-[640px] h-auto mx-auto" viewBox="0 0 300 300">
             {segments.map((segment, idx) => {
               const isHovered = hoveredIndex === idx
               return (
@@ -285,7 +285,7 @@ function DonutChart({
         </div>
 
         {/* Category Legend */}
-        <div className="grid grid-cols-2 gap-x-8 gap-y-3 mt-6 w-full max-w-md md:max-w-lg lg:max-w-xl">
+        <div className="grid grid-cols-2 gap-x-8 gap-y-3 mt-8 w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl">
           {segments.map((segment, idx) => (
             <button
               key={idx}

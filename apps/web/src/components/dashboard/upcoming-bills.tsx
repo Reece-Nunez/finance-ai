@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight, Calendar, DollarSign } from 'lucide-react'
@@ -51,6 +52,13 @@ function formatCurrencyShort(amount: number) {
   return `$${Math.round(amount)}`
 }
 
+// Parse date string as local date (not UTC) to avoid timezone issues
+function parseLocalDate(dateStr: string): Date {
+  // dateStr is in format "YYYY-MM-DD"
+  const [year, month, day] = dateStr.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
 function detectRecurringBills(transactions: Transaction[]): RecurringBill[] {
   // Group transactions by merchant/name
   const merchantMap: Record<string, { amounts: number[]; dates: string[]; category: string | null }> = {}
@@ -77,7 +85,7 @@ function detectRecurringBills(transactions: Transaction[]): RecurringBill[] {
 
       if (allSimilar) {
         // Extract day of month from most recent transaction
-        const lastDate = new Date(data.dates[0])
+        const lastDate = parseLocalDate(data.dates[0])
         recurring.push({
           name,
           amount: avgAmount,
@@ -99,7 +107,7 @@ function detectPaydays(transactions: Transaction[]): number[] {
   if (markedIncomeTransactions.length > 0) {
     const dayMap: Record<number, number> = {}
     markedIncomeTransactions.forEach((tx) => {
-      const day = new Date(tx.date).getDate()
+      const day = parseLocalDate(tx.date).getDate()
       dayMap[day] = (dayMap[day] || 0) + 1
     })
     // Return days that appear at least once (since they're explicitly marked)
@@ -113,7 +121,7 @@ function detectPaydays(transactions: Transaction[]): number[] {
 
   const dayMap: Record<number, number> = {}
   incomeTransactions.forEach((tx) => {
-    const day = new Date(tx.date).getDate()
+    const day = parseLocalDate(tx.date).getDate()
     dayMap[day] = (dayMap[day] || 0) + 1
   })
 
@@ -124,6 +132,7 @@ function detectPaydays(transactions: Transaction[]): number[] {
 }
 
 export function UpcomingBills({ transactions }: UpcomingBillsProps) {
+  const router = useRouter()
   const [weekOffset, setWeekOffset] = useState(0)
 
   const recurringBills = useMemo(() => detectRecurringBills(transactions), [transactions])
@@ -349,9 +358,10 @@ export function UpcomingBills({ transactions }: UpcomingBillsProps) {
               </p>
               <div className="max-h-[400px] space-y-1.5 overflow-y-auto">
                 {recurringBills.map((bill, idx) => (
-                  <div
+                  <button
                     key={idx}
-                    className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2.5 text-sm"
+                    onClick={() => router.push(`/dashboard/recurring?highlight=${encodeURIComponent(bill.name)}`)}
+                    className="flex w-full items-center justify-between rounded-lg bg-muted/50 px-3 py-2.5 text-sm hover:bg-muted transition-colors cursor-pointer"
                   >
                     <div className="flex items-center gap-2">
                       <MerchantLogo
@@ -369,7 +379,7 @@ export function UpcomingBills({ transactions }: UpcomingBillsProps) {
                         {formatCurrency(bill.amount)}
                       </span>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
