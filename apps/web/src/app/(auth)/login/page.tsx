@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Shield, ArrowLeft } from 'lucide-react'
 import { SESSION_CONFIG } from '@/lib/security/session-config'
 import { toast } from 'sonner'
 
@@ -56,6 +56,12 @@ function LoginForm() {
   const supabase = createClient()
   const toastShownRef = useRef(false)
 
+  // MFA state
+  const [showMFA, setShowMFA] = useState(false)
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null)
+  const [mfaCode, setMfaCode] = useState('')
+  const [verifyingMFA, setVerifyingMFA] = useState(false)
+
   // Clear stale session data and show appropriate message on load
   useEffect(() => {
     // Clear any stale session tracking data
@@ -93,7 +99,7 @@ function LoginForm() {
     setError(null)
     setLoading(true)
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
@@ -105,6 +111,58 @@ function LoginForm() {
       return
     }
 
+    // Check if MFA is required
+    const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+
+    if (aalData?.nextLevel === 'aal2' && aalData?.currentLevel === 'aal1') {
+      // User has MFA enabled, need to verify
+      const { data: factorsData } = await supabase.auth.mfa.listFactors()
+      const totpFactors = factorsData?.totp?.filter(f => f.status === 'verified') || []
+
+      if (totpFactors.length > 0) {
+        setMfaFactorId(totpFactors[0].id)
+        setShowMFA(true)
+        setLoading(false)
+        return
+      }
+    }
+
+    // No MFA required, proceed with login
+    completeLogin()
+  }
+
+  const handleMFAVerify = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!mfaFactorId || mfaCode.length !== 6) return
+
+    setVerifyingMFA(true)
+    setError(null)
+
+    try {
+      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
+        factorId: mfaFactorId,
+      })
+
+      if (challengeError) throw challengeError
+
+      const { error: verifyError } = await supabase.auth.mfa.verify({
+        factorId: mfaFactorId,
+        challengeId: challengeData.id,
+        code: mfaCode,
+      })
+
+      if (verifyError) throw verifyError
+
+      completeLogin()
+    } catch (err: unknown) {
+      const error = err as { message?: string }
+      setError(error.message || 'Invalid verification code')
+      toast.error('Verification Failed', { description: 'Invalid code. Please try again.' })
+    }
+    setVerifyingMFA(false)
+  }
+
+  const completeLogin = () => {
     // Initialize session tracking on successful login
     try {
       const now = Date.now()
@@ -117,6 +175,81 @@ function LoginForm() {
     toast.success('Welcome Back!', { description: 'You have successfully signed in.' })
     router.push('/dashboard')
     router.refresh()
+  }
+
+  const handleBackToLogin = async () => {
+    // Sign out to reset state
+    await supabase.auth.signOut()
+    setShowMFA(false)
+    setMfaFactorId(null)
+    setMfaCode('')
+    setError(null)
+  }
+
+  // MFA Challenge Screen
+  if (showMFA) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-background to-slate-100 px-4 dark:from-slate-950/20 dark:via-background dark:to-slate-900/20">
+        <Card className="w-full max-w-md border-none shadow-2xl shadow-slate-500/10">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
+              <Shield className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <CardTitle className="text-2xl">Two-Factor Authentication</CardTitle>
+            <CardDescription>
+              Enter the 6-digit code from your authenticator app
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleMFAVerify} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="mfa-code">Verification Code</Label>
+                <Input
+                  id="mfa-code"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  placeholder="000000"
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className="h-14 text-center text-2xl tracking-widest font-mono"
+                  autoComplete="one-time-code"
+                  autoFocus
+                />
+              </div>
+              {error && (
+                <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                  {error}
+                </div>
+              )}
+              <Button
+                type="submit"
+                className="h-11 w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-lg"
+                disabled={verifyingMFA || mfaCode.length !== 6}
+              >
+                {verifyingMFA ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  'Verify'
+                )}
+              </Button>
+            </form>
+            <Button
+              variant="ghost"
+              className="mt-4 w-full"
+              onClick={handleBackToLogin}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (

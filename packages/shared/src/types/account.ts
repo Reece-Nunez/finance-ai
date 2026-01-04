@@ -1,6 +1,7 @@
 export interface Account {
   id: string
   plaid_account_id: string
+  plaid_item_id: string
   name: string
   official_name: string | null
   institution_name: string | null

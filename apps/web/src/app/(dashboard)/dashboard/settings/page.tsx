@@ -48,7 +48,9 @@ import {
   CreditCard,
   Crown,
   ExternalLink,
+  Smartphone,
 } from 'lucide-react'
+import { MFASettings } from '@/components/settings/mfa-settings'
 import { useSubscription } from '@/hooks/useSubscription'
 import { Slider } from '@/components/ui/slider'
 import { useTheme } from 'next-themes'
@@ -1787,7 +1789,18 @@ export default function SettingsPage() {
             <CardDescription>Manage your account security</CardDescription>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
+          {/* Two-Factor Authentication */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <Smartphone className="h-4 w-4 text-emerald-600" />
+              <h4 className="text-sm font-medium">Two-Factor Authentication (2FA)</h4>
+            </div>
+            <MFASettings />
+          </div>
+
+          <Separator />
+
           {/* Session Security Info */}
           <div className="p-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
             <div className="flex items-start gap-3">

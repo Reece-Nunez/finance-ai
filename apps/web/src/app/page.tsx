@@ -149,7 +149,11 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t py-8">
         <div className="mx-auto max-w-7xl px-4 text-center text-sm text-muted-foreground">
-          <p>Built with AI for better financial decisions.</p>
+          <div className="flex justify-center gap-6 mb-4">
+            <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-foreground transition-colors">Terms of Service</Link>
+          </div>
+          <p>&copy; {new Date().getFullYear()} Sterling. All rights reserved.</p>
         </div>
       </footer>
     </div>
