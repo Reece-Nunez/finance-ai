@@ -17,6 +17,8 @@ import {
   Check,
   Loader2,
   RotateCw,
+  X,
+  Trash2,
 } from 'lucide-react'
 
 interface Notification {
@@ -154,6 +156,43 @@ export function NotificationsDropdown() {
     }
   }
 
+  const deleteNotification = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent triggering the parent click handler
+    try {
+      await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', notificationId: id }),
+      })
+      const wasUnread = notifications.find(n => n.id === id)?.read === false
+      setNotifications(prev => prev.filter(n => n.id !== id))
+      if (wasUnread) {
+        setUnreadCount(prev => Math.max(0, prev - 1))
+      }
+    } catch (error) {
+      console.error('Failed to delete notification:', error)
+    }
+  }
+
+  const clearAllNotifications = async () => {
+    try {
+      // Delete all notifications one by one (or we could add a bulk delete to API)
+      await Promise.all(
+        notifications.map(n =>
+          fetch('/api/notifications', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'delete', notificationId: n.id }),
+          })
+        )
+      )
+      setNotifications([])
+      setUnreadCount(0)
+    } catch (error) {
+      console.error('Failed to clear notifications:', error)
+    }
+  }
+
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
@@ -191,6 +230,18 @@ export function NotificationsDropdown() {
                 Mark all read
               </Button>
             )}
+            {notifications.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                onClick={clearAllNotifications}
+                title="Clear all notifications"
+              >
+                <Trash2 className="mr-1 h-3 w-3" />
+                Clear all
+              </Button>
+            )}
           </div>
         </div>
 
@@ -211,7 +262,7 @@ export function NotificationsDropdown() {
             {notifications.map((notification) => (
               <div
                 key={notification.id}
-                className={`flex gap-3 p-3 transition-colors hover:bg-muted/50 cursor-pointer ${
+                className={`flex gap-3 p-3 transition-colors hover:bg-muted/50 cursor-pointer group relative ${
                   !notification.read ? 'bg-emerald-50/50 dark:bg-emerald-950/20' : ''
                 } ${getPriorityColor(notification.priority)}`}
                 onClick={() => {
@@ -236,9 +287,18 @@ export function NotificationsDropdown() {
                     {formatTimeAgo(notification.created_at)}
                   </p>
                 </div>
-                {!notification.read && (
-                  <div className="flex h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
-                )}
+                <div className="flex items-center gap-1 shrink-0">
+                  {!notification.read && (
+                    <div className="flex h-2 w-2 rounded-full bg-emerald-500" />
+                  )}
+                  <button
+                    onClick={(e) => deleteNotification(notification.id, e)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded"
+                    title="Delete notification"
+                  >
+                    <X className="h-3.5 w-3.5 text-muted-foreground hover:text-red-600" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
