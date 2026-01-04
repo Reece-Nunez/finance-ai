@@ -13,7 +13,10 @@
       "Bash(cat:*)",
       "WebFetch(domain:logo.clearbit.com)",
       "Bash(find:*)",
-      "Bash(npx shadcn@latest add:*)"
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(npm run build:web:*)",
+      "Bash(npx create-expo-app@latest mobile --template blank-typescript --no-install)",
+      "Bash(npm view:*)"
     ]
   }
 }
