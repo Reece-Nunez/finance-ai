@@ -8,22 +8,25 @@ applications:
             - npm ci --prefix ../..
         build:
           commands:
-            # Create .env file for runtime
-            - echo "PLAID_CLIENT_ID=$PLAID_CLIENT_ID" >> .env.local
-            - echo "PLAID_SECRET=$PLAID_SECRET" >> .env.local
-            - echo "PLAID_ENV=$PLAID_ENV" >> .env.local
-            - echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY" >> .env.local
-            - echo "STRIPE_SECRET_KEY=$STRIPE_SECRET_KEY" >> .env.local
-            - echo "STRIPE_WEBHOOK_SECRET=$STRIPE_WEBHOOK_SECRET" >> .env.local
-            - echo "STRIPE_PRO_MONTHLY_PRICE_ID=$STRIPE_PRO_MONTHLY_PRICE_ID" >> .env.local
-            - echo "STRIPE_PRO_YEARLY_PRICE_ID=$STRIPE_PRO_YEARLY_PRICE_ID" >> .env.local
-            - echo "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY" >> .env.local
-            - echo "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL" >> .env.local
-            - echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY" >> .env.local
-            - echo "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=$NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY" >> .env.local
-            - echo "NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE_ID=$NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE_ID" >> .env.local
-            - echo "NEXT_PUBLIC_STRIPE_PRO_YEARLY_PRICE_ID=$NEXT_PUBLIC_STRIPE_PRO_YEARLY_PRICE_ID" >> .env.local
-            - echo "NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL" >> .env.local
+            # Create .env file for runtime (values not logged)
+            - |
+              cat <<EOF > .env.local
+              PLAID_CLIENT_ID=${PLAID_CLIENT_ID}
+              PLAID_SECRET=${PLAID_SECRET}
+              PLAID_ENV=${PLAID_ENV}
+              SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+              STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+              STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+              STRIPE_PRO_MONTHLY_PRICE_ID=${STRIPE_PRO_MONTHLY_PRICE_ID}
+              STRIPE_PRO_YEARLY_PRICE_ID=${STRIPE_PRO_YEARLY_PRICE_ID}
+              ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+              NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+              NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+              NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
+              NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE_ID=${NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE_ID}
+              NEXT_PUBLIC_STRIPE_PRO_YEARLY_PRICE_ID=${NEXT_PUBLIC_STRIPE_PRO_YEARLY_PRICE_ID}
+              NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+              EOF
             - npm run build --prefix ../..
       artifacts:
         baseDirectory: .next
