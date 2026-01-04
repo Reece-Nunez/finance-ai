@@ -33,6 +33,7 @@ import {
   Lock,
   Crown,
 } from 'lucide-react'
+import Image from 'next/image'
 import ReactMarkdown from 'react-markdown'
 import { formatCategory } from '@/lib/format'
 import { useSubscription } from '@/hooks/useSubscription'
@@ -86,6 +87,7 @@ interface InsightsData {
   healthStatus: 'excellent' | 'good' | 'fair' | 'needs_attention'
   insights: Insight[]
   suggestions: Suggestion[]
+  userName: string | null
 }
 
 // Quick Action Card Component
@@ -470,14 +472,22 @@ export default function ChatPage() {
     <div className="flex flex-col h-full">
       {/* Header with Health Score */}
       <div className="flex items-center justify-between p-6 border-b">
-        <div>
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-emerald-500" />
-            AI Financial Advisor
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {insights ? `${insights.period.month} ${insights.period.year} • ${insights.period.daysLeft} days left` : 'Loading...'}
-          </p>
+        <div className="flex items-center gap-3">
+          <Image
+            src="/logo.png"
+            alt="Sterling"
+            width={40}
+            height={40}
+            className="h-10 w-10 object-contain"
+          />
+          <div>
+            <h2 className="text-3xl font-semibold font-[family-name:var(--font-serif)]">
+              Sterling
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {insights ? `${insights.period.month} ${insights.period.year} • ${insights.period.daysLeft} days left` : 'Loading...'}
+            </p>
+          </div>
         </div>
         {insights && (
           <HealthScoreRing
@@ -486,6 +496,18 @@ export default function ChatPage() {
             stats={insights.stats}
           />
         )}
+      </div>
+
+      {/* Personalized Greeting */}
+      <div className="px-6 pt-6">
+        <div className="rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border border-emerald-200 dark:border-emerald-800 p-4">
+          <p className="text-lg font-medium text-emerald-900 dark:text-emerald-100">
+            Hello{insights?.userName ? `, ${insights.userName}` : ''}! 👋
+          </p>
+          <p className="text-sm text-emerald-700 dark:text-emerald-300 mt-1">
+            How can I help you with your finances today?
+          </p>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -619,13 +641,17 @@ export default function ChatPage() {
       {/* Chat Header */}
       <div className="flex items-center justify-between p-4 border-b">
         <div className="flex items-center gap-3">
-          <div className="rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 p-2">
-            <Sparkles className="h-4 w-4 text-white" />
-          </div>
+          <Image
+            src="/logo.png"
+            alt="Sterling"
+            width={32}
+            height={32}
+            className="h-8 w-8 object-contain"
+          />
           <div>
-            <p className="font-medium">AI Financial Advisor</p>
+            <p className="font-semibold font-[family-name:var(--font-serif)]">Sterling</p>
             <p className="text-xs text-muted-foreground">
-              {insights ? `${insights.period.month} • Health Score: ${insights.healthScore}` : 'Ready to help'}
+              {insights ? `${insights.period.month} • Health Score: ${insights.healthScore}` : 'Your AI Financial Advisor'}
             </p>
           </div>
         </div>
@@ -643,9 +669,13 @@ export default function ChatPage() {
             className={`flex gap-4 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             {message.role === 'assistant' && (
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600">
-                <Sparkles className="h-4 w-4 text-white" />
-              </div>
+              <Image
+                src="/logo.png"
+                alt="Sterling"
+                width={32}
+                height={32}
+                className="h-8 w-8 shrink-0 object-contain"
+              />
             )}
             <div
               className={`max-w-[80%] rounded-2xl px-4 py-3 ${
@@ -673,9 +703,13 @@ export default function ChatPage() {
         ))}
         {loading && (
           <div className="flex gap-4">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600">
-              <Sparkles className="h-4 w-4 text-white" />
-            </div>
+            <Image
+              src="/logo.png"
+              alt="Sterling"
+              width={32}
+              height={32}
+              className="h-8 w-8 shrink-0 object-contain"
+            />
             <div className="flex items-center gap-2 rounded-2xl bg-muted px-4 py-3">
               <Loader2 className="h-4 w-4 animate-spin" />
               <span className="text-sm text-muted-foreground">Analyzing your finances...</span>
@@ -843,7 +877,8 @@ export default function ChatPage() {
 
       {/* Main Chat Area */}
       <Card className="flex-1 flex flex-col overflow-hidden">
-        {messages.length === 0 ? <WelcomeScreen /> : <ChatView />}
+        {/* Render inline to prevent remounting on state changes */}
+        {messages.length === 0 ? WelcomeScreen() : ChatView()}
       </Card>
     </div>
   )

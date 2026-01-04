@@ -21,14 +21,15 @@ export async function GET() {
       )
     }
 
-    // Fetch user's AI preferences
+    // Fetch user's AI preferences and name
     const { data: profile } = await supabase
       .from('user_profiles')
-      .select('ai_preferences')
+      .select('ai_preferences, first_name')
       .eq('user_id', user.id)
       .maybeSingle()
 
     const aiPrefs = profile?.ai_preferences || {}
+    const userName = profile?.first_name || user.user_metadata?.first_name || null
 
     // Check if transaction analysis is allowed
     if (aiPrefs.allow_transaction_analysis === false) {
@@ -285,7 +286,8 @@ export async function GET() {
       healthScore,
       healthStatus,
       insights,
-      suggestions: suggestions.slice(0, 6) // Top 6 suggestions
+      suggestions: suggestions.slice(0, 6), // Top 6 suggestions
+      userName,
     })
   } catch (error) {
     console.error('Error fetching insights:', error)
