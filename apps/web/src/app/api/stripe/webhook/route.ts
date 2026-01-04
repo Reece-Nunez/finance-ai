@@ -1,14 +1,21 @@
 import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { stripe } from '@/lib/stripe'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 
-// Use service role for webhook handling (bypasses RLS)
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy initialization to avoid build-time errors
+let _supabaseAdmin: SupabaseClient | null = null
+
+function getSupabaseAdmin(): SupabaseClient {
+  if (!_supabaseAdmin) {
+    _supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabaseAdmin
+}
 
 export async function POST(request: Request) {
   const body = await request.text()
@@ -87,7 +94,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
   if (!userId) {
     // Try to find user by customer ID
     const customerId = subscription.customer as string
-    const { data: profile } = await supabaseAdmin
+    const { data: profile } = await getSupabaseAdmin()
       .from('user_profiles')
       .select('user_id')
       .eq('stripe_customer_id', customerId)
@@ -127,7 +134,7 @@ async function updateUserSubscription(userId: string, subscription: Stripe.Subsc
     updates.trial_ends_at = new Date(trialEnd * 1000).toISOString()
   }
 
-  const { error } = await supabaseAdmin
+  const { error } = await getSupabaseAdmin()
     .from('user_profiles')
     .update(updates)
     .eq('user_id', userId)
@@ -142,7 +149,7 @@ async function updateUserSubscription(userId: string, subscription: Stripe.Subsc
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   const customerId = subscription.customer as string
 
-  const { data: profile } = await supabaseAdmin
+  const { data: profile } = await getSupabaseAdmin()
     .from('user_profiles')
     .select('user_id')
     .eq('stripe_customer_id', customerId)
@@ -154,7 +161,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   }
 
   // Downgrade to free tier
-  await supabaseAdmin
+  await getSupabaseAdmin()
     .from('user_profiles')
     .update({
       subscription_tier: 'free',
@@ -171,7 +178,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
   const customerId = invoice.customer as string
 
-  const { data: profile } = await supabaseAdmin
+  const { data: profile } = await getSupabaseAdmin()
     .from('user_profiles')
     .select('user_id')
     .eq('stripe_customer_id', customerId)
@@ -183,7 +190,7 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
   }
 
   // Mark subscription as past_due
-  await supabaseAdmin
+  await getSupabaseAdmin()
     .from('user_profiles')
     .update({ subscription_status: 'past_due' })
     .eq('user_id', profile.user_id)
