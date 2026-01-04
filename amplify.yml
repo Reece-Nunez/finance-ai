@@ -8,25 +8,8 @@ applications:
             - npm ci --prefix ../..
         build:
           commands:
-            # Create .env file for runtime (values not logged)
-            - |
-              cat <<EOF > .env.local
-              PLAID_CLIENT_ID=${PLAID_CLIENT_ID}
-              PLAID_SECRET=${PLAID_SECRET}
-              PLAID_ENV=${PLAID_ENV}
-              SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
-              STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
-              STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
-              STRIPE_PRO_MONTHLY_PRICE_ID=${STRIPE_PRO_MONTHLY_PRICE_ID}
-              STRIPE_PRO_YEARLY_PRICE_ID=${STRIPE_PRO_YEARLY_PRICE_ID}
-              ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-              NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
-              NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
-              NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
-              NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE_ID=${NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE_ID}
-              NEXT_PUBLIC_STRIPE_PRO_YEARLY_PRICE_ID=${NEXT_PUBLIC_STRIPE_PRO_YEARLY_PRICE_ID}
-              NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
-              EOF
+            - printenv | grep -E "^(PLAID_|SUPABASE_|STRIPE_|ANTHROPIC_|NEXT_PUBLIC_)" > .env.local
+            - echo "Created .env.local with $(wc -l < .env.local) variables"
             - npm run build --prefix ../..
       artifacts:
         baseDirectory: .next
