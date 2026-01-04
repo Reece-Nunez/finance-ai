@@ -1,0 +1,17 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci
+    build:
+      commands:
+        - npx turbo build --filter=@sterling/web
+  artifacts:
+    baseDirectory: apps/web/.next
+    files:
+      - '**/*'ac
+  cache:
+    paths:
+      - node_modules/**/*
+      - apps/web/.next/cache/**/*
