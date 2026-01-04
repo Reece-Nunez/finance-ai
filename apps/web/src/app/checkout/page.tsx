@@ -20,12 +20,10 @@ const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
 
 const PRICES = {
   monthly: {
-    id: process.env.NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE_ID!,
     amount: 9.99,
     period: 'month',
   },
   yearly: {
-    id: process.env.NEXT_PUBLIC_STRIPE_PRO_YEARLY_PRICE_ID!,
     amount: 79.99,
     period: 'year',
     savings: '33%',
@@ -53,7 +51,7 @@ interface PromoInfo {
   amountOff: number | null
 }
 
-function CheckoutForm({ priceId, plan }: { priceId: string; plan: 'monthly' | 'yearly' }) {
+function CheckoutForm({ plan }: { plan: 'monthly' | 'yearly' }) {
   const stripe = useStripe()
   const elements = useElements()
   const router = useRouter()
@@ -134,7 +132,7 @@ function CheckoutForm({ priceId, plan }: { priceId: string; plan: 'monthly' | 'y
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          priceId,
+          plan,
           paymentMethodId: paymentMethod.id,
           promoCodeId: promoInfo?.promoCodeId || null,
         }),
@@ -309,7 +307,6 @@ function CheckoutContent() {
   const [loading, setLoading] = useState(true)
 
   const plan = (searchParams.get('plan') as 'monthly' | 'yearly') || 'monthly'
-  const priceId = plan === 'yearly' ? PRICES.yearly.id : PRICES.monthly.id
 
   useEffect(() => {
     // Create setup intent when page loads
@@ -431,7 +428,7 @@ function CheckoutContent() {
                       },
                     }}
                   >
-                    <CheckoutForm priceId={priceId} plan={plan} />
+                    <CheckoutForm plan={plan} />
                   </Elements>
                 ) : (
                   <div className="py-8 text-center text-muted-foreground">

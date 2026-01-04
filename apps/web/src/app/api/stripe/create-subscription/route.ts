@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@/lib/supabase/server'
-import { stripe } from '@/lib/stripe'
+import { stripe, getStripePrices } from '@/lib/stripe'
 import { getUserSubscription, updateSubscription } from '@/lib/subscription'
 
 export async function POST(request: Request) {
@@ -13,15 +13,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { priceId, paymentMethodId, promoCodeId } = await request.json()
+    const { plan, paymentMethodId, promoCodeId } = await request.json()
 
-    console.log('Create subscription request:', { priceId, paymentMethodId: !!paymentMethodId, promoCodeId })
+    console.log('Create subscription request:', { plan, paymentMethodId: !!paymentMethodId, promoCodeId })
 
-    // Basic validation - ensure it looks like a Stripe price ID
-    // Stripe will validate the actual price exists when creating subscription
-    if (!priceId || typeof priceId !== 'string' || !priceId.startsWith('price_')) {
-      console.error('Invalid price ID format:', priceId, 'Type:', typeof priceId)
-      return NextResponse.json({ error: `Invalid price ID: ${priceId || 'undefined'}` }, { status: 400 })
+    // Validate plan and get price ID from server-side env vars
+    if (!plan || (plan !== 'monthly' && plan !== 'yearly')) {
+      return NextResponse.json({ error: 'Invalid plan type' }, { status: 400 })
+    }
+
+    const prices = getStripePrices()
+    const priceId = plan === 'yearly' ? prices.PRO_YEARLY : prices.PRO_MONTHLY
+
+    if (!priceId) {
+      console.error('Price ID not configured for plan:', plan)
+      return NextResponse.json({ error: 'Price not configured' }, { status: 500 })
     }
 
     if (!paymentMethodId) {

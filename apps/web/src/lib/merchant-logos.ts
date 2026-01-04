@@ -182,6 +182,7 @@ export const MERCHANT_DOMAINS: Record<string, string> = {
   'winndixie': 'winndixie.com',
   'shoprite': 'shoprite.com',
   'acme': 'acmemarkets.com',
+  'homeland': 'homelandstores.com',
 
   // Gas Stations
   'shell': 'shell.com',
@@ -250,6 +251,8 @@ export const MERCHANT_DOMAINS: Record<string, string> = {
   'newegg': 'newegg.com',
   'bh': 'bhphotovideo.com',
   'bhphoto': 'bhphotovideo.com',
+  'supabase': 'supabase.com',
+  'life360': 'life360.com',
 
   // Streaming & Entertainment
   'netflix': 'netflix.com',
@@ -284,6 +287,7 @@ export const MERCHANT_DOMAINS: Record<string, string> = {
   'epicgames': 'epicgames.com',
   'siriusxm': 'siriusxm.com',
   'sirius': 'siriusxm.com',
+  'poncan': 'poncantheatre.org',
 
   // Utilities & Services
   'att': 'att.com',
@@ -298,6 +302,7 @@ export const MERCHANT_DOMAINS: Record<string, string> = {
   'cox': 'cox.com',
   'centurylink': 'centurylink.com',
   'frontier': 'frontier.com',
+  'oklahomafarm': 'okfarmbureau.org',
 
   // Rideshare & Delivery
   'uber': 'uber.com',
@@ -437,7 +442,6 @@ export const MERCHANT_DOMAINS: Record<string, string> = {
   'notion': 'notion.so',
   'slack': 'slack.com',
   'zoom': 'zoom.us',
-  'life360': 'life360.com',
   'life 360': 'life360.com',
   'rocketmoney': 'rocketmoney.com',
   'rocket money': 'rocketmoney.com',
@@ -455,7 +459,7 @@ export const MERCHANT_DOMAINS: Record<string, string> = {
   'napa auto': 'napaonline.com',
   'carquest': 'carquest.com',
   'o reilly': 'oreillyauto.com',
-  'kelle '
+  'kelle': 'kellerepair.com',
 
   // Other Common
   'costcowholesale': 'costco.com',
