@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@/lib/supabase/server'
-import { stripe, STRIPE_PRICES } from '@/lib/stripe'
+import { stripe, getStripePrices } from '@/lib/stripe'
 import { getUserSubscription, updateSubscription } from '@/lib/subscription'
 
 export async function POST(request: Request) {
@@ -15,8 +15,10 @@ export async function POST(request: Request) {
 
     const { priceId, paymentMethodId, promoCodeId } = await request.json()
 
-    // Validate price ID
-    if (priceId !== STRIPE_PRICES.PRO_MONTHLY && priceId !== STRIPE_PRICES.PRO_YEARLY) {
+    // Validate price ID (get prices at runtime, not build time)
+    const stripePrices = getStripePrices()
+    if (priceId !== stripePrices.PRO_MONTHLY && priceId !== stripePrices.PRO_YEARLY) {
+      console.error('Invalid price ID:', priceId, 'Expected:', stripePrices.PRO_MONTHLY, 'or', stripePrices.PRO_YEARLY)
       return NextResponse.json({ error: 'Invalid price ID' }, { status: 400 })
     }
 

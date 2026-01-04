@@ -33,6 +33,15 @@ export const stripe = new Proxy({} as Stripe, {
   },
 })
 
+// Function to get prices at runtime (not build time)
+export function getStripePrices() {
+  return {
+    PRO_MONTHLY: process.env.STRIPE_PRO_MONTHLY_PRICE_ID || '',
+    PRO_YEARLY: process.env.STRIPE_PRO_YEARLY_PRICE_ID || '',
+  }
+}
+
+// Deprecated: use getStripePrices() instead
 export const STRIPE_PRICES = {
   PRO_MONTHLY: process.env.STRIPE_PRO_MONTHLY_PRICE_ID || '',
   PRO_YEARLY: process.env.STRIPE_PRO_YEARLY_PRICE_ID || '',
