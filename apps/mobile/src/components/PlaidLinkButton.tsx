@@ -1,9 +1,8 @@
 import { useState, useCallback } from 'react'
-import { TouchableOpacity, Text, ActivityIndicator, Alert, View } from 'react-native'
+import { TouchableOpacity, Text, ActivityIndicator, Alert } from 'react-native'
 import {
   create,
   open,
-  dismissLink,
   LinkSuccess,
   LinkExit,
   LinkIOSPresentationStyle,

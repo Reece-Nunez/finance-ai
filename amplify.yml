@@ -10,7 +10,7 @@ frontend:
   artifacts:
     baseDirectory: apps/web/.next
     files:
-      - '**/*'ac
+      - '**/*'
   cache:
     paths:
       - node_modules/**/*
