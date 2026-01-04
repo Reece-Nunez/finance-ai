@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { plaidClient } from '@/lib/plaid'
-import { Products, CountryCode } from 'plaid'
+import { Products, CountryCode, PlaidError } from 'plaid'
 
 export async function POST() {
   try {
@@ -25,8 +25,20 @@ export async function POST() {
     return NextResponse.json({ link_token: response.data.link_token })
   } catch (error) {
     console.error('Error creating link token:', error)
+
+    // Extract Plaid-specific error details
+    const plaidError = error as { response?: { data?: PlaidError } }
+    const errorMessage = plaidError.response?.data?.error_message || 'Failed to create link token'
+    const errorCode = plaidError.response?.data?.error_code || 'UNKNOWN'
+
+    console.error('Plaid error details:', {
+      code: errorCode,
+      message: errorMessage,
+      type: plaidError.response?.data?.error_type,
+    })
+
     return NextResponse.json(
-      { error: 'Failed to create link token' },
+      { error: errorMessage, code: errorCode },
       { status: 500 }
     )
   }

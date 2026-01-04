@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { usePlaidLink } from 'react-plaid-link'
 import { Button } from '@/components/ui/button'
-import { Plus, Loader2 } from 'lucide-react'
+import { Plus, Loader2, AlertCircle } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface PlaidLinkButtonProps {
   onSuccess?: () => void
@@ -12,14 +13,30 @@ interface PlaidLinkButtonProps {
 export function PlaidLinkButton({ onSuccess }: PlaidLinkButtonProps) {
   const [linkToken, setLinkToken] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const createLinkToken = async () => {
-      const response = await fetch('/api/plaid/create-link-token', {
-        method: 'POST',
-      })
-      const data = await response.json()
-      setLinkToken(data.link_token)
+      try {
+        const response = await fetch('/api/plaid/create-link-token', {
+          method: 'POST',
+        })
+        const data = await response.json()
+
+        if (!response.ok) {
+          console.error('Plaid error:', data)
+          setError(data.error || 'Failed to initialize bank connection')
+          toast.error('Bank Connection Error', {
+            description: data.error || 'Failed to initialize. Please try again later.'
+          })
+          return
+        }
+
+        setLinkToken(data.link_token)
+      } catch (err) {
+        console.error('Error fetching link token:', err)
+        setError('Failed to connect to server')
+      }
     }
     createLinkToken()
   }, [])
@@ -57,6 +74,19 @@ export function PlaidLinkButton({ onSuccess }: PlaidLinkButtonProps) {
     token: linkToken,
     onSuccess: onPlaidSuccess,
   })
+
+  if (error) {
+    return (
+      <Button
+        disabled
+        variant="destructive"
+        className="opacity-80"
+      >
+        <AlertCircle className="mr-2 h-4 w-4" />
+        Connection Unavailable
+      </Button>
+    )
+  }
 
   return (
     <Button
