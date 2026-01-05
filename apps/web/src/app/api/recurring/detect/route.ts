@@ -13,7 +13,7 @@ const AI_RECURRING_PROMPT = `You are a financial analyst specializing in detecti
 4. **Insurance** - Auto, home, health, life (monthly/quarterly/annual)
 5. **Rent/Mortgage** - Housing payments
 6. **Credit card auto-payments** - If there's a pattern of paying the same card monthly
-7. **Paychecks** - Regular income deposits (bi-weekly or monthly)
+7. **Paychecks** - Regular income deposits (bi-weekly or monthly) - USE PROVIDED INCOME SOURCES DATA
 
 ## WHAT TO EXCLUDE (Not Bills - Just Frequent Shopping):
 - **Gas stations** - Even if you go weekly, buying gas is shopping, not a bill
@@ -53,7 +53,13 @@ Respond with a JSON object:
   "insights": "Brief summary of what you found"
 }
 
-Only include items with confidence >= 70. Sort by confidence descending. Be CONSERVATIVE - when in doubt, exclude it.`
+Only include items with confidence >= 70. Sort by confidence descending. Be CONSERVATIVE - when in doubt, exclude it.
+
+## IMPORTANT: User-Verified Data
+The user has already set up some income sources and recurring bills in the app. This data is provided separately as "knownIncomeSources" and "knownRecurringPatterns".
+- For income: USE the provided income sources data for paydays/typical_day. Don't guess - use the actual dates from the data.
+- For bills: If a recurring pattern is already known, include it with the exact data provided.
+- You can ALSO detect new patterns that aren't in the known data yet.`
 
 interface Transaction {
   id: string
@@ -74,14 +80,50 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // Fetch income sources - these are user-verified
+  const { data: incomeSources } = await supabase
+    .from('income_sources')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+
+  // Fetch known recurring patterns - user-verified bills
+  const { data: recurringPatterns } = await supabase
+    .from('recurring_patterns')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+
+  // Convert income sources to recurring format
+  const incomeRecurring = (incomeSources || [])
+    .filter(source => source.frequency !== 'irregular' && !source.next_expected_date?.startsWith('9999'))
+    .map(source => {
+      const nextDate = source.next_expected_date ? new Date(source.next_expected_date) : null
+      const typicalDay = nextDate ? nextDate.getDate() : (source.last_received_date ? new Date(source.last_received_date).getDate() : 1)
+
+      return {
+        name: source.display_name || source.name,
+        type: 'income' as const,
+        frequency: source.frequency === 'bi-weekly' ? 'bi-weekly' : source.frequency === 'weekly' ? 'weekly' : 'monthly',
+        typical_day: typicalDay,
+        amount: Math.abs(source.amount),
+        amount_varies: false,
+        confidence: source.is_verified ? 100 : 95,
+        next_expected_date: source.next_expected_date || '',
+        category: 'INCOME',
+        bill_type: 'income' as const,
+        fromIncomeSource: true,
+      }
+    })
+
   // Check subscription for AI features
   const subscription = await getUserSubscription(user.id)
   const isPro = canAccessFeature(subscription, 'ai_suggestions') // Using ai_suggestions as proxy for AI features
 
   if (!isPro) {
-    // Return empty for non-Pro users - they'll use client-side pattern matching
+    // Return income sources for non-Pro users - they'll use client-side pattern matching for bills
     return NextResponse.json({
-      recurring: [],
+      recurring: incomeRecurring,
       useClientDetection: true,
       message: 'AI recurring detection requires Pro subscription'
     })
@@ -114,7 +156,7 @@ export async function GET() {
 
   if (!transactions || transactions.length < 10) {
     return NextResponse.json({
-      recurring: [],
+      recurring: incomeRecurring, // Still return income sources even without enough transactions
       message: 'Not enough transaction history for AI analysis'
     })
   }
@@ -130,6 +172,27 @@ export async function GET() {
     is_income: tx.is_income || tx.amount < 0,
   }))
 
+  // Format income sources for AI context
+  const incomeContext = (incomeSources || []).map(source => ({
+    name: source.display_name || source.name,
+    amount: source.amount,
+    frequency: source.frequency,
+    typical_day: source.next_expected_date
+      ? new Date(source.next_expected_date).getDate()
+      : (source.last_received_date ? new Date(source.last_received_date).getDate() : null),
+    next_expected_date: source.next_expected_date,
+    income_type: source.income_type,
+  }))
+
+  // Format recurring patterns for AI context
+  const billsContext = (recurringPatterns || []).map(pattern => ({
+    name: pattern.display_name || pattern.name,
+    amount: pattern.amount,
+    frequency: pattern.frequency,
+    typical_day: pattern.expected_day,
+    category: pattern.category,
+  }))
+
   try {
     const response = await anthropic.messages.create({
       model: 'claude-3-5-haiku-20241022', // Using Haiku for cost efficiency
@@ -137,7 +200,16 @@ export async function GET() {
       messages: [
         {
           role: 'user',
-          content: `Analyze these ${transactions.length} transactions from the last 6 months and identify all recurring patterns:\n\n${JSON.stringify(txList, null, 2)}`,
+          content: `Analyze these ${transactions.length} transactions from the last 6 months and identify all recurring patterns.
+
+## Known Income Sources (USER VERIFIED - use these exact dates):
+${JSON.stringify(incomeContext, null, 2)}
+
+## Known Recurring Bills (USER VERIFIED):
+${JSON.stringify(billsContext, null, 2)}
+
+## Transactions to analyze:
+${JSON.stringify(txList, null, 2)}`,
         },
       ],
       system: AI_RECURRING_PROMPT,
@@ -160,15 +232,42 @@ export async function GET() {
       })
     }
 
+    // Get AI results
+    const aiResults = result.recurring || []
+
+    // For income items: replace AI-guessed data with actual income sources data
+    // For expense items: use AI results but also include any known patterns
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mergedResults: any[] = []
+    const processedNames = new Set<string>()
+
+    // First, add income sources with their exact data (overrides any AI guesses)
+    incomeRecurring.forEach(source => {
+      mergedResults.push(source)
+      processedNames.add(source.name.toLowerCase())
+    })
+
+    // Then add AI-detected items (excluding duplicates and income items we already have)
+    aiResults.forEach((item: { name: string; type: string }) => {
+      const nameLower = item.name.toLowerCase()
+      // Skip if it's an income item we already have from income sources
+      if (item.type === 'income' && processedNames.has(nameLower)) return
+      // Skip duplicate names
+      if (processedNames.has(nameLower)) return
+
+      mergedResults.push(item)
+      processedNames.add(nameLower)
+    })
+
     return NextResponse.json({
-      recurring: result.recurring || [],
+      recurring: mergedResults,
       insights: result.insights || '',
       aiPowered: true,
     })
   } catch (aiError) {
     console.error('AI recurring detection error:', aiError)
     return NextResponse.json({
-      recurring: [],
+      recurring: incomeRecurring, // Still return income sources even if AI fails
       error: 'AI analysis failed',
       useClientDetection: true,
     })

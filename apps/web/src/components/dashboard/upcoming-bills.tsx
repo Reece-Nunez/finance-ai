@@ -50,6 +50,17 @@ interface AIRecurringItem {
   category: string
 }
 
+interface IncomeSource {
+  id: string
+  name: string
+  display_name: string
+  income_type: string
+  amount: number
+  frequency: string
+  next_expected_date: string | null
+  last_received_date: string | null
+}
+
 interface UpcomingBillsProps {
   transactions: Transaction[]
   isPro?: boolean
@@ -202,8 +213,26 @@ export function UpcomingBills({ transactions, isPro = false }: UpcomingBillsProp
   const [weekOffset, setWeekOffset] = useState(0)
   const [aiRecurringBills, setAiRecurringBills] = useState<RecurringBill[]>([])
   const [aiPaydays, setAiPaydays] = useState<number[]>([])
+  const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([])
   const [loadingAI, setLoadingAI] = useState(false)
   const [usingAI, setUsingAI] = useState(false)
+
+  // Fetch income sources for accurate payday info
+  useEffect(() => {
+    const fetchIncomeSources = async () => {
+      try {
+        const response = await fetch('/api/income')
+        if (response.ok) {
+          const data = await response.json()
+          setIncomeSources(data.sources || [])
+        }
+      } catch (error) {
+        console.error('Failed to fetch income sources:', error)
+      }
+    }
+
+    fetchIncomeSources()
+  }, [])
 
   // Fetch AI-detected recurring bills for Pro users
   useEffect(() => {
@@ -218,12 +247,11 @@ export function UpcomingBills({ transactions, isPro = false }: UpcomingBillsProp
           if (data.aiPowered && data.recurring?.length > 0) {
             // Convert AI results to RecurringBill format
             const bills: RecurringBill[] = []
-            const paydays: number[] = []
+            // Don't use AI for paydays - we'll use income sources instead
 
             data.recurring.forEach((item: AIRecurringItem) => {
-              if (item.type === 'income') {
-                paydays.push(item.typical_day)
-              } else {
+              // Skip income items - we get those from income sources
+              if (item.type !== 'income') {
                 bills.push({
                   name: item.name,
                   amount: item.amount,
@@ -238,7 +266,6 @@ export function UpcomingBills({ transactions, isPro = false }: UpcomingBillsProp
             })
 
             setAiRecurringBills(bills)
-            setAiPaydays(paydays)
             setUsingAI(true)
           }
         }
@@ -252,12 +279,42 @@ export function UpcomingBills({ transactions, isPro = false }: UpcomingBillsProp
     fetchAIRecurring()
   }, [isPro])
 
+  // Get paydays from income sources (more accurate than AI guessing)
+  useEffect(() => {
+    if (incomeSources.length > 0) {
+      const paydays: number[] = []
+
+      incomeSources.forEach(source => {
+        // Skip irregular income - no set payday
+        if (source.frequency === 'irregular') return
+        // Skip far-future placeholder dates
+        if (source.next_expected_date?.startsWith('9999')) return
+
+        if (source.next_expected_date) {
+          const [, , day] = source.next_expected_date.split('-').map(Number)
+          if (!paydays.includes(day)) {
+            paydays.push(day)
+          }
+        } else if (source.last_received_date) {
+          // Fallback to last received date
+          const [, , day] = source.last_received_date.split('-').map(Number)
+          if (!paydays.includes(day)) {
+            paydays.push(day)
+          }
+        }
+      })
+
+      setAiPaydays(paydays)
+    }
+  }, [incomeSources])
+
   // Use AI results if available, otherwise fall back to basic pattern matching
   const basicRecurringBills = useMemo(() => detectRecurringBills(transactions), [transactions])
   const basicPaydays = useMemo(() => detectPaydays(transactions), [transactions])
 
   const recurringBills = usingAI ? aiRecurringBills : basicRecurringBills
-  const paydays = usingAI ? aiPaydays : basicPaydays
+  // Prioritize income sources for paydays (most accurate), then AI, then basic detection
+  const paydays = aiPaydays.length > 0 ? aiPaydays : basicPaydays
 
   // Get the week's dates
   const today = new Date()

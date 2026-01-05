@@ -3,6 +3,225 @@ import { createClient } from '@/lib/supabase/server'
 import { anthropic, FINANCIAL_ADVISOR_SYSTEM_PROMPT, formatFinancialContext } from '@/lib/ai'
 import { getUserSubscription, canAccessFeature } from '@/lib/subscription'
 import { checkAndIncrementUsage, rateLimitResponse } from '@/lib/ai-usage'
+import { SupabaseClient } from '@supabase/supabase-js'
+
+// Tools that Sterling can use to take actions
+const STERLING_TOOLS = [
+  {
+    name: 'create_transaction_rule',
+    description: 'Create a transaction rule to automatically rename, categorize, or ignore transactions that match a pattern. Use this when the user asks to ignore, categorize, or rename certain transactions.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        match_pattern: {
+          type: 'string',
+          description: 'The text pattern to match in transaction names (e.g., "INTEREST" to match interest deposits, "WALMART" for Walmart transactions)',
+        },
+        display_name: {
+          type: 'string',
+          description: 'Optional: Rename matching transactions to this display name',
+        },
+        set_category: {
+          type: 'string',
+          description: 'Optional: Set the category for matching transactions',
+        },
+        set_ignore_type: {
+          type: 'string',
+          enum: ['all', 'budget', 'none'],
+          description: 'Optional: "all" to ignore from all reports, "budget" to ignore from budget only, "none" to not ignore',
+        },
+        set_as_income: {
+          type: 'boolean',
+          description: 'Optional: Mark matching transactions as income',
+        },
+      },
+      required: ['match_pattern'],
+    },
+  },
+  {
+    name: 'update_transaction',
+    description: 'Update a specific transaction (rename, categorize, or ignore it). Use this for one-off changes to a single transaction.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        transaction_id: {
+          type: 'string',
+          description: 'The ID of the transaction to update',
+        },
+        display_name: {
+          type: 'string',
+          description: 'New display name for the transaction',
+        },
+        category: {
+          type: 'string',
+          description: 'New category for the transaction',
+        },
+        ignore_type: {
+          type: 'string',
+          enum: ['all', 'budget', 'none'],
+          description: '"all" to ignore from all reports, "budget" to ignore from budget only, "none" to not ignore',
+        },
+      },
+      required: ['transaction_id'],
+    },
+  },
+  {
+    name: 'search_transactions',
+    description: 'Search for transactions by name or pattern to find specific transactions',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        search_term: {
+          type: 'string',
+          description: 'The text to search for in transaction names',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of results to return (default 10)',
+        },
+      },
+      required: ['search_term'],
+    },
+  },
+]
+
+// Execute a tool call
+async function executeTool(
+  toolName: string,
+  toolInput: Record<string, unknown>,
+  supabase: SupabaseClient,
+  userId: string
+): Promise<{ success: boolean; message: string; data?: unknown }> {
+  switch (toolName) {
+    case 'create_transaction_rule': {
+      const { match_pattern, display_name, set_category, set_ignore_type, set_as_income } = toolInput as {
+        match_pattern: string
+        display_name?: string
+        set_category?: string
+        set_ignore_type?: string
+        set_as_income?: boolean
+      }
+
+      // Build description
+      const actions: string[] = []
+      if (display_name) actions.push(`rename to "${display_name}"`)
+      if (set_category) actions.push(`categorize as "${set_category}"`)
+      if (set_as_income) actions.push('mark as income')
+      if (set_ignore_type === 'all') actions.push('ignore from all reports')
+      if (set_ignore_type === 'budget') actions.push('ignore from budget')
+
+      const description = actions.length > 0
+        ? `"${match_pattern}": ${actions.join(', ')}`
+        : `Match "${match_pattern}"`
+
+      // Create the rule
+      const { data: rule, error } = await supabase
+        .from('transaction_rules')
+        .insert({
+          user_id: userId,
+          match_field: 'name',
+          match_pattern,
+          display_name: display_name || null,
+          set_category: set_category || null,
+          set_as_income: set_as_income || false,
+          set_ignore_type: set_ignore_type || null,
+          description,
+        })
+        .select()
+        .single()
+
+      if (error) {
+        return { success: false, message: `Failed to create rule: ${error.message}` }
+      }
+
+      // Apply rule to existing transactions
+      const updates: Record<string, unknown> = {}
+      if (display_name) updates.display_name = display_name
+      if (set_category) updates.category = set_category
+      if (set_as_income) updates.is_income = true
+      if (set_ignore_type && set_ignore_type !== 'none') updates.ignore_type = set_ignore_type
+
+      if (Object.keys(updates).length > 0) {
+        // First count matching transactions
+        const { count } = await supabase
+          .from('transactions')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .ilike('name', `%${match_pattern}%`)
+
+        // Then update them
+        await supabase
+          .from('transactions')
+          .update(updates)
+          .eq('user_id', userId)
+          .ilike('name', `%${match_pattern}%`)
+
+        return {
+          success: true,
+          message: `Created rule "${description}" and applied to ${count || 0} existing transactions.`,
+          data: { rule, updated_count: count || 0 },
+        }
+      }
+
+      return { success: true, message: `Created rule: ${description}`, data: { rule } }
+    }
+
+    case 'update_transaction': {
+      const { transaction_id, display_name, category, ignore_type } = toolInput as {
+        transaction_id: string
+        display_name?: string
+        category?: string
+        ignore_type?: string
+      }
+
+      const updates: Record<string, unknown> = {}
+      if (display_name) updates.display_name = display_name
+      if (category) updates.category = category
+      if (ignore_type) updates.ignore_type = ignore_type
+
+      if (Object.keys(updates).length === 0) {
+        return { success: false, message: 'No updates specified' }
+      }
+
+      const { error } = await supabase
+        .from('transactions')
+        .update(updates)
+        .eq('id', transaction_id)
+        .eq('user_id', userId)
+
+      if (error) {
+        return { success: false, message: `Failed to update transaction: ${error.message}` }
+      }
+
+      return { success: true, message: 'Transaction updated successfully' }
+    }
+
+    case 'search_transactions': {
+      const { search_term, limit = 10 } = toolInput as { search_term: string; limit?: number }
+
+      const { data: transactions, error } = await supabase
+        .from('transactions')
+        .select('id, name, display_name, merchant_name, amount, date, category, ignore_type')
+        .eq('user_id', userId)
+        .ilike('name', `%${search_term}%`)
+        .order('date', { ascending: false })
+        .limit(limit)
+
+      if (error) {
+        return { success: false, message: `Failed to search transactions: ${error.message}` }
+      }
+
+      return {
+        success: true,
+        message: `Found ${transactions?.length || 0} transactions matching "${search_term}"`,
+        data: { transactions },
+      }
+    }
+
+    default:
+      return { success: false, message: `Unknown tool: ${toolName}` }
+  }
+}
 
 export async function GET(request: Request) {
   try {
@@ -216,19 +435,94 @@ ${greeting}
 ${financialContext}
 ${budgetContext}`
 
-    // Call Claude
+    // Call Claude with tools
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1024,
-      system: systemPrompt,
+      system: systemPrompt + `
+
+## ACTIONS YOU CAN TAKE
+You have the ability to take actions in the app when users ask you to. Available actions include:
+- Creating transaction rules to ignore, rename, or categorize transactions
+- Updating individual transactions
+- Searching for specific transactions
+
+When a user asks you to do something like "ignore all interest transactions" or "categorize all Walmart as groceries", USE THE TOOLS to actually do it, don't just explain how they could do it themselves.
+
+After using a tool, always confirm what you did in a friendly way.`,
       messages: messages.map((m: { role: string; content: string }) => ({
         role: m.role as 'user' | 'assistant',
         content: m.content,
       })),
+      tools: STERLING_TOOLS,
     })
 
-    const assistantMessage =
-      response.content[0].type === 'text' ? response.content[0].text : ''
+    // Process the response - handle tool calls if present
+    let assistantMessage = ''
+    const toolResults: Array<{ tool: string; result: string }> = []
+
+    for (const block of response.content) {
+      if (block.type === 'text') {
+        assistantMessage += block.text
+      } else if (block.type === 'tool_use') {
+        // Execute the tool
+        const result = await executeTool(
+          block.name,
+          block.input as Record<string, unknown>,
+          supabase,
+          user.id
+        )
+        toolResults.push({
+          tool: block.name,
+          result: result.message,
+        })
+
+        // If tool was used, we need to continue the conversation to get a final response
+        if (response.stop_reason === 'tool_use') {
+          // Call Claude again with tool results
+          const toolResultMessages = [
+            ...messages.map((m: { role: string; content: string }) => ({
+              role: m.role as 'user' | 'assistant',
+              content: m.content,
+            })),
+            {
+              role: 'assistant' as const,
+              content: response.content,
+            },
+            {
+              role: 'user' as const,
+              content: [
+                {
+                  type: 'tool_result' as const,
+                  tool_use_id: block.id,
+                  content: JSON.stringify(result),
+                },
+              ],
+            },
+          ]
+
+          const followUpResponse = await anthropic.messages.create({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 1024,
+            system: systemPrompt,
+            messages: toolResultMessages,
+            tools: STERLING_TOOLS,
+          })
+
+          // Extract text from follow-up response
+          for (const followUpBlock of followUpResponse.content) {
+            if (followUpBlock.type === 'text') {
+              assistantMessage = followUpBlock.text
+            }
+          }
+        }
+      }
+    }
+
+    // If no text response was generated, create one from tool results
+    if (!assistantMessage && toolResults.length > 0) {
+      assistantMessage = toolResults.map(r => `✅ ${r.result}`).join('\n')
+    }
 
     // Save assistant message
     await supabase.from('chat_messages').insert({
@@ -238,7 +532,11 @@ ${budgetContext}`
       content: assistantMessage,
     })
 
-    return NextResponse.json({ message: assistantMessage, session_id: sessionId })
+    return NextResponse.json({
+      message: assistantMessage,
+      session_id: sessionId,
+      actions_taken: toolResults.length > 0 ? toolResults : undefined,
+    })
   } catch (error) {
     console.error('Error in AI chat:', error)
     return NextResponse.json(
