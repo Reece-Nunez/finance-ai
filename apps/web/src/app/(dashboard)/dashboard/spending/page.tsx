@@ -529,11 +529,25 @@ export default function SpendingPage() {
   const [selectedMonth, setSelectedMonth] = useState(5) // Current month (last in array)
   const [includeBills, setIncludeBills] = useState(true)
 
+  // Custom date range state
+  const [customStartDate, setCustomStartDate] = useState(() => {
+    const date = new Date()
+    date.setMonth(date.getMonth() - 1)
+    return date.toISOString().split('T')[0]
+  })
+  const [customEndDate, setCustomEndDate] = useState(() => {
+    return new Date().toISOString().split('T')[0]
+  })
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
       try {
-        const response = await fetch(`/api/spending?period=${period}`)
+        let url = `/api/spending?period=${period}`
+        if (period === 'custom') {
+          url = `/api/spending?period=custom&start_date=${customStartDate}&end_date=${customEndDate}`
+        }
+        const response = await fetch(url)
         if (response.ok) {
           const result = await response.json()
           setData(result)
@@ -546,7 +560,7 @@ export default function SpendingPage() {
     }
 
     fetchData()
-  }, [period])
+  }, [period, customStartDate, customEndDate])
 
   const handleCategoryClick = (category: string) => {
     router.push(`/dashboard/spending/category/${encodeURIComponent(category)}`)
@@ -593,10 +607,34 @@ export default function SpendingPage() {
           <TabsList className="w-full sm:w-auto">
             <TabsTrigger value="last_month" className="flex-1 sm:flex-none text-xs sm:text-sm">Last Month</TabsTrigger>
             <TabsTrigger value="this_month" className="flex-1 sm:flex-none text-xs sm:text-sm">This Month</TabsTrigger>
-            <TabsTrigger value="last_90_days" className="flex-1 sm:flex-none text-xs sm:text-sm">Custom</TabsTrigger>
+            <TabsTrigger value="custom" className="flex-1 sm:flex-none text-xs sm:text-sm">Custom</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
+
+      {/* Custom Date Range Picker */}
+      {period === 'custom' && (
+        <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/50 rounded-lg">
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-muted-foreground">From:</label>
+            <input
+              type="date"
+              value={customStartDate}
+              onChange={(e) => setCustomStartDate(e.target.value)}
+              className="px-3 py-1.5 text-sm border rounded-md bg-background"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-muted-foreground">To:</label>
+            <input
+              type="date"
+              value={customEndDate}
+              onChange={(e) => setCustomEndDate(e.target.value)}
+              className="px-3 py-1.5 text-sm border rounded-md bg-background"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Monthly Bar Chart */}
       <MonthlyBarChart

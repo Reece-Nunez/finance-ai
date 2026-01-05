@@ -520,7 +520,7 @@ Based on ALL of this data, provide highly personalized suggestions. Be specific 
     // CALL AI
     // =========================================================================
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-20250514', // Using Haiku for cost efficiency
+      model: 'claude-3-5-haiku-20241022', // Using Haiku for cost efficiency
       max_tokens: 2048, // Increased for more detailed suggestions
       system: SUGGESTION_SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userMessage }],

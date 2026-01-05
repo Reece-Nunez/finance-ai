@@ -55,7 +55,7 @@ export async function POST(request: Request) {
 
     // Parse the natural language query using Claude with tool use
     const parseResponse = await anthropic.messages.create({
-      model: 'claude-haiku-4-20250514', // Using Haiku for cost efficiency - parsing is simpler
+      model: 'claude-3-5-haiku-20241022', // Using Haiku for cost efficiency - parsing is simpler
       max_tokens: 1024,
       system: SEARCH_PARSER_SYSTEM_PROMPT.replace('{{CURRENT_DATE}}', today),
       tools: [SEARCH_FILTER_TOOL],

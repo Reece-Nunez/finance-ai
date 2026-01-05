@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Sparkles, TrendingUp } from 'lucide-react'
+import { Plus, TrendingUp } from 'lucide-react'
+import { SterlingIcon } from '@/components/ui/sterling-icon'
 import Link from 'next/link'
 import { DashboardClient } from '@/components/dashboard/dashboard-client'
 import { getUserSubscription } from '@/lib/subscription'
@@ -109,8 +110,8 @@ export default async function DashboardPage() {
                 </Button>
                 <Button variant="outline" asChild>
                   <Link href="/dashboard/chat">
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Chat with AI Advisor
+                    <SterlingIcon size="md" className="mr-2" />
+                    Ask Sterling
                   </Link>
                 </Button>
               </div>

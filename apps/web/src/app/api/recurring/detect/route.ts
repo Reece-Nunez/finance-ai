@@ -132,7 +132,7 @@ export async function GET() {
 
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-20250514', // Using Haiku for cost efficiency
+      model: 'claude-3-5-haiku-20241022', // Using Haiku for cost efficiency
       max_tokens: 4096,
       messages: [
         {

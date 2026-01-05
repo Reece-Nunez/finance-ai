@@ -41,13 +41,19 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const period = searchParams.get('period') || 'this_month'
   const category = searchParams.get('category')
+  const customStartDate = searchParams.get('start_date')
+  const customEndDate = searchParams.get('end_date')
 
   // Calculate date ranges
   const now = new Date()
   let startDate: Date
   let endDate: Date = new Date(now.getFullYear(), now.getMonth() + 1, 0) // End of current month
 
-  if (period === 'last_month') {
+  if (period === 'custom' && customStartDate && customEndDate) {
+    // Custom date range
+    startDate = new Date(customStartDate)
+    endDate = new Date(customEndDate)
+  } else if (period === 'last_month') {
     startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
     endDate = new Date(now.getFullYear(), now.getMonth(), 0)
   } else if (period === 'this_month') {

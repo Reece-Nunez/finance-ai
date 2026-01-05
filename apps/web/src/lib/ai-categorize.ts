@@ -102,7 +102,7 @@ export async function categorizeTransactions(
   supabase: SupabaseClient,
   userId: string,
   transactionIds?: string[],
-  options?: { force?: boolean }
+  options?: { force?: boolean; batchSize?: number; processAll?: boolean }
 ): Promise<CategorizeResult> {
   // Fetch user's AI preferences
   const { data: profile } = await supabase
@@ -129,16 +129,19 @@ export async function categorizeTransactions(
     .select('id, plaid_transaction_id, plaid_account_id, name, merchant_name, amount, date, category, display_name, ai_category')
     .eq('user_id', userId)
 
+  const batchSize = options?.batchSize || 25
+
   if (transactionIds && transactionIds.length > 0) {
     query = query.in('id', transactionIds)
+  } else if (options?.processAll) {
+    // Process ALL uncategorized transactions (no limit, for batch processing)
+    query = query.or('ai_category.is.null,display_name.is.null').order('date', { ascending: false })
   } else if (options?.force) {
     // Force mode: get recent transactions regardless of AI category status
-    // Limit to 25 to avoid token limits
-    query = query.order('date', { ascending: false }).limit(25)
+    query = query.order('date', { ascending: false }).limit(batchSize)
   } else {
     // Normal mode: get transactions that haven't been AI-categorized OR don't have a display name yet
-    // Limit to 25 to avoid token limits
-    query = query.or('ai_category.is.null,display_name.is.null').limit(25)
+    query = query.or('ai_category.is.null,display_name.is.null').limit(batchSize)
   }
 
   const { data: transactions, error } = await query
@@ -202,7 +205,7 @@ ${JSON.stringify(txList, null, 2)}
 Please categorize these transactions and clean up the names using the account context provided. Each transaction includes its source_account which tells you which account it came from.`
 
   const response = await anthropic.messages.create({
-    model: 'claude-haiku-4-20250514', // Using Haiku for cost efficiency (~90% cheaper than Sonnet)
+    model: 'claude-3-5-haiku-20241022', // Using Haiku for cost efficiency (~90% cheaper than Sonnet)
     max_tokens: 4096,
     messages: [
       {
@@ -398,5 +401,106 @@ Please categorize these transactions and clean up the names using the account co
     found: transactions.length,
     categorized_items: categorizedItems.length > 0 ? categorizedItems : undefined,
     skipped_items: skippedItems.length > 0 ? skippedItems : undefined,
+  }
+}
+
+/**
+ * Process ALL uncategorized transactions in batches
+ * This is for the "Categorize All" button in settings
+ */
+export async function categorizeAllTransactions(
+  supabase: SupabaseClient,
+  userId: string,
+  onProgress?: (processed: number, total: number) => void
+): Promise<CategorizeResult> {
+  const BATCH_SIZE = 25
+
+  // First, count total uncategorized transactions
+  const { count } = await supabase
+    .from('transactions')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .or('ai_category.is.null,display_name.is.null')
+
+  const totalUncategorized = count || 0
+
+  if (totalUncategorized === 0) {
+    return {
+      categorized: 0,
+      needs_review: 0,
+      message: 'All transactions are already categorized'
+    }
+  }
+
+  console.log(`Starting batch categorization of ${totalUncategorized} transactions`)
+
+  let totalCategorized = 0
+  let totalNeedsReview = 0
+  let processed = 0
+  const allCategorizedItems: CategorizedItem[] = []
+  const allSkippedItems: SkippedItem[] = []
+
+  // Process in batches
+  while (processed < totalUncategorized) {
+    // Get next batch of uncategorized transactions
+    const { data: batchIds } = await supabase
+      .from('transactions')
+      .select('id')
+      .eq('user_id', userId)
+      .or('ai_category.is.null,display_name.is.null')
+      .order('date', { ascending: false })
+      .limit(BATCH_SIZE)
+
+    if (!batchIds || batchIds.length === 0) {
+      break // No more transactions to process
+    }
+
+    const ids = batchIds.map(t => t.id)
+
+    // Categorize this batch
+    let batchCategorized = 0
+    let batchNeedsReview = 0
+    try {
+      const result = await categorizeTransactions(supabase, userId, ids)
+
+      batchCategorized = result.categorized
+      batchNeedsReview = result.needs_review
+      totalCategorized += result.categorized
+      totalNeedsReview += result.needs_review
+
+      if (result.categorized_items) {
+        allCategorizedItems.push(...result.categorized_items)
+      }
+      if (result.skipped_items) {
+        allSkippedItems.push(...result.skipped_items)
+      }
+    } catch (batchError) {
+      console.error(`Error processing batch:`, batchError)
+      // Continue with next batch even if this one fails
+    }
+
+    processed += batchIds.length
+
+    // Report progress
+    if (onProgress) {
+      onProgress(processed, totalUncategorized)
+    }
+
+    console.log(`Batch progress: ${processed}/${totalUncategorized} (${totalCategorized} categorized)`)
+
+    // Safety: if we've processed a batch but nothing changed, stop to prevent infinite loop
+    if (batchCategorized === 0 && batchNeedsReview === 0 && batchIds.length === BATCH_SIZE) {
+      console.log('No progress made in batch, stopping to prevent infinite loop')
+      break
+    }
+  }
+
+  return {
+    categorized: totalCategorized,
+    needs_review: totalNeedsReview,
+    found: processed,
+    categorized_items: allCategorizedItems.length > 0 ? allCategorizedItems : undefined,
+    skipped_items: allSkippedItems.length > 0 ? allSkippedItems : undefined,
+    message: `Processed ${processed} transactions in batches`
   }
 }

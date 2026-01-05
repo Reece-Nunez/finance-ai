@@ -10,10 +10,11 @@ import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { formatCategory } from '@/lib/format'
+import { SterlingIcon } from '@/components/ui/sterling-icon'
 import {
   User,
   Bell,
-  Sparkles,
+  // Sparkles removed - using SterlingIcon for AI features
   Download,
   Moon,
   Shield,
@@ -402,18 +403,25 @@ export default function SettingsPage() {
   }
 
   // Manually run AI categorization
-  const runAICategorization = async (force = false) => {
+  const runAICategorization = async (force = false, processAll = false) => {
     setRunningCategorization(true)
     setCategorizationResult(null)
-    setCategorizationStatus('Finding transactions to categorize...')
+    setCategorizationStatus(processAll ? 'Starting batch categorization of all transactions...' : 'Finding transactions to categorize...')
 
     // Simulate progress updates with timeouts
-    const statusUpdates = [
-      { delay: 2000, message: 'Analyzing transactions with AI...' },
-      { delay: 8000, message: 'Processing AI suggestions...' },
-      { delay: 15000, message: 'Updating transaction records...' },
-      { delay: 25000, message: 'Almost done, finalizing...' },
-    ]
+    const statusUpdates = processAll
+      ? [
+          { delay: 3000, message: 'Processing transactions in batches...' },
+          { delay: 10000, message: 'Still working through batches...' },
+          { delay: 30000, message: 'Processing more batches...' },
+          { delay: 60000, message: 'Almost there, finishing up...' },
+        ]
+      : [
+          { delay: 2000, message: 'Analyzing transactions with AI...' },
+          { delay: 8000, message: 'Processing AI suggestions...' },
+          { delay: 15000, message: 'Updating transaction records...' },
+          { delay: 25000, message: 'Almost done, finalizing...' },
+        ]
 
     const timeouts: NodeJS.Timeout[] = []
     statusUpdates.forEach(({ delay, message }) => {
@@ -424,7 +432,7 @@ export default function SettingsPage() {
       const response = await fetch('/api/ai/categorize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ force }),
+        body: JSON.stringify({ force, process_all: processAll }),
       })
       const data = await response.json()
 
@@ -805,7 +813,7 @@ export default function SettingsPage() {
                 className="w-full bg-gradient-to-r from-slate-500 to-slate-700 hover:from-slate-600 hover:to-slate-800"
               >
                 <a href="/dashboard/settings/billing">
-                  <Sparkles className="mr-2 h-4 w-4" />
+                  <SterlingIcon size="md" className="mr-2" />
                   Upgrade to Pro
                 </a>
               </Button>
@@ -1239,7 +1247,7 @@ export default function SettingsPage() {
       <Card>
         <CardHeader className="flex flex-row items-center gap-3">
           <div className="rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 p-2.5">
-            <Sparkles className="h-5 w-5 text-white" />
+            <SterlingIcon size="lg" />
           </div>
           <div className="flex-1">
             <CardTitle>AI Preferences</CardTitle>
@@ -1472,16 +1480,26 @@ export default function SettingsPage() {
                 )}
 
                 {/* Re-run all button */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => runAICategorization(true)}
+                    onClick={() => runAICategorization(true, false)}
                     disabled={runningCategorization || !aiPreferences.auto_categorize}
                     className="text-xs text-muted-foreground hover:text-foreground"
                   >
                     <RefreshCw className="h-3 w-3 mr-1" />
-                    Re-run on all recent transactions
+                    Re-run recent
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => runAICategorization(false, true)}
+                    disabled={runningCategorization || !aiPreferences.auto_categorize}
+                    className="text-xs"
+                  >
+                    <SterlingIcon size="sm" className="mr-1" />
+                    Categorize ALL transactions
                   </Button>
                   <Button
                     variant="ghost"

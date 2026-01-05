@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { categorizeTransactions } from '@/lib/ai-categorize'
+import { categorizeTransactions, categorizeAllTransactions } from '@/lib/ai-categorize'
 import { getUserSubscription, canAccessFeature } from '@/lib/subscription'
 import { checkAndIncrementUsage, rateLimitResponse } from '@/lib/ai-usage'
 
@@ -34,15 +34,20 @@ export async function POST(request: Request) {
 
     let transactionIds: string[] | undefined
     let force = false
+    let processAll = false
     try {
       const body = await request.json()
       transactionIds = body.transaction_ids
       force = body.force === true
+      processAll = body.process_all === true
     } catch {
       // No body provided, will categorize all uncategorized
     }
 
-    const result = await categorizeTransactions(supabase, user.id, transactionIds, { force })
+    // Use batch processing for "process all" requests
+    const result = processAll
+      ? await categorizeAllTransactions(supabase, user.id)
+      : await categorizeTransactions(supabase, user.id, transactionIds, { force })
 
     // Save AI categorization report if there were any results
     let reportId: string | null = null

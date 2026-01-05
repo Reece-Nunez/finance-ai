@@ -8,12 +8,12 @@ import { Badge } from '@/components/ui/badge'
 import {
   ArrowLeft,
   Loader2,
-  Sparkles,
   CheckCircle2,
   AlertCircle,
   Clock,
   ChevronRight,
 } from 'lucide-react'
+import { SterlingIcon } from '@/components/ui/sterling-icon'
 
 interface AIReport {
   id: string
@@ -73,7 +73,9 @@ export default function AIReportsPage() {
 
       {reports.length === 0 ? (
         <div className="text-center py-16">
-          <Sparkles className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <div className="mx-auto mb-4">
+            <SterlingIcon size="xl" className="opacity-50" />
+          </div>
           <h2 className="text-xl font-semibold">No Reports Yet</h2>
           <p className="text-muted-foreground mt-2">
             AI categorization reports will appear here after transactions are synced and processed.
