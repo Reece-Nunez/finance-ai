@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
   Send,
-  Sparkles,
   User,
   Loader2,
   Plus,
@@ -33,6 +32,7 @@ import {
   Lock,
   Crown,
 } from 'lucide-react'
+import { SterlingIcon } from '@/components/ui/sterling-icon'
 import Image from 'next/image'
 import ReactMarkdown from 'react-markdown'
 import { formatCategory } from '@/lib/format'
@@ -576,7 +576,7 @@ export default function ChatPage() {
                   {suggestion.priority === 'high' ? (
                     <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
                   ) : (
-                    <Sparkles className="h-4 w-4 text-emerald-500 shrink-0" />
+                    <SterlingIcon size="sm" className="shrink-0" />
                   )}
                   <span className="text-sm">{suggestion.text}</span>
                   <ArrowRight className="h-4 w-4 text-muted-foreground ml-auto shrink-0" />
@@ -793,7 +793,7 @@ export default function ChatPage() {
               </div>
               <div className="mt-8 grid gap-3 text-left w-full">
                 <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <Sparkles className="h-5 w-5 text-slate-500" />
+                  <SterlingIcon size="md" />
                   <div>
                     <p className="font-medium text-sm">AI Financial Advisor</p>
                     <p className="text-xs text-muted-foreground">Get personalized advice 24/7</p>

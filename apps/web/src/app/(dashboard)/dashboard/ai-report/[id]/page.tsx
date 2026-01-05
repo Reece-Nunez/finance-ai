@@ -11,11 +11,11 @@ import {
   Check,
   X,
   Loader2,
-  Sparkles,
   AlertCircle,
   CheckCircle2,
   Clock,
 } from 'lucide-react'
+import { SterlingIcon } from '@/components/ui/sterling-icon'
 import { formatCategory, formatCurrency } from '@/lib/format'
 
 interface CategorizedItem {
@@ -371,7 +371,7 @@ export default function AIReportPage() {
                           )}
                         </p>
                         <div className="flex items-center gap-2 text-sm">
-                          <Sparkles className="h-4 w-4 text-purple-500" />
+                          <SterlingIcon size="sm" />
                           <span>
                             Suggested: <strong>{formatCategory(item.suggested_category)}</strong>
                           </span>

@@ -27,7 +27,6 @@ import {
   DollarSign,
   X,
   Check,
-  Sparkles,
   ShoppingCart,
   Utensils,
   Car,
@@ -39,6 +38,7 @@ import {
   Gift,
   MoreHorizontal,
 } from 'lucide-react'
+import { SterlingIcon } from '@/components/ui/sterling-icon'
 
 interface Transaction {
   id: string
@@ -536,7 +536,7 @@ function AddBudgetSection({
         {suggestedCategories.length > 0 && (
           <div className="mb-4">
             <p className="text-xs font-medium text-muted-foreground mb-2">
-              <Sparkles className="h-3 w-3 inline mr-1" />
+              <SterlingIcon size="sm" className="inline mr-1" />
               SUGGESTED BASED ON SPENDING
             </p>
             <div className="flex flex-wrap gap-2">

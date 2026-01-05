@@ -8,6 +8,15 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { formatCategory } from '@/lib/format'
 import { SterlingIcon } from '@/components/ui/sterling-icon'
@@ -221,6 +230,13 @@ export default function SettingsPage() {
   const [runningCategorization, setRunningCategorization] = useState(false)
   const [categorizationStatus, setCategorizationStatus] = useState('')
   const [applyingChange, setApplyingChange] = useState<string | null>(null)
+
+  // Batch categorization modal state
+  const [batchModalOpen, setBatchModalOpen] = useState(false)
+  const [batchTotal, setBatchTotal] = useState(0)
+  const [batchProcessed, setBatchProcessed] = useState(0)
+  const [batchStarted, setBatchStarted] = useState(false)
+  const [loadingBatchCount, setLoadingBatchCount] = useState(false)
   const [categorizationResult, setCategorizationResult] = useState<{
     categorized: number
     needs_review: number
@@ -510,6 +526,75 @@ export default function SettingsPage() {
         ),
       }
     })
+  }
+
+  // Open batch categorization modal with count
+  const openBatchModal = async () => {
+    setLoadingBatchCount(true)
+    setBatchModalOpen(true)
+    setBatchStarted(false)
+    setBatchProcessed(0)
+
+    try {
+      const response = await fetch('/api/ai/categorize')
+      const data = await response.json()
+      setBatchTotal(data.uncategorized_count || 0)
+    } catch (error) {
+      console.error('Failed to get uncategorized count:', error)
+      setBatchTotal(0)
+    }
+    setLoadingBatchCount(false)
+  }
+
+  // Run batch categorization with progress simulation
+  const runBatchCategorization = async () => {
+    setBatchStarted(true)
+    setBatchProcessed(0)
+    setCategorizationResult(null)
+
+    // Simulate progress updates while waiting for the API
+    const progressInterval = setInterval(() => {
+      setBatchProcessed(prev => {
+        // Gradually increase but never reach 100% until done
+        const increment = Math.max(1, Math.floor((batchTotal - prev) * 0.05))
+        return Math.min(prev + increment, Math.floor(batchTotal * 0.95))
+      })
+    }, 2000)
+
+    try {
+      const response = await fetch('/api/ai/categorize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ process_all: true }),
+      })
+      const data = await response.json()
+
+      clearInterval(progressInterval)
+      setBatchProcessed(batchTotal)
+
+      setCategorizationResult({
+        categorized: data.categorized || 0,
+        needs_review: data.needs_review || 0,
+        found: data.found || 0,
+        message: data.message,
+        skipped_items: data.skipped_items,
+      })
+
+      // Close modal after a short delay to show completion
+      setTimeout(() => {
+        setBatchModalOpen(false)
+        setBatchStarted(false)
+      }, 2000)
+    } catch (error) {
+      console.error('Failed to run batch categorization:', error)
+      clearInterval(progressInterval)
+      setCategorizationResult({
+        categorized: 0,
+        needs_review: 0,
+        found: 0,
+        message: 'Failed to run batch categorization',
+      })
+    }
   }
 
   // Handle AI preference changes with auto-save
@@ -1494,7 +1579,7 @@ export default function SettingsPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => runAICategorization(false, true)}
+                    onClick={openBatchModal}
                     disabled={runningCategorization || !aiPreferences.auto_categorize}
                     className="text-xs"
                   >
@@ -1901,6 +1986,116 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Batch Categorization Modal */}
+      <Dialog open={batchModalOpen} onOpenChange={(open) => !batchStarted && setBatchModalOpen(open)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <SterlingIcon size="md" />
+              Categorize All Transactions
+            </DialogTitle>
+            <DialogDescription>
+              {!batchStarted ? (
+                <>
+                  This will analyze and categorize all uncategorized transactions using AI.
+                  This process may take <strong>1-5 minutes</strong> depending on the number of transactions.
+                </>
+              ) : (
+                'Processing your transactions...'
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            {loadingBatchCount ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : !batchStarted ? (
+              <div className="space-y-4">
+                <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                        {batchTotal > 0 ? (
+                          <>Found <strong>{batchTotal.toLocaleString()}</strong> transaction{batchTotal !== 1 ? 's' : ''} to categorize</>
+                        ) : (
+                          'No uncategorized transactions found'
+                        )}
+                      </p>
+                      {batchTotal > 0 && (
+                        <p className="text-xs text-amber-700 dark:text-amber-300">
+                          This may take a while. Please don&apos;t close this window until complete.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Progress</span>
+                    <span className="font-medium">
+                      {batchProcessed.toLocaleString()} / {batchTotal.toLocaleString()}
+                    </span>
+                  </div>
+                  <Progress
+                    value={batchTotal > 0 ? (batchProcessed / batchTotal) * 100 : 0}
+                    className="h-3"
+                  />
+                  <p className="text-xs text-muted-foreground text-center">
+                    {batchProcessed === batchTotal && categorizationResult ? (
+                      <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                        Complete! Categorized {categorizationResult.categorized} transactions.
+                      </span>
+                    ) : (
+                      <>Processing transactions in batches...</>
+                    )}
+                  </p>
+                </div>
+
+                {batchProcessed < batchTotal && (
+                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Please wait, this may take a few minutes...</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            {!batchStarted ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => setBatchModalOpen(false)}
+                  disabled={loadingBatchCount}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={runBatchCategorization}
+                  disabled={loadingBatchCount || batchTotal === 0}
+                  className="bg-gradient-to-r from-slate-500 to-slate-700 hover:from-slate-600 hover:to-slate-800"
+                >
+                  <SterlingIcon size="sm" className="mr-2" />
+                  Start Categorization
+                </Button>
+              </>
+            ) : batchProcessed === batchTotal && categorizationResult ? (
+              <Button onClick={() => setBatchModalOpen(false)}>
+                <Check className="h-4 w-4 mr-2" />
+                Done
+              </Button>
+            ) : null}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

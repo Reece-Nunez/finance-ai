@@ -23,8 +23,8 @@ import {
   ThumbsUp,
   ThumbsDown,
   MessageSquare,
-  Sparkles,
 } from 'lucide-react'
+import { SterlingIcon } from '@/components/ui/sterling-icon'
 import {
   Dialog,
   DialogContent,
@@ -314,7 +314,7 @@ export function AnomalyAlerts() {
       setAnomalies(anomalies.filter(a => a.id !== explainAnomaly.id))
       toast.success('Got it! This transaction won\'t affect your spending patterns.', {
         description: 'The AI has learned from your feedback.',
-        icon: <Sparkles className="h-4 w-4" />,
+        icon: <SterlingIcon size="sm" />,
       })
 
       // Reset dialog state
@@ -660,7 +660,7 @@ export function AnomalyAlerts() {
                     </>
                   ) : (
                     <>
-                      <Sparkles className="mr-2 h-4 w-4" />
+                      <SterlingIcon size="sm" className="mr-2" />
                       Teach AI
                     </>
                   )}

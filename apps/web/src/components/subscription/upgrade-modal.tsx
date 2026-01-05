@@ -12,7 +12,6 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   Check,
-  Sparkles,
   Brain,
   TrendingUp,
   Shield,
@@ -20,6 +19,7 @@ import {
   Zap,
   Loader2,
 } from 'lucide-react'
+import { SterlingIcon } from '@/components/ui/sterling-icon'
 import { useSubscription } from '@/hooks/useSubscription'
 
 interface UpgradeModalProps {
@@ -30,7 +30,7 @@ interface UpgradeModalProps {
 
 const PRO_FEATURES = [
   { icon: Brain, label: 'AI Financial Chat', description: 'Get personalized advice from your AI advisor' },
-  { icon: Sparkles, label: 'Natural Language Search', description: 'Ask questions about your transactions' },
+  { icon: Brain, label: 'Natural Language Search', description: 'Ask questions about your transactions' },
   { icon: Zap, label: 'Smart Categorization', description: 'AI automatically categorizes transactions' },
   { icon: Shield, label: 'Anomaly Detection', description: 'Get alerts for suspicious activity' },
   { icon: TrendingUp, label: 'Cash Flow Predictions', description: '30-day balance forecasts with AI learning' },
@@ -52,7 +52,7 @@ export function UpgradeModal({ open, onOpenChange, feature }: UpgradeModalProps)
       <DialogContent className="sm:max-w-xl">
         <DialogHeader className="text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-slate-500 to-slate-700">
-            <Sparkles className="h-6 w-6 text-white" />
+            <SterlingIcon size="lg" />
           </div>
           <DialogTitle className="text-2xl">Upgrade to Pro</DialogTitle>
           <DialogDescription>
@@ -137,7 +137,7 @@ export function UpgradeModal({ open, onOpenChange, feature }: UpgradeModalProps)
             </>
           ) : (
             <>
-              <Sparkles className="mr-2 h-4 w-4" />
+              <SterlingIcon size="sm" className="mr-2" />
               Start Free Trial
             </>
           )}

@@ -14,7 +14,6 @@ import {
   ArrowUp,
   Info,
   Brain,
-  Sparkles,
   Target,
   ChevronDown,
   ChevronUp,
@@ -22,6 +21,7 @@ import {
   Wallet,
   PiggyBank,
 } from 'lucide-react'
+import { SterlingIcon } from '@/components/ui/sterling-icon'
 import {
   Tooltip,
   TooltipContent,
@@ -559,7 +559,7 @@ export function CashFlowForecast() {
           <div className="rounded-lg border border-indigo-200 bg-indigo-50/50 p-3 dark:border-indigo-800 dark:bg-indigo-950/30">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                <SterlingIcon size="sm" />
                 <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
                   AI-Enhanced Prediction
                 </span>

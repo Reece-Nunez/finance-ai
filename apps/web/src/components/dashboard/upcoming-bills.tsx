@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ChevronLeft, ChevronRight, Calendar, DollarSign, Sparkles, Loader2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Calendar, DollarSign, Loader2 } from 'lucide-react'
+import { SterlingIcon } from '@/components/ui/sterling-icon'
 import {
   Tooltip,
   TooltipContent,
@@ -339,7 +340,7 @@ export function UpcomingBills({ transactions, isPro = false }: UpcomingBillsProp
               )}
               {usingAI && !loadingAI && (
                 <Badge variant="secondary" className="text-xs gap-1 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
-                  <Sparkles className="h-3 w-3" />
+                  <SterlingIcon size="sm" />
                   AI Enhanced
                 </Badge>
               )}

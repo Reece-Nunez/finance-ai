@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, Brain, Shield, PieChart, Sparkles, Zap } from 'lucide-react'
+import { ArrowRight, Brain, Shield, PieChart, Zap } from 'lucide-react'
+import { SterlingIcon } from '@/components/ui/sterling-icon'
 
 export default function Home() {
   return (
@@ -33,7 +34,7 @@ export default function Home() {
 
           <div className="mx-auto max-w-7xl px-4 py-24 text-center lg:py-32">
             <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1.5 text-sm font-medium text-slate-700 dark:bg-slate-800/50 dark:text-slate-300">
-              <Sparkles className="h-4 w-4" />
+              <SterlingIcon size="sm" />
               AI-Powered Financial Intelligence
             </div>
             <h1 className="mx-auto mt-6 max-w-4xl text-5xl font-bold tracking-tight lg:text-6xl">

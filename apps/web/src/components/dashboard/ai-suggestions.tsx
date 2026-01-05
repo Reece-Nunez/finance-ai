@@ -9,7 +9,6 @@ import {
   CheckCircle,
   Lightbulb,
   RefreshCw,
-  Sparkles,
   X,
   ArrowRightLeft,
   PiggyBank,
@@ -19,6 +18,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react'
+import { SterlingIcon } from '@/components/ui/sterling-icon'
 import { toast } from 'sonner'
 
 interface Suggestion {
@@ -198,7 +198,7 @@ export function AISuggestions() {
       >
         <div className="flex items-center gap-2">
           <div className="rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 p-2">
-            <Sparkles className="h-5 w-5 text-white" />
+            <SterlingIcon size="md" />
           </div>
           <div>
             <CardTitle className="flex items-center gap-2">

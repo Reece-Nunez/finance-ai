@@ -12,7 +12,6 @@ import {
   AlertTriangle,
   TrendingDown,
   RefreshCw,
-  Sparkles,
   DollarSign,
   Check,
   Loader2,
@@ -20,6 +19,7 @@ import {
   X,
   Trash2,
 } from 'lucide-react'
+import { SterlingIcon } from '@/components/ui/sterling-icon'
 
 interface Notification {
   id: string
@@ -43,7 +43,7 @@ function getNotificationIcon(type: string) {
     case 'recurring_payment':
       return <RefreshCw className="h-4 w-4 text-purple-500" />
     case 'ai_suggestion':
-      return <Sparkles className="h-4 w-4 text-emerald-500" />
+      return <SterlingIcon size="sm" />
     case 'unusual_spending':
       return <DollarSign className="h-4 w-4 text-orange-500" />
     case 'large_withdrawal':

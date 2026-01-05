@@ -12,7 +12,8 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Check, Shield, Loader2, ArrowLeft, CreditCard, Sparkles } from 'lucide-react'
+import { Check, Shield, Loader2, ArrowLeft, CreditCard } from 'lucide-react'
+import { SterlingIcon } from '@/components/ui/sterling-icon'
 import Link from 'next/link'
 import Image from 'next/image'
 
@@ -208,7 +209,7 @@ function CheckoutForm({ plan }: { plan: 'monthly' | 'yearly' }) {
         )}
         <div className="mt-3 pt-3 border-t">
           <p className="text-sm text-muted-foreground flex items-center gap-2">
-            <Sparkles className="h-4 w-4" />
+            <SterlingIcon size="sm" />
             {promoInfo?.isFree ? 'No payment required' : '14-day free trial included'}
           </p>
         </div>

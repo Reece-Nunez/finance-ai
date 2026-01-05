@@ -9,8 +9,8 @@ import { Progress } from '@/components/ui/progress'
 import {
   ArrowLeft,
   CheckCircle2,
-  Sparkles,
 } from 'lucide-react'
+import { SterlingIcon } from '@/components/ui/sterling-icon'
 import { CategorySelector } from '@/components/dashboard/category-selector'
 import { MerchantLogo } from '@/components/ui/merchant-logo'
 
@@ -136,7 +136,7 @@ export default function UncategorizedPage() {
           <CardContent className="pt-8 pb-6">
             <div className="mb-4 flex justify-center">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30">
-                <Sparkles className="h-8 w-8" />
+                <SterlingIcon size="lg" />
               </div>
             </div>
             <h2 className="text-xl font-bold mb-2">All Categorized!</h2>

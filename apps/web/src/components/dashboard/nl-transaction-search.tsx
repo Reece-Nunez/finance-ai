@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
-  Sparkles,
   X,
   Loader2,
   ArrowRight,
@@ -14,6 +13,7 @@ import {
   ChevronRight,
   Crown,
 } from 'lucide-react'
+import { SterlingIcon } from '@/components/ui/sterling-icon'
 import { formatCurrency, formatCategory, formatDate } from '@/lib/format'
 import { MerchantLogo } from '@/components/ui/merchant-logo'
 import {
@@ -100,7 +100,7 @@ export function NLTransactionSearch({ onTransactionClick }: NLTransactionSearchP
             className="w-full relative group"
           >
             <div className="h-12 pl-12 pr-24 text-base rounded-xl border border-slate-200 dark:border-slate-700 bg-gradient-to-r from-slate-50/50 to-slate-100/50 dark:from-slate-900/20 dark:to-slate-800/20 flex items-center">
-              <Sparkles className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+              <span className="absolute left-4 top-1/2 -translate-y-1/2"><SterlingIcon size="md" /></span>
               <span className="text-muted-foreground text-sm">Ask about your transactions using AI...</span>
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
                 <Badge className="bg-gradient-to-r from-slate-500 to-slate-700 text-white text-[10px]">
@@ -120,7 +120,7 @@ export function NLTransactionSearch({ onTransactionClick }: NLTransactionSearchP
     <div className="mb-6">
       {/* Search Input */}
       <form onSubmit={handleSubmit} className="relative">
-        <Sparkles className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+        <span className="absolute left-4 top-1/2 -translate-y-1/2"><SterlingIcon size="md" /></span>
         <Input
           placeholder="Ask about your transactions... (e.g., 'How much did I spend on Amazon?')"
           value={query}
@@ -190,7 +190,7 @@ export function NLTransactionSearch({ onTransactionClick }: NLTransactionSearchP
           {/* Interpretation Header */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-violet-500" />
+              <SterlingIcon size="sm" />
               <p className="text-sm font-medium">{result.interpretation.summary}</p>
             </div>
             <button

@@ -31,9 +31,13 @@ import {
   History,
   Trash2,
   CreditCard,
-  Sparkles,
   Filter,
+  RefreshCw,
+  Loader2,
+  Zap,
 } from 'lucide-react'
+import { toast } from 'sonner'
+import { SterlingIcon } from '@/components/ui/sterling-icon'
 import { MerchantLogo } from '@/components/ui/merchant-logo'
 
 interface Transaction {
@@ -103,6 +107,17 @@ function getFrequencyLabel(frequency: string): string {
     'yearly': 'Yearly',
   }
   return labels[frequency] || frequency
+}
+
+// Normalize merchant name for API calls
+function normalizeMerchant(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .split(/\s+/)
+    .slice(0, 3)
+    .join(' ')
+    .trim()
 }
 
 function getDaysUntil(dateStr: string): number {
@@ -491,7 +506,7 @@ function AllRecurringTab({
       {filtered.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <Sparkles className="h-12 w-12 text-muted-foreground/50" />
+            <SterlingIcon size="lg" className="opacity-50" />
             <p className="mt-2 text-muted-foreground">
               {search ? 'No matching recurring transactions' : 'No recurring transactions detected'}
             </p>
@@ -957,7 +972,7 @@ function PatternsBreakdownModal({
       <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-emerald-500" />
+            <SterlingIcon size="md" />
             AI-Detected Patterns
           </SheetTitle>
           <p className="text-sm text-muted-foreground">
@@ -1068,6 +1083,11 @@ export default function RecurringPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('upcoming')
 
+  // AI status
+  const [aiPowered, setAiPowered] = useState(false)
+  const [lastAnalysis, setLastAnalysis] = useState<string | null>(null)
+  const [reanalyzing, setReanalyzing] = useState(false)
+
   // Modal states
   const [detailItem, setDetailItem] = useState<RecurringTransaction | null>(null)
   const [historyItem, setHistoryItem] = useState<RecurringTransaction | null>(null)
@@ -1083,6 +1103,8 @@ export default function RecurringPage() {
           const data = await response.json()
           setRecurring(data.recurring || [])
           setYearlySpend(data.yearlySpend || 0)
+          setAiPowered(data.aiPowered || false)
+          setLastAnalysis(data.lastAnalysis || null)
         }
       } catch (error) {
         console.error('Error fetching recurring:', error)
@@ -1094,12 +1116,60 @@ export default function RecurringPage() {
     fetchRecurring()
   }, [])
 
-  const handleRemove = (item: RecurringTransaction) => {
-    // For now, just remove from the local state
-    // In a full implementation, you'd save this preference to the database
-    setRecurring(recurring.filter((r) => r.id !== item.id))
-    setDetailItem(null)
-    setCalendarDayDate(null)
+  const handleReanalyze = async () => {
+    setReanalyzing(true)
+    try {
+      const response = await fetch('/api/recurring', { method: 'POST' })
+      const data = await response.json()
+
+      if (response.ok) {
+        setRecurring(data.recurring || [])
+        setYearlySpend(data.yearlySpend || 0)
+        setAiPowered(data.aiPowered || true)
+        setLastAnalysis(data.lastAnalysis || new Date().toISOString())
+        toast.success(`AI detected ${data.recurring?.length || 0} recurring bills`)
+      } else if (response.status === 403) {
+        toast.error('Pro subscription required for AI analysis')
+      } else if (response.status === 429) {
+        toast.error('Rate limit reached. Please try again later.')
+      } else {
+        toast.error(data.error || 'Failed to analyze recurring transactions')
+      }
+    } catch (error) {
+      console.error('Error reanalyzing:', error)
+      toast.error('Failed to analyze recurring transactions')
+    } finally {
+      setReanalyzing(false)
+    }
+  }
+
+  const handleRemove = async (item: RecurringTransaction) => {
+    const merchantPattern = normalizeMerchant(item.displayName || item.name)
+
+    try {
+      const response = await fetch('/api/recurring', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          merchantPattern,
+          originalName: item.displayName || item.name,
+          reason: 'user_dismissed',
+        }),
+      })
+
+      if (response.ok) {
+        // Remove from local state
+        setRecurring(recurring.filter((r) => r.id !== item.id))
+        setDetailItem(null)
+        setCalendarDayDate(null)
+        toast.success(`Removed "${item.displayName}" from recurring`)
+      } else {
+        toast.error('Failed to remove item')
+      }
+    } catch (error) {
+      console.error('Error removing item:', error)
+      toast.error('Failed to remove item')
+    }
   }
 
   const handleDayClick = (date: Date, items: RecurringTransaction[]) => {
@@ -1124,19 +1194,42 @@ export default function RecurringPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Recurring Transactions</h1>
-          <p className="text-muted-foreground">
-            AI-detected recurring bills and subscriptions
-          </p>
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <span>
+              {aiPowered ? 'AI-detected' : 'Pattern-detected'} recurring bills and subscriptions
+            </span>
+            {aiPowered && lastAnalysis && (
+              <Badge variant="outline" className="text-xs">
+                <Zap className="h-3 w-3 mr-1" />
+                Updated {new Date(lastAnalysis).toLocaleDateString()}
+              </Badge>
+            )}
+          </div>
         </div>
-        <button
-          onClick={() => setShowPatternsBreakdown(true)}
-          className="flex items-center gap-2 rounded-lg border px-3 py-2 hover:bg-muted/50 transition-colors"
-        >
-          <Sparkles className="h-5 w-5 text-emerald-500" />
-          <span className="text-sm font-medium">
-            {recurring.length} patterns detected
-          </span>
-        </button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleReanalyze}
+            disabled={reanalyzing}
+          >
+            {reanalyzing ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
+            )}
+            {reanalyzing ? 'Analyzing...' : 'Re-analyze with AI'}
+          </Button>
+          <button
+            onClick={() => setShowPatternsBreakdown(true)}
+            className="flex items-center gap-2 rounded-lg border px-3 py-2 hover:bg-muted/50 transition-colors"
+          >
+            <SterlingIcon size="md" />
+            <span className="text-sm font-medium">
+              {recurring.length} patterns
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}

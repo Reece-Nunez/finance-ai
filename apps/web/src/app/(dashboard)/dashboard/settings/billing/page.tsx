@@ -8,11 +8,11 @@ import {
   Crown,
   CreditCard,
   Check,
-  Sparkles,
   Loader2,
   ExternalLink,
   Calendar,
 } from 'lucide-react'
+import { SterlingIcon } from '@/components/ui/sterling-icon'
 import { useSubscription } from '@/hooks/useSubscription'
 import { UpgradeModal } from '@/components/subscription/upgrade-modal'
 import { toast } from 'sonner'
@@ -153,7 +153,7 @@ export default function BillingPage() {
               onClick={() => setShowUpgrade(true)}
               className="bg-gradient-to-r from-slate-500 to-slate-700 hover:from-slate-600 hover:to-slate-800"
             >
-              <Sparkles className="h-4 w-4 mr-2" />
+              <SterlingIcon size="sm" className="mr-2" />
               Upgrade to Pro
             </Button>
           )}

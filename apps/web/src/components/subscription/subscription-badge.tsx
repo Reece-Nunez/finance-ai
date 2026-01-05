@@ -2,7 +2,8 @@
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Sparkles, Crown } from 'lucide-react'
+import { Crown } from 'lucide-react'
+import { SterlingIcon } from '@/components/ui/sterling-icon'
 import { useSubscription } from '@/hooks/useSubscription'
 import { useState } from 'react'
 import { UpgradeModal } from './upgrade-modal'
@@ -35,7 +36,7 @@ export function SubscriptionBadge() {
         onClick={() => setShowUpgrade(true)}
         className="h-7 gap-1.5 text-xs border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
       >
-        <Sparkles className="h-3 w-3" />
+        <SterlingIcon size="sm" />
         Upgrade
       </Button>
       <UpgradeModal open={showUpgrade} onOpenChange={setShowUpgrade} />

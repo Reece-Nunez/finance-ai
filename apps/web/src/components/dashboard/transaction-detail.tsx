@@ -18,7 +18,6 @@ import {
   Clock,
   DollarSign,
   Repeat,
-  Sparkles,
   ChevronDown,
   ChevronUp,
   Banknote,
@@ -31,6 +30,7 @@ import {
   CreditCard,
   Split,
 } from 'lucide-react'
+import { SterlingIcon } from '@/components/ui/sterling-icon'
 import { CategorySelector } from './category-selector'
 import { MerchantLogo } from '@/components/ui/merchant-logo'
 
@@ -664,7 +664,7 @@ export function TransactionDetail({
           {analysis && (
             <div className="rounded-lg border bg-gradient-to-br from-emerald-50 to-teal-50 p-4 dark:from-emerald-950/30 dark:to-teal-950/30">
               <div className="mb-3 flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-emerald-600" />
+                <SterlingIcon size="md" />
                 <span className="font-semibold">AI Analysis</span>
               </div>
               <div className="space-y-2">

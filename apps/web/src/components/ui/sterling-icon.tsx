@@ -25,6 +25,7 @@ export function SterlingIcon({ className, size = 'md' }: SterlingIconProps) {
       width={width}
       height={height}
       className={cn('inline-block', className)}
+      unoptimized
     />
   )
 }

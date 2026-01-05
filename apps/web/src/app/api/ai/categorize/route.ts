@@ -4,6 +4,30 @@ import { categorizeTransactions, categorizeAllTransactions } from '@/lib/ai-cate
 import { getUserSubscription, canAccessFeature } from '@/lib/subscription'
 import { checkAndIncrementUsage, rateLimitResponse } from '@/lib/ai-usage'
 
+// GET - Get count of uncategorized transactions
+export async function GET() {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Count uncategorized transactions
+    const { count } = await supabase
+      .from('transactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .or('ai_category.is.null,display_name.is.null')
+
+    return NextResponse.json({ uncategorized_count: count || 0 })
+  } catch (error) {
+    console.error('Error getting uncategorized count:', error)
+    return NextResponse.json({ error: 'Failed to get count' }, { status: 500 })
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
