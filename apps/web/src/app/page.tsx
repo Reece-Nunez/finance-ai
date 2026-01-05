@@ -37,7 +37,7 @@ export default function Home() {
               <SterlingIcon size="sm" />
               AI-Powered Financial Intelligence
             </div>
-            <h1 className="mx-auto mt-6 max-w-4xl text-5xl font-bold tracking-tight lg:text-6xl">
+            <h1 className="mx-auto mt-6 max-w-4xl text-3xl sm:text-5xl font-bold tracking-tight lg:text-6xl">
               All your finances.{' '}
               <span className="bg-gradient-to-r from-slate-600 to-slate-800 bg-clip-text text-transparent">
                 One smart view.
@@ -89,7 +89,7 @@ export default function Home() {
               </p>
             </div>
             <div className="mt-16 grid gap-8 md:grid-cols-3">
-              <div className="group relative overflow-hidden rounded-2xl border bg-card p-8 transition-all hover:shadow-lg hover:shadow-slate-500/10">
+              <div className="group relative overflow-hidden rounded-2xl border bg-card p-5 sm:p-8 transition-all hover:shadow-lg hover:shadow-slate-500/10">
                 <div className="absolute inset-0 -z-10 bg-gradient-to-br from-slate-500/5 to-slate-600/5 opacity-0 transition-opacity group-hover:opacity-100" />
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-slate-500 to-slate-700 shadow-lg shadow-slate-500/25">
                   <Brain className="h-6 w-6 text-white" />
@@ -100,7 +100,7 @@ export default function Home() {
                   recommendations to help you save more money.
                 </p>
               </div>
-              <div className="group relative overflow-hidden rounded-2xl border bg-card p-8 transition-all hover:shadow-lg hover:shadow-slate-500/10">
+              <div className="group relative overflow-hidden rounded-2xl border bg-card p-5 sm:p-8 transition-all hover:shadow-lg hover:shadow-slate-500/10">
                 <div className="absolute inset-0 -z-10 bg-gradient-to-br from-slate-500/5 to-slate-600/5 opacity-0 transition-opacity group-hover:opacity-100" />
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-slate-500 to-slate-700 shadow-lg shadow-slate-500/25">
                   <PieChart className="h-6 w-6 text-white" />
@@ -111,7 +111,7 @@ export default function Home() {
                   real-time updates and intelligent alerts.
                 </p>
               </div>
-              <div className="group relative overflow-hidden rounded-2xl border bg-card p-8 transition-all hover:shadow-lg hover:shadow-slate-500/10">
+              <div className="group relative overflow-hidden rounded-2xl border bg-card p-5 sm:p-8 transition-all hover:shadow-lg hover:shadow-slate-500/10">
                 <div className="absolute inset-0 -z-10 bg-gradient-to-br from-slate-500/5 to-slate-600/5 opacity-0 transition-opacity group-hover:opacity-100" />
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-slate-500 to-slate-700 shadow-lg shadow-slate-500/25">
                   <Shield className="h-6 w-6 text-white" />

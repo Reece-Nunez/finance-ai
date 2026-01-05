@@ -99,9 +99,9 @@ export function NLTransactionSearch({ onTransactionClick }: NLTransactionSearchP
             onClick={() => setShowUpgradeModal(true)}
             className="w-full relative group"
           >
-            <div className="h-12 pl-12 pr-24 text-base rounded-xl border border-slate-200 dark:border-slate-700 bg-gradient-to-r from-slate-50/50 to-slate-100/50 dark:from-slate-900/20 dark:to-slate-800/20 flex items-center">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2"><SterlingIcon size="md" /></span>
-              <span className="text-muted-foreground text-sm">Ask about your transactions using AI...</span>
+            <div className="h-12 pl-10 sm:pl-12 pr-16 sm:pr-24 text-base rounded-xl border border-slate-200 dark:border-slate-700 bg-gradient-to-r from-slate-50/50 to-slate-100/50 dark:from-slate-900/20 dark:to-slate-800/20 flex items-center">
+              <span className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2"><SterlingIcon size="md" /></span>
+              <span className="text-muted-foreground text-xs sm:text-sm truncate">Ask about your transactions using AI...</span>
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
                 <Badge className="bg-gradient-to-r from-slate-500 to-slate-700 text-white text-[10px]">
                   <Crown className="h-3 w-3 mr-1" />
@@ -120,12 +120,12 @@ export function NLTransactionSearch({ onTransactionClick }: NLTransactionSearchP
     <div className="mb-6">
       {/* Search Input */}
       <form onSubmit={handleSubmit} className="relative">
-        <span className="absolute left-4 top-1/2 -translate-y-1/2"><SterlingIcon size="md" /></span>
+        <span className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2"><SterlingIcon size="md" /></span>
         <Input
-          placeholder="Ask about your transactions... (e.g., 'How much did I spend on Amazon?')"
+          placeholder="Ask about your transactions..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="h-12 pl-12 pr-24 text-base rounded-xl border-slate-200 dark:border-slate-800 bg-gradient-to-r from-slate-50/50 to-slate-100/50 dark:from-slate-950/20 dark:to-slate-900/20 focus-visible:ring-slate-500"
+          className="h-12 pl-10 sm:pl-12 pr-20 sm:pr-24 text-sm sm:text-base rounded-xl border-slate-200 dark:border-slate-800 bg-gradient-to-r from-slate-50/50 to-slate-100/50 dark:from-slate-950/20 dark:to-slate-900/20 focus-visible:ring-slate-500"
         />
         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
           {query && !isLoading && (

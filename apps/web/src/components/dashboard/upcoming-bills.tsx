@@ -277,12 +277,12 @@ export function UpcomingBills({ isPro = false }: UpcomingBillsProps) {
         </CardHeader>
         <CardContent>
           {/* Week Calendar */}
-          <div className="grid grid-cols-7 gap-1">
+          <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
             {/* Day headers */}
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => (
               <div
-                key={day}
-                className="py-1 text-center text-xs font-medium text-muted-foreground"
+                key={idx}
+                className="py-1 text-center text-[10px] sm:text-xs font-medium text-muted-foreground"
               >
                 {day}
               </div>
@@ -297,12 +297,12 @@ export function UpcomingBills({ isPro = false }: UpcomingBillsProps) {
               return (
                 <div
                   key={date.toISOString()}
-                  className={`relative flex min-h-[120px] flex-col items-center rounded-lg border p-2 ${
+                  className={`relative flex min-h-[80px] sm:min-h-[120px] flex-col items-center rounded-md sm:rounded-lg border p-1 sm:p-2 ${
                     todayCheck ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30' : ''
                   }`}
                 >
                   <span
-                    className={`text-sm font-medium ${
+                    className={`text-xs sm:text-sm font-medium ${
                       todayCheck ? 'text-emerald-600 dark:text-emerald-400' : ''
                     }`}
                   >
@@ -311,8 +311,8 @@ export function UpcomingBills({ isPro = false }: UpcomingBillsProps) {
                   {payday && (
                     <Tooltip>
                       <TooltipTrigger>
-                        <div className="mt-1 flex h-6 w-6 items-center justify-center rounded-full bg-green-500">
-                          <DollarSign className="h-3.5 w-3.5 text-white" />
+                        <div className="mt-0.5 sm:mt-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-green-500">
+                          <DollarSign className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-white" />
                         </div>
                       </TooltipTrigger>
                       <TooltipContent>
@@ -321,16 +321,16 @@ export function UpcomingBills({ isPro = false }: UpcomingBillsProps) {
                     </Tooltip>
                   )}
                   {bills.length > 0 && (
-                    <div className="mt-1 flex flex-col items-center gap-1">
-                      <div className="flex flex-wrap justify-center gap-1">
-                        {bills.slice(0, 4).map((bill, idx) => (
+                    <div className="mt-0.5 sm:mt-1 flex flex-col items-center gap-0.5 sm:gap-1">
+                      <div className="flex flex-wrap justify-center gap-0.5 sm:gap-1">
+                        {bills.slice(0, 2).map((bill, idx) => (
                           <Tooltip key={idx}>
                             <TooltipTrigger>
                               <MerchantLogo
                                 merchantName={bill.displayName || bill.name}
                                 category={bill.category}
                                 size="sm"
-                                className="h-5 w-5"
+                                className="h-4 w-4 sm:h-5 sm:w-5"
                               />
                             </TooltipTrigger>
                             <TooltipContent>
@@ -340,12 +340,12 @@ export function UpcomingBills({ isPro = false }: UpcomingBillsProps) {
                           </Tooltip>
                         ))}
                       </div>
-                      {bills.length > 4 && (
-                        <span className="text-[10px] text-muted-foreground">
-                          +{bills.length - 4} more
+                      {bills.length > 2 && (
+                        <span className="text-[8px] sm:text-[10px] text-muted-foreground">
+                          +{bills.length - 2}
                         </span>
                       )}
-                      <span className="text-xs font-medium text-red-600 dark:text-red-400">
+                      <span className="text-[10px] sm:text-xs font-medium text-red-600 dark:text-red-400">
                         {formatCurrencyShort(dayTotal)}
                       </span>
                     </div>
