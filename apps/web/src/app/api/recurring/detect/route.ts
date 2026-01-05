@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { getUserSubscription, canAccessFeature } from '@/lib/subscription'
 import { anthropic } from '@/lib/ai'
+import { checkAndIncrementUsage, rateLimitResponse } from '@/lib/ai-usage'
 
 const AI_RECURRING_PROMPT = `You are a financial analyst specializing in detecting recurring BILLS and SUBSCRIPTIONS from bank transaction data.
 
@@ -75,15 +76,24 @@ export async function GET() {
 
   // Check subscription for AI features
   const subscription = await getUserSubscription(user.id)
-  const canUseAI = canAccessFeature(subscription, 'ai_suggestions') // Using ai_suggestions as proxy for AI features
+  const isPro = canAccessFeature(subscription, 'ai_suggestions') // Using ai_suggestions as proxy for AI features
 
-  if (!canUseAI) {
+  if (!isPro) {
     // Return empty for non-Pro users - they'll use client-side pattern matching
     return NextResponse.json({
       recurring: [],
       useClientDetection: true,
       message: 'AI recurring detection requires Pro subscription'
     })
+  }
+
+  // Check rate limits
+  const usageCheck = await checkAndIncrementUsage(supabase, user.id, 'recurring_detection', isPro)
+  if (!usageCheck.allowed) {
+    return NextResponse.json(
+      rateLimitResponse('recurring detection', usageCheck.limit, isPro),
+      { status: 429 }
+    )
   }
 
   // Fetch last 6 months of transactions for analysis
@@ -122,7 +132,7 @@ export async function GET() {
 
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-haiku-4-20250514', // Using Haiku for cost efficiency
       max_tokens: 4096,
       messages: [
         {

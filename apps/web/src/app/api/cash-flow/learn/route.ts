@@ -447,7 +447,7 @@ Format your response as JSON:
 
     try {
       const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-haiku-4-20250514', // Using Haiku for cost efficiency
         max_tokens: 2000,
         messages: [{ role: 'user', content: prompt }],
       })

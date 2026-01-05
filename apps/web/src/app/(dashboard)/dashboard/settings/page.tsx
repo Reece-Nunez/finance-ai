@@ -1472,16 +1472,29 @@ export default function SettingsPage() {
                 )}
 
                 {/* Re-run all button */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => runAICategorization(true)}
-                  disabled={runningCategorization || !aiPreferences.auto_categorize}
-                  className="text-xs text-muted-foreground hover:text-foreground"
-                >
-                  <RefreshCw className="h-3 w-3 mr-1" />
-                  Re-run on all recent transactions
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => runAICategorization(true)}
+                    disabled={runningCategorization || !aiPreferences.auto_categorize}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                    Re-run on all recent transactions
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    asChild
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    <a href="/dashboard/ai-reports">
+                      <FileText className="h-3 w-3 mr-1" />
+                      View all reports
+                    </a>
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

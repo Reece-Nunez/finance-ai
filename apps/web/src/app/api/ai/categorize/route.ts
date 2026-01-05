@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { categorizeTransactions } from '@/lib/ai-categorize'
 import { getUserSubscription, canAccessFeature } from '@/lib/subscription'
+import { checkAndIncrementUsage, rateLimitResponse } from '@/lib/ai-usage'
 
 export async function POST(request: Request) {
   try {
@@ -14,10 +15,20 @@ export async function POST(request: Request) {
 
     // Check subscription for AI categorization access
     const subscription = await getUserSubscription(user.id)
-    if (!canAccessFeature(subscription, 'ai_categorization')) {
+    const isPro = canAccessFeature(subscription, 'ai_categorization')
+    if (!isPro) {
       return NextResponse.json(
         { error: 'upgrade_required', message: 'AI Categorization requires a Pro subscription' },
         { status: 403 }
+      )
+    }
+
+    // Check rate limits
+    const usageCheck = await checkAndIncrementUsage(supabase, user.id, 'categorization', isPro)
+    if (!usageCheck.allowed) {
+      return NextResponse.json(
+        rateLimitResponse('categorization', usageCheck.limit, isPro),
+        { status: 429 }
       )
     }
 

@@ -54,6 +54,13 @@ interface AIReport {
   created_at: string
 }
 
+interface TransactionStatus {
+  id: string
+  needs_review: boolean
+  display_name: string | null
+  ai_category: string | null
+}
+
 export default function AIReportPage() {
   const params = useParams()
   const router = useRouter()
@@ -65,6 +72,9 @@ export default function AIReportPage() {
   const [applying, setApplying] = useState<string | null>(null)
   const [appliedItems, setAppliedItems] = useState<Set<string>>(new Set())
   const [rejectedItems, setRejectedItems] = useState<Set<string>>(new Set())
+  const [transactionStatuses, setTransactionStatuses] = useState<Map<string, TransactionStatus>>(new Map())
+  const [revertedItems, setRevertedItems] = useState<Set<string>>(new Set())
+  const [retriedItems, setRetriedItems] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     async function loadReport() {
@@ -74,6 +84,35 @@ export default function AIReportPage() {
         if (response.ok) {
           const data = await response.json()
           setReport(data)
+
+          // Fetch current transaction statuses to see what's already been processed
+          const allIds = [
+            ...(data.skipped_items || []).map((i: SkippedItem) => i.transaction_id),
+            ...(data.categorized_items || []).map((i: CategorizedItem) => i.transaction_id),
+          ]
+
+          if (allIds.length > 0) {
+            const { data: txData } = await supabase
+              .from('transactions')
+              .select('id, needs_review, display_name, ai_category')
+              .in('id', allIds)
+
+            if (txData) {
+              const statusMap = new Map<string, TransactionStatus>()
+              txData.forEach((tx: TransactionStatus) => statusMap.set(tx.id, tx))
+              setTransactionStatuses(statusMap)
+
+              // Mark items as already processed if needs_review is false
+              const alreadyProcessed = new Set<string>()
+              data.skipped_items?.forEach((item: SkippedItem) => {
+                const status = statusMap.get(item.transaction_id)
+                if (status && !status.needs_review) {
+                  alreadyProcessed.add(item.transaction_id)
+                }
+              })
+              setRejectedItems(alreadyProcessed)
+            }
+          }
         }
       } catch (error) {
         console.error('Error loading report:', error)
@@ -83,7 +122,7 @@ export default function AIReportPage() {
     }
 
     loadReport()
-  }, [reportId])
+  }, [reportId, supabase])
 
   const acceptSuggestion = async (item: SkippedItem) => {
     setApplying(item.transaction_id)
@@ -128,6 +167,59 @@ export default function AIReportPage() {
       }
     } catch (error) {
       console.error('Error rejecting suggestion:', error)
+    } finally {
+      setApplying(null)
+    }
+  }
+
+  const revertCategorizedItem = async (item: CategorizedItem) => {
+    setApplying(item.transaction_id)
+    try {
+      // Clear the AI-applied category and name, revert to original
+      const { error } = await supabase
+        .from('transactions')
+        .update({
+          ai_category: null,
+          ai_confidence: null,
+          display_name: null, // Revert to showing original name
+        })
+        .eq('id', item.transaction_id)
+
+      if (!error) {
+        setRevertedItems(prev => new Set(prev).add(item.transaction_id))
+      }
+    } catch (error) {
+      console.error('Error reverting categorized item:', error)
+    } finally {
+      setApplying(null)
+    }
+  }
+
+  const retryApplyName = async (item: CategorizedItem) => {
+    if (!item.new_name) return
+    setApplying(item.transaction_id)
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .update({
+          display_name: item.new_name,
+        })
+        .eq('id', item.transaction_id)
+
+      if (!error) {
+        setRetriedItems(prev => new Set(prev).add(item.transaction_id))
+        // Update the status map to reflect the new name
+        setTransactionStatuses(prev => {
+          const newMap = new Map(prev)
+          const existing = newMap.get(item.transaction_id)
+          if (existing) {
+            newMap.set(item.transaction_id, { ...existing, display_name: item.new_name! })
+          }
+          return newMap
+        })
+      }
+    } catch (error) {
+      console.error('Error retrying name application:', error)
     } finally {
       setApplying(null)
     }
@@ -350,36 +442,92 @@ export default function AIReportPage() {
               <CardTitle className="text-lg">Successfully Categorized</CardTitle>
             </div>
             <p className="text-sm text-muted-foreground">
-              These transactions were automatically categorized with high confidence.
+              These transactions were automatically categorized with high confidence. Click &quot;Undo&quot; to revert changes.
             </p>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {report.categorized_items.map((item) => (
-                <div
-                  key={item.transaction_id}
-                  className="flex items-center justify-between py-3 border-b last:border-b-0"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium truncate">
-                        {item.new_name || item.original_name}
+              {report.categorized_items.map((item) => {
+                const isReverted = revertedItems.has(item.transaction_id)
+                const isRetried = retriedItems.has(item.transaction_id)
+                const isProcessing = applying === item.transaction_id
+                const currentStatus = transactionStatuses.get(item.transaction_id)
+                const actualDisplayName = currentStatus?.display_name
+                const nameNotApplied = !isReverted && !isRetried && item.new_name && actualDisplayName !== item.new_name
+
+                return (
+                  <div
+                    key={item.transaction_id}
+                    className={`flex items-center justify-between py-3 border-b last:border-b-0 ${
+                      isReverted ? 'opacity-60' : ''
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className={`font-medium truncate ${isReverted ? 'line-through' : ''}`}>
+                          {isReverted ? item.original_name : (actualDisplayName || item.new_name || item.original_name)}
+                        </p>
+                        {!isReverted && item.new_name && item.new_name !== item.original_name && (
+                          <span className="text-xs text-muted-foreground">
+                            (was: {item.original_name})
+                          </span>
+                        )}
+                        {nameNotApplied && (
+                          <Badge variant="outline" className="text-amber-600 border-amber-300">
+                            Name not applied
+                          </Badge>
+                        )}
+                        {isRetried && (
+                          <Badge variant="outline" className="text-emerald-600 border-emerald-300">
+                            Fixed
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {formatCategory(item.new_category)} • {item.confidence}% confident
                       </p>
-                      {item.new_name && item.new_name !== item.original_name && (
-                        <span className="text-xs text-muted-foreground">
-                          (was: {item.original_name})
-                        </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium tabular-nums">
+                        ${Math.abs(item.amount).toFixed(2)}
+                      </span>
+                      {nameNotApplied && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                          onClick={() => retryApplyName(item)}
+                          disabled={isProcessing}
+                        >
+                          {isProcessing ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            'Retry'
+                          )}
+                        </Button>
+                      )}
+                      {!isReverted && !nameNotApplied && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-muted-foreground hover:text-red-500"
+                          onClick={() => revertCategorizedItem(item)}
+                          disabled={isProcessing}
+                        >
+                          {isProcessing ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            'Undo'
+                          )}
+                        </Button>
+                      )}
+                      {isReverted && (
+                        <span className="text-xs text-muted-foreground">Reverted</span>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {formatCategory(item.new_category)} • {item.confidence}% confident
-                    </p>
                   </div>
-                  <span className="text-sm font-medium tabular-nums">
-                    ${Math.abs(item.amount).toFixed(2)}
-                  </span>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </CardContent>
         </Card>

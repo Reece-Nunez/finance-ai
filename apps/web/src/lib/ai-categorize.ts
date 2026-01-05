@@ -202,7 +202,7 @@ ${JSON.stringify(txList, null, 2)}
 Please categorize these transactions and clean up the names using the account context provided. Each transaction includes its source_account which tells you which account it came from.`
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-haiku-4-20250514', // Using Haiku for cost efficiency (~90% cheaper than Sonnet)
     max_tokens: 4096,
     messages: [
       {
@@ -348,7 +348,8 @@ Please categorize these transactions and clean up the names using the account co
           if (confidence >= confidenceThreshold) {
             fallbackData.ai_category = cat.category
           }
-          if (merchantCleanup && cat.clean_name) {
+          const nameWasApplied = merchantCleanup && cat.clean_name
+          if (nameWasApplied) {
             fallbackData.display_name = cat.clean_name
           }
           if (Object.keys(fallbackData).length > 0) {
@@ -359,19 +360,30 @@ Please categorize these transactions and clean up the names using the account co
               .eq('user_id', userId)
             if (!fallbackError && confidence >= confidenceThreshold) {
               updated++
+              // Track successfully categorized item - only include new_name if it was actually applied
+              categorizedItems.push({
+                transaction_id: cat.transaction_id,
+                original_name: txDetails?.name || 'Unknown',
+                amount: txDetails?.amount || 0,
+                date: txDetails?.date || '',
+                new_category: cat.category,
+                new_name: nameWasApplied ? cat.clean_name : undefined,
+                confidence,
+              })
             }
           }
         }
       } else if (confidence >= confidenceThreshold) {
         updated++
-        // Track successfully categorized item
+        // Track successfully categorized item - only include new_name if it was actually applied
+        const nameWasApplied = merchantCleanup && cat.clean_name
         categorizedItems.push({
           transaction_id: cat.transaction_id,
           original_name: txDetails?.name || 'Unknown',
           amount: txDetails?.amount || 0,
           date: txDetails?.date || '',
           new_category: cat.category,
-          new_name: cat.clean_name,
+          new_name: nameWasApplied ? cat.clean_name : undefined,
           confidence,
         })
       }

@@ -9,6 +9,7 @@ import {
 } from '@/lib/search-parser'
 import { SearchResponse } from '@/types/search'
 import { getUserSubscription, canAccessFeature } from '@/lib/subscription'
+import { checkAndIncrementUsage, rateLimitResponse } from '@/lib/ai-usage'
 
 export async function POST(request: Request) {
   try {
@@ -23,10 +24,20 @@ export async function POST(request: Request) {
 
     // Check subscription for NL search access
     const subscription = await getUserSubscription(user.id)
-    if (!canAccessFeature(subscription, 'nl_search')) {
+    const isPro = canAccessFeature(subscription, 'nl_search')
+    if (!isPro) {
       return NextResponse.json(
         { error: 'upgrade_required', message: 'Natural Language Search requires a Pro subscription' },
         { status: 403 }
+      )
+    }
+
+    // Check rate limits
+    const usageCheck = await checkAndIncrementUsage(supabase, user.id, 'search', isPro)
+    if (!usageCheck.allowed) {
+      return NextResponse.json(
+        rateLimitResponse('search', usageCheck.limit, isPro),
+        { status: 429 }
       )
     }
 
@@ -44,7 +55,7 @@ export async function POST(request: Request) {
 
     // Parse the natural language query using Claude with tool use
     const parseResponse = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-haiku-4-20250514', // Using Haiku for cost efficiency - parsing is simpler
       max_tokens: 1024,
       system: SEARCH_PARSER_SYSTEM_PROMPT.replace('{{CURRENT_DATE}}', today),
       tools: [SEARCH_FILTER_TOOL],

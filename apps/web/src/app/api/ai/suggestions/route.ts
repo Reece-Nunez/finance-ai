@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { anthropic } from '@/lib/ai'
 import { getUserSubscription, canAccessFeature } from '@/lib/subscription'
+import { checkAndIncrementUsage, rateLimitResponse } from '@/lib/ai-usage'
 
 const SUGGESTION_SYSTEM_PROMPT = `You are an intelligent financial advisor with deep insight into this specific user's spending patterns, upcoming cash flow, and financial goals. You provide highly personalized, actionable suggestions based on comprehensive data analysis.
 
@@ -90,10 +91,20 @@ export async function POST() {
 
     // Check subscription for AI suggestions access
     const subscription = await getUserSubscription(user.id)
-    if (!canAccessFeature(subscription, 'ai_suggestions')) {
+    const isPro = canAccessFeature(subscription, 'ai_suggestions')
+    if (!isPro) {
       return NextResponse.json(
         { error: 'upgrade_required', message: 'AI Suggestions requires a Pro subscription' },
         { status: 403 }
+      )
+    }
+
+    // Check rate limits (using insights limit since suggestions are similar)
+    const usageCheck = await checkAndIncrementUsage(supabase, user.id, 'insights', isPro)
+    if (!usageCheck.allowed) {
+      return NextResponse.json(
+        rateLimitResponse('suggestions', usageCheck.limit, isPro),
+        { status: 429 }
       )
     }
 
@@ -509,7 +520,7 @@ Based on ALL of this data, provide highly personalized suggestions. Be specific 
     // CALL AI
     // =========================================================================
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-haiku-4-20250514', // Using Haiku for cost efficiency
       max_tokens: 2048, // Increased for more detailed suggestions
       system: SUGGESTION_SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userMessage }],
