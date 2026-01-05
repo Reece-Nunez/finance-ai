@@ -173,6 +173,15 @@ export async function GET(request: Request) {
   const days = parseInt(searchParams.get('days') || '30', 10)
   const lowBalanceThreshold = parseFloat(searchParams.get('threshold') || '100')
   const storePredictions = searchParams.get('store') === 'true'
+  const recalculate = searchParams.get('recalculate') === 'true'
+
+  // If recalculate is true, delete old predictions to force fresh calculation
+  if (recalculate) {
+    await supabase
+      .from('cash_flow_predictions')
+      .delete()
+      .eq('user_id', user.id)
+  }
 
   // Get all accounts for total balance
   const { data: accounts, error: accountsError } = await supabase
@@ -199,6 +208,7 @@ export async function GET(request: Request) {
     .eq('user_id', user.id)
     .gte('date', twelveMonthsAgo.toISOString().split('T')[0])
     .neq('ignore_type', 'all')
+    .or('ignored.is.null,ignored.eq.false')
     .order('date', { ascending: false })
 
   if (txError) {
@@ -332,6 +342,7 @@ export async function GET(request: Request) {
       .select('date, amount, is_income')
       .eq('user_id', user.id)
       .in('date', predDates)
+      .or('ignored.is.null,ignored.eq.false')
 
     const dailyActuals: Map<string, { income: number; expenses: number }> = new Map()
     for (const tx of predTransactions || []) {

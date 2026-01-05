@@ -14,12 +14,13 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Count uncategorized transactions
+    // Count uncategorized transactions (only those without ai_category)
+    // We don't re-process transactions just because they lack a display_name
     const { count } = await supabase
       .from('transactions')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', user.id)
-      .or('ai_category.is.null,display_name.is.null')
+      .is('ai_category', null)
 
     return NextResponse.json({ uncategorized_count: count || 0 })
   } catch (error) {

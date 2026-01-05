@@ -10,11 +10,11 @@ export const AI_LIMITS = {
     search: 20,
   },
   pro: {
-    categorization: 100,
-    chat: 200,
-    recurring_detection: 50,
-    insights: 100,
-    search: 200,
+    categorization: 1000,
+    chat: 1000,
+    recurring_detection: 1000,
+    insights: 1000,
+    search: 1000,
   },
 } as const
 

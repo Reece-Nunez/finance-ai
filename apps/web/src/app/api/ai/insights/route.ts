@@ -57,7 +57,7 @@ export async function GET() {
     const startOfLastMonth = new Date(currentYear, currentMonth - 1, 1).toISOString().split('T')[0]
     const endOfLastMonth = new Date(currentYear, currentMonth, 0).toISOString().split('T')[0]
 
-    // Fetch current month transactions
+    // Fetch current month transactions (excluding ignored)
     const { data: currentTransactions } = await supabase
       .from('transactions')
       .select('amount, category, date, name, merchant_name')
@@ -65,8 +65,9 @@ export async function GET() {
       .gte('date', startOfMonth)
       .lte('date', endOfMonth)
       .neq('ignore_type', 'all')
+      .or('ignored.is.null,ignored.eq.false')
 
-    // Fetch last month transactions
+    // Fetch last month transactions (excluding ignored)
     const { data: lastMonthTransactions } = await supabase
       .from('transactions')
       .select('amount, category')
@@ -74,6 +75,7 @@ export async function GET() {
       .gte('date', startOfLastMonth)
       .lte('date', endOfLastMonth)
       .neq('ignore_type', 'all')
+      .or('ignored.is.null,ignored.eq.false')
 
     // Fetch budgets
     const { data: budgets } = await supabase

@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
     startDate = new Date(now.getFullYear(), now.getMonth(), 1)
   }
 
-  // Get transactions for the period
+  // Get transactions for the period (excluding ignored transfers)
   let query = supabase
     .from('transactions')
     .select('*')
@@ -84,6 +84,7 @@ export async function GET(request: NextRequest) {
     .gte('date', startDate.toISOString().split('T')[0])
     .lte('date', endDate.toISOString().split('T')[0])
     .neq('ignore_type', 'all')
+    .or('ignored.is.null,ignored.eq.false')
     .order('date', { ascending: false })
 
   if (category) {
@@ -110,6 +111,7 @@ export async function GET(request: NextRequest) {
     .gte('date', prevStartDate.toISOString().split('T')[0])
     .lte('date', prevEndDate.toISOString().split('T')[0])
     .neq('ignore_type', 'all')
+    .or('ignored.is.null,ignored.eq.false')
 
   if (category) {
     prevQuery = prevQuery.ilike('category', category)

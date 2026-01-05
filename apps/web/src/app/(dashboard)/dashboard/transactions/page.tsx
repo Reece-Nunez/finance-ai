@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,11 +20,13 @@ import {
   X,
   Loader2,
   ChevronRight,
+  ArrowLeftRight,
 } from 'lucide-react'
 import { formatCategory, formatCurrency } from '@/lib/format'
 import { TransactionDetail } from '@/components/dashboard/transaction-detail'
 import { MerchantLogo } from '@/components/ui/merchant-logo'
 import { NLTransactionSearch } from '@/components/dashboard/nl-transaction-search'
+import { TransferReviewModal } from '@/components/dashboard/transfer-review-modal'
 import { SearchTransaction } from '@/types/search'
 
 interface Transaction {
@@ -47,35 +50,64 @@ interface Account {
   mask: string | null
 }
 
+const PAGE_SIZE = 100
+
 export default function TransactionsPage() {
   const supabase = createClient()
+  const searchParams = useSearchParams()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
+  const [hasMore, setHasMore] = useState(true)
+  const [totalCount, setTotalCount] = useState<number | null>(null)
+  const [transferModalOpen, setTransferModalOpen] = useState(false)
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [searchResults, setSearchResults] = useState<Transaction[] | null>(null)
+  const [searching, setSearching] = useState(false)
   const [activeTab, setActiveTab] = useState<'all' | 'income' | 'expenses'>('all')
   const [dateFilter, setDateFilter] = useState('This Month')
   const [visibleCount, setVisibleCount] = useState(50)
 
+  // Check for review_transfers query param
+  useEffect(() => {
+    if (searchParams.get('review_transfers') === 'true') {
+      setTransferModalOpen(true)
+      // Clear the query param from URL without page reload
+      window.history.replaceState({}, '', '/dashboard/transactions')
+    }
+  }, [searchParams])
+
   useEffect(() => {
     async function loadData() {
       setLoading(true)
+
+      // Get total count
+      const { count } = await supabase
+        .from('transactions')
+        .select('*', { count: 'exact', head: true })
+
+      setTotalCount(count)
 
       const [txRes, accRes] = await Promise.all([
         supabase
           .from('transactions')
           .select('*')
           .order('date', { ascending: false })
-          .limit(500),
+          .range(0, PAGE_SIZE - 1),
         supabase
           .from('accounts')
           .select('plaid_account_id, name, official_name, mask'),
       ])
 
-      if (txRes.data) setTransactions(txRes.data)
+      if (txRes.data) {
+        setTransactions(txRes.data)
+        setHasMore(txRes.data.length === PAGE_SIZE)
+      }
       if (accRes.data) setAccounts(accRes.data)
 
       setLoading(false)
@@ -84,12 +116,72 @@ export default function TransactionsPage() {
     loadData()
   }, [supabase])
 
-  // Filter transactions
-  const filteredTransactions = useMemo(() => {
-    let filtered = [...transactions]
+  const loadMoreTransactions = async () => {
+    if (loadingMore || !hasMore) return
 
-    // Search filter
-    if (searchQuery) {
+    setLoadingMore(true)
+    const offset = transactions.length
+
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .order('date', { ascending: false })
+      .range(offset, offset + PAGE_SIZE - 1)
+
+    if (data && !error) {
+      setTransactions(prev => [...prev, ...data])
+      setHasMore(data.length === PAGE_SIZE)
+    }
+
+    setLoadingMore(false)
+  }
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  // Server-side search when query changes
+  const performSearch = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults(null)
+      return
+    }
+
+    setSearching(true)
+    try {
+      const searchLower = `%${query.toLowerCase()}%`
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .or(`name.ilike.${searchLower},display_name.ilike.${searchLower},merchant_name.ilike.${searchLower}`)
+        .order('date', { ascending: false })
+        .limit(200)
+
+      if (!error && data) {
+        setSearchResults(data)
+      }
+    } catch (error) {
+      console.error('Search error:', error)
+    } finally {
+      setSearching(false)
+    }
+  }, [supabase])
+
+  useEffect(() => {
+    performSearch(debouncedSearch)
+  }, [debouncedSearch, performSearch])
+
+  // Filter transactions - use server search results when available
+  const filteredTransactions = useMemo(() => {
+    // When searching, use server-side search results
+    let filtered = searchResults !== null ? [...searchResults] : [...transactions]
+
+    // Only apply local search filter if not using server results (fallback)
+    if (searchQuery && searchResults === null) {
       const query = searchQuery.toLowerCase()
       filtered = filtered.filter(tx =>
         (tx.display_name || tx.merchant_name || tx.name).toLowerCase().includes(query) ||
@@ -97,32 +189,34 @@ export default function TransactionsPage() {
       )
     }
 
-    // Date filter
-    const now = new Date()
-    switch (dateFilter) {
-      case 'Today':
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-        filtered = filtered.filter(tx => new Date(tx.date) >= today)
-        break
-      case 'This Week':
-        const weekAgo = new Date(now)
-        weekAgo.setDate(weekAgo.getDate() - 7)
-        filtered = filtered.filter(tx => new Date(tx.date) >= weekAgo)
-        break
-      case 'This Month':
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-        filtered = filtered.filter(tx => new Date(tx.date) >= monthStart)
-        break
-      case 'Last 3 Months':
-        const threeMonthsAgo = new Date(now)
-        threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
-        filtered = filtered.filter(tx => new Date(tx.date) >= threeMonthsAgo)
-        break
-      case 'This Year':
-        const yearStart = new Date(now.getFullYear(), 0, 1)
-        filtered = filtered.filter(tx => new Date(tx.date) >= yearStart)
-        break
-      // 'All Time' - no filter
+    // Date filter - skip when searching (user wants to find a specific transaction)
+    if (!searchQuery) {
+      const now = new Date()
+      switch (dateFilter) {
+        case 'Today':
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+          filtered = filtered.filter(tx => new Date(tx.date) >= today)
+          break
+        case 'This Week':
+          const weekAgo = new Date(now)
+          weekAgo.setDate(weekAgo.getDate() - 7)
+          filtered = filtered.filter(tx => new Date(tx.date) >= weekAgo)
+          break
+        case 'This Month':
+          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+          filtered = filtered.filter(tx => new Date(tx.date) >= monthStart)
+          break
+        case 'Last 3 Months':
+          const threeMonthsAgo = new Date(now)
+          threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
+          filtered = filtered.filter(tx => new Date(tx.date) >= threeMonthsAgo)
+          break
+        case 'This Year':
+          const yearStart = new Date(now.getFullYear(), 0, 1)
+          filtered = filtered.filter(tx => new Date(tx.date) >= yearStart)
+          break
+        // 'All Time' - no filter
+      }
     }
 
     // Type filter
@@ -133,7 +227,7 @@ export default function TransactionsPage() {
     }
 
     return filtered
-  }, [transactions, searchQuery, dateFilter, activeTab])
+  }, [transactions, searchQuery, searchResults, dateFilter, activeTab])
 
   // Calculate totals
   const totals = useMemo(() => {
@@ -221,8 +315,17 @@ export default function TransactionsPage() {
   return (
     <div className="max-w-3xl mx-auto py-2 md:py-6">
       {/* Header */}
-      <div className="mb-4 md:mb-6">
+      <div className="flex items-center justify-between mb-4 md:mb-6">
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Transactions</h1>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setTransferModalOpen(true)}
+          className="gap-2"
+        >
+          <ArrowLeftRight className="h-4 w-4" />
+          <span className="hidden sm:inline">Review Transfers</span>
+        </Button>
       </div>
 
       {/* AI-Powered Natural Language Search */}
@@ -232,19 +335,21 @@ export default function TransactionsPage() {
       <div className="relative mb-6">
         <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="Search transactions..."
+          placeholder="Search all transactions..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="h-12 pl-12 pr-10 text-base rounded-xl border-0 bg-muted/50 focus-visible:ring-1"
         />
-        {searchQuery && (
+        {searching ? (
+          <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 animate-spin text-muted-foreground" />
+        ) : searchQuery ? (
           <button
             onClick={() => setSearchQuery('')}
             className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
           >
             <X className="h-5 w-5" />
           </button>
-        )}
+        ) : null}
       </div>
 
       {/* Filter Tabs */}
@@ -314,7 +419,13 @@ export default function TransactionsPage() {
             <Search className="h-8 w-8 text-muted-foreground" />
           </div>
           <p className="text-lg font-medium">No transactions found</p>
-          <p className="text-muted-foreground mt-1">Try adjusting your search or filters</p>
+          <p className="text-muted-foreground mt-1">
+            {searching
+              ? 'Searching...'
+              : searchQuery
+                ? `No matches found for "${searchQuery}"`
+                : 'Try adjusting your search or filters'}
+          </p>
         </div>
       ) : (
         <div className="space-y-1">
@@ -381,7 +492,7 @@ export default function TransactionsPage() {
             </div>
           ))}
 
-          {/* Load More */}
+          {/* Load More - for visible count within loaded transactions */}
           {visibleCount < filteredTransactions.length && (
             <div className="pt-6 pb-4 text-center">
               <Button
@@ -389,10 +500,43 @@ export default function TransactionsPage() {
                 onClick={() => setVisibleCount(prev => prev + 50)}
                 className="rounded-xl px-8"
               >
-                Load More
+                Show More
               </Button>
               <p className="text-xs text-muted-foreground mt-2">
-                Showing {visibleCount} of {filteredTransactions.length}
+                Showing {Math.min(visibleCount, filteredTransactions.length)} of {filteredTransactions.length} loaded
+              </p>
+            </div>
+          )}
+
+          {/* Load More from Database */}
+          {visibleCount >= filteredTransactions.length && hasMore && (
+            <div className="pt-6 pb-4 text-center">
+              <Button
+                variant="outline"
+                onClick={loadMoreTransactions}
+                disabled={loadingMore}
+                className="rounded-xl px-8"
+              >
+                {loadingMore ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  'Load More Transactions'
+                )}
+              </Button>
+              <p className="text-xs text-muted-foreground mt-2">
+                Loaded {transactions.length}{totalCount ? ` of ${totalCount}` : ''} transactions
+              </p>
+            </div>
+          )}
+
+          {/* All loaded message */}
+          {!hasMore && transactions.length > 0 && (
+            <div className="pt-6 pb-4 text-center">
+              <p className="text-xs text-muted-foreground">
+                All {transactions.length} transactions loaded
               </p>
             </div>
           )}
@@ -406,6 +550,16 @@ export default function TransactionsPage() {
         open={!!selectedTransaction}
         onOpenChange={(open) => !open && setSelectedTransaction(null)}
         onUpdate={handleTransactionUpdate}
+      />
+
+      {/* Transfer Review Modal */}
+      <TransferReviewModal
+        open={transferModalOpen}
+        onOpenChange={setTransferModalOpen}
+        onComplete={() => {
+          // Refresh transactions to update ignored status
+          window.location.reload()
+        }}
       />
     </div>
   )

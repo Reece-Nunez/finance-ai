@@ -385,6 +385,7 @@ export const MERCHANT_DOMAINS: Record<string, string> = {
   'americanexpress': 'americanexpress.com',
   'amex': 'americanexpress.com',
   'synchrony': 'synchrony.com',
+  'tinker': 'tinkerfcu.org',
 
   // Insurance
   'geico': 'geico.com',
@@ -471,6 +472,7 @@ export const MERCHANT_DOMAINS: Record<string, string> = {
   'discounttire': 'discounttire.com',
   'carmax': 'carmax.com',
   'carvana': 'carvana.com',
+  'lds reimbursement' : 'churchofjesuschrist.org',
 }
 
 // Normalize merchant name for lookup

@@ -13,11 +13,20 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Progress } from '@/components/ui/progress'
 import {
   Repeat,
   Calendar as CalendarIcon,
@@ -35,7 +44,18 @@ import {
   RefreshCw,
   Loader2,
   Zap,
+  Check,
+  AlertTriangle,
+  Plus,
 } from 'lucide-react'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { toast } from 'sonner'
 import { SterlingIcon } from '@/components/ui/sterling-icon'
 import { MerchantLogo } from '@/components/ui/merchant-logo'
@@ -396,7 +416,8 @@ function AllRecurringTab({
   const [sortBy, setSortBy] = useState<'name' | 'amount' | 'frequency' | 'next'>('next')
 
   const filtered = useMemo(() => {
-    let result = [...recurring]
+    // Only show bills/expenses, not income (income is on its own page now)
+    let result = recurring.filter(r => !r.isIncome)
 
     // Filter by search
     if (search) {
@@ -429,34 +450,20 @@ function AllRecurringTab({
   }, [recurring, search, sortBy])
 
   const subscriptionCount = recurring.filter((r) => !r.isIncome).length
-  const incomeCount = recurring.filter((r) => r.isIncome).length
 
   return (
     <div className="space-y-6">
       {/* Header Stats */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         <Card className="bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/30 dark:to-orange-950/30">
           <CardContent className="flex items-center gap-4 p-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/20">
               <CreditCard className="h-6 w-6 text-red-600" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Subscriptions</p>
+              <p className="text-sm text-muted-foreground">Recurring Bills</p>
               <p className="text-2xl font-bold">{subscriptionCount}</p>
-              <p className="text-xs text-muted-foreground">bills & expenses</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30">
-          <CardContent className="flex items-center gap-4 p-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-500/20">
-              <DollarSign className="h-6 w-6 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Recurring Income</p>
-              <p className="text-2xl font-bold">{incomeCount}</p>
-              <p className="text-xs text-muted-foreground">paychecks & deposits</p>
+              <p className="text-xs text-muted-foreground">subscriptions & expenses</p>
             </div>
           </CardContent>
         </Card>
@@ -469,7 +476,7 @@ function AllRecurringTab({
             <div>
               <p className="text-sm text-muted-foreground">Yearly Spend</p>
               <p className="text-2xl font-bold">{formatCurrency(yearlySpend)}</p>
-              <p className="text-xs text-muted-foreground">on subscriptions</p>
+              <p className="text-xs text-muted-foreground">on recurring bills</p>
             </div>
           </CardContent>
         </Card>
@@ -508,11 +515,11 @@ function AllRecurringTab({
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <SterlingIcon size="lg" className="opacity-50" />
             <p className="mt-2 text-muted-foreground">
-              {search ? 'No matching recurring transactions' : 'No recurring transactions detected'}
+              {search ? 'No matching recurring bills' : 'No recurring bills detected'}
             </p>
             {!search && (
               <p className="mt-1 text-sm text-muted-foreground">
-                AI will detect patterns as more transactions are synced
+                AI will detect patterns as more transactions are synced, or add manually below
               </p>
             )}
           </CardContent>
@@ -841,13 +848,44 @@ function DetailModal({
   onOpenChange,
   item,
   onRemove,
+  onUpdate,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   item: RecurringTransaction | null
   onRemove: () => void
+  onUpdate: (id: string, updates: { frequency?: string }) => Promise<void>
 }) {
+  const [editingFrequency, setEditingFrequency] = useState(false)
+  const [selectedFrequency, setSelectedFrequency] = useState<string>('')
+  const [saving, setSaving] = useState(false)
+
+  // Reset state when item changes
+  useEffect(() => {
+    if (item) {
+      setSelectedFrequency(item.frequency)
+      setEditingFrequency(false)
+    }
+  }, [item])
+
   if (!item) return null
+
+  const handleSaveFrequency = async () => {
+    if (selectedFrequency === item.frequency) {
+      setEditingFrequency(false)
+      return
+    }
+    setSaving(true)
+    try {
+      await onUpdate(item.id, { frequency: selectedFrequency })
+      setEditingFrequency(false)
+      toast.success('Frequency updated')
+    } catch {
+      toast.error('Failed to update frequency')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -884,9 +922,35 @@ function DetailModal({
 
           {/* Details */}
           <div className="space-y-3">
-            <div className="flex justify-between rounded-lg bg-muted/50 p-3">
+            {/* Editable Frequency */}
+            <div className="flex items-center justify-between rounded-lg bg-muted/50 p-3">
               <span className="text-muted-foreground">Frequency</span>
-              <Badge variant="secondary">{getFrequencyLabel(item.frequency)}</Badge>
+              {editingFrequency ? (
+                <div className="flex items-center gap-2">
+                  <Select value={selectedFrequency} onValueChange={setSelectedFrequency}>
+                    <SelectTrigger className="w-32 h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="bi-weekly">Bi-weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="quarterly">Quarterly</SelectItem>
+                      <SelectItem value="yearly">Yearly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button size="sm" variant="ghost" onClick={handleSaveFrequency} disabled={saving}>
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4 text-green-600" />}
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setEditingFrequency(true)}
+                  className="flex items-center gap-1 hover:opacity-70"
+                >
+                  <Badge variant="secondary">{getFrequencyLabel(item.frequency)}</Badge>
+                </button>
+              )}
             </div>
             <div className="flex justify-between rounded-lg bg-muted/50 p-3">
               <span className="text-muted-foreground">Next Expected</span>
@@ -920,6 +984,11 @@ function DetailModal({
               </Badge>
             </div>
           </div>
+
+          {/* Hint */}
+          <p className="text-xs text-muted-foreground text-center">
+            Click on Frequency to edit
+          </p>
 
           {/* Actions */}
           <div className="pt-4">
@@ -1076,6 +1145,196 @@ function PatternsBreakdownModal({
   )
 }
 
+// Add Recurring Modal Component
+function AddRecurringModal({
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSuccess: () => void
+}) {
+  const [name, setName] = useState('')
+  const [amount, setAmount] = useState('')
+  const [frequency, setFrequency] = useState<string>('monthly')
+  const [isIncome, setIsIncome] = useState(false)
+  const [nextDate, setNextDate] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const handleSubmit = async () => {
+    if (!name.trim() || !amount) {
+      toast.error('Please fill in name and amount')
+      return
+    }
+
+    const amountNum = parseFloat(amount)
+    if (isNaN(amountNum) || amountNum <= 0) {
+      toast.error('Please enter a valid amount')
+      return
+    }
+
+    setSaving(true)
+    try {
+      const response = await fetch('/api/recurring', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          amount: amountNum,
+          frequency,
+          isIncome,
+          nextDate: nextDate || undefined,
+        }),
+      })
+
+      if (response.ok) {
+        toast.success(`Added "${name}" as recurring ${isIncome ? 'income' : 'expense'}`)
+        onSuccess()
+        onOpenChange(false)
+        // Reset form
+        setName('')
+        setAmount('')
+        setFrequency('monthly')
+        setIsIncome(false)
+        setNextDate('')
+      } else {
+        const data = await response.json()
+        toast.error(data.error || 'Failed to add recurring item')
+      }
+    } catch (error) {
+      console.error('Error adding recurring:', error)
+      toast.error('Failed to add recurring item')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Plus className="h-5 w-5" />
+            Add Recurring {isIncome ? 'Income' : 'Transaction'}
+          </DialogTitle>
+          <DialogDescription>
+            Manually add a recurring bill, subscription, or income that wasn&apos;t detected automatically.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          {/* Type Toggle */}
+          <div className="flex rounded-lg border p-1 gap-1">
+            <button
+              type="button"
+              onClick={() => setIsIncome(false)}
+              className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${
+                !isIncome
+                  ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                  : 'text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              Bill / Expense
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsIncome(true)}
+              className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${
+                isIncome
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                  : 'text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              Income
+            </button>
+          </div>
+
+          {/* Name */}
+          <div className="space-y-2">
+            <Label htmlFor="name">Name</Label>
+            <Input
+              id="name"
+              placeholder={isIncome ? "e.g., Paycheck, Rental Income" : "e.g., Netflix, Rent, Electric Bill"}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+
+          {/* Amount */}
+          <div className="space-y-2">
+            <Label htmlFor="amount">Amount</Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+              <Input
+                id="amount"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="pl-7"
+              />
+            </div>
+          </div>
+
+          {/* Frequency */}
+          <div className="space-y-2">
+            <Label htmlFor="frequency">Frequency</Label>
+            <Select value={frequency} onValueChange={setFrequency}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select frequency" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="weekly">Weekly</SelectItem>
+                <SelectItem value="bi-weekly">Bi-weekly</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem>
+                <SelectItem value="quarterly">Quarterly</SelectItem>
+                <SelectItem value="yearly">Yearly</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Next Date (optional) */}
+          <div className="space-y-2">
+            <Label htmlFor="nextDate">Next Expected Date (optional)</Label>
+            <Input
+              id="nextDate"
+              type="date"
+              value={nextDate}
+              onChange={(e) => setNextDate(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={saving || !name.trim() || !amount}
+            className={isIncome ? 'bg-green-600 hover:bg-green-700' : ''}
+          >
+            {saving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Adding...
+              </>
+            ) : (
+              <>
+                <Plus className="mr-2 h-4 w-4" />
+                Add {isIncome ? 'Income' : 'Recurring'}
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // Main Page Component
 export default function RecurringPage() {
   const [recurring, setRecurring] = useState<RecurringTransaction[]>([])
@@ -1095,13 +1354,27 @@ export default function RecurringPage() {
   const [calendarDayItems, setCalendarDayItems] = useState<RecurringTransaction[]>([])
   const [showPatternsBreakdown, setShowPatternsBreakdown] = useState(false)
 
+  // AI Analysis Modal states
+  const [analysisModalOpen, setAnalysisModalOpen] = useState(false)
+  const [analysisStarted, setAnalysisStarted] = useState(false)
+  const [analysisProgress, setAnalysisProgress] = useState(0)
+  const [analysisResult, setAnalysisResult] = useState<{
+    count: number
+    message?: string
+    error?: string
+  } | null>(null)
+
+  // Add Recurring Modal state
+  const [addRecurringOpen, setAddRecurringOpen] = useState(false)
+
   useEffect(() => {
     const fetchRecurring = async () => {
       try {
         const response = await fetch('/api/recurring')
         if (response.ok) {
           const data = await response.json()
-          setRecurring(data.recurring || [])
+          const recurringData = data.recurring || []
+          setRecurring(recurringData)
           setYearlySpend(data.yearlySpend || 0)
           setAiPowered(data.aiPowered || false)
           setLastAnalysis(data.lastAnalysis || null)
@@ -1116,28 +1389,76 @@ export default function RecurringPage() {
     fetchRecurring()
   }, [])
 
-  const handleReanalyze = async () => {
+  // Open analysis modal
+  const openAnalysisModal = () => {
+    setAnalysisModalOpen(true)
+    setAnalysisStarted(false)
+    setAnalysisProgress(0)
+    setAnalysisResult(null)
+  }
+
+  // Run AI analysis with progress
+  const runAnalysis = async () => {
+    setAnalysisStarted(true)
+    setAnalysisProgress(0)
+    setAnalysisResult(null)
     setReanalyzing(true)
+
+    // Simulate progress updates while waiting for the API
+    const progressInterval = setInterval(() => {
+      setAnalysisProgress((prev) => {
+        // Gradually increase but never reach 100% until done
+        const increment = Math.max(1, Math.floor((100 - prev) * 0.08))
+        return Math.min(prev + increment, 92)
+      })
+    }, 1500)
+
     try {
       const response = await fetch('/api/recurring', { method: 'POST' })
       const data = await response.json()
 
+      clearInterval(progressInterval)
+      setAnalysisProgress(100)
+
       if (response.ok) {
-        setRecurring(data.recurring || [])
+        const recurringData = data.recurring || []
+        setRecurring(recurringData)
         setYearlySpend(data.yearlySpend || 0)
         setAiPowered(data.aiPowered || true)
         setLastAnalysis(data.lastAnalysis || new Date().toISOString())
-        toast.success(`AI detected ${data.recurring?.length || 0} recurring bills`)
+        setAnalysisResult({
+          count: recurringData.length,
+          message: data.message,
+        })
+
+        // Close modal after showing success
+        setTimeout(() => {
+          setAnalysisModalOpen(false)
+          setAnalysisStarted(false)
+        }, 2000)
       } else if (response.status === 403) {
-        toast.error('Pro subscription required for AI analysis')
+        setAnalysisResult({
+          count: 0,
+          error: 'Pro subscription required for AI analysis',
+        })
       } else if (response.status === 429) {
-        toast.error('Rate limit reached. Please try again later.')
+        setAnalysisResult({
+          count: 0,
+          error: 'Rate limit reached. Please try again later.',
+        })
       } else {
-        toast.error(data.error || 'Failed to analyze recurring transactions')
+        setAnalysisResult({
+          count: 0,
+          error: data.error || 'Failed to analyze recurring transactions',
+        })
       }
     } catch (error) {
       console.error('Error reanalyzing:', error)
-      toast.error('Failed to analyze recurring transactions')
+      clearInterval(progressInterval)
+      setAnalysisResult({
+        count: 0,
+        error: 'Failed to analyze recurring transactions',
+      })
     } finally {
       setReanalyzing(false)
     }
@@ -1177,6 +1498,49 @@ export default function RecurringPage() {
     setCalendarDayItems(items)
   }
 
+  // Update a recurring pattern (e.g., change frequency)
+  const handleUpdateRecurring = async (id: string, updates: { frequency?: string }) => {
+    const response = await fetch('/api/recurring', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...updates }),
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to update')
+    }
+
+    // Update local state
+    const data = await response.json()
+    if (data.pattern) {
+      setRecurring(recurring.map(r => {
+        if (r.id === id) {
+          return {
+            ...r,
+            frequency: data.pattern.frequency || r.frequency,
+            nextDate: data.pattern.next_expected_date || r.nextDate,
+          }
+        }
+        return r
+      }))
+    }
+  }
+
+  // Refresh recurring data after adding manually
+  const handleAddSuccess = async () => {
+    try {
+      const response = await fetch('/api/recurring')
+      if (response.ok) {
+        const data = await response.json()
+        const recurringData = data.recurring || []
+        setRecurring(recurringData)
+        setYearlySpend(data.yearlySpend || 0)
+      }
+    } catch (error) {
+      console.error('Error refreshing recurring:', error)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -1208,17 +1572,20 @@ export default function RecurringPage() {
         </div>
         <div className="flex items-center gap-2">
           <Button
+            variant="default"
+            size="sm"
+            onClick={() => setAddRecurringOpen(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Recurring
+          </Button>
+          <Button
             variant="outline"
             size="sm"
-            onClick={handleReanalyze}
-            disabled={reanalyzing}
+            onClick={openAnalysisModal}
           >
-            {reanalyzing ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4 mr-2" />
-            )}
-            {reanalyzing ? 'Analyzing...' : 'Re-analyze with AI'}
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Re-analyze with AI
           </Button>
           <button
             onClick={() => setShowPatternsBreakdown(true)}
@@ -1279,6 +1646,7 @@ export default function RecurringPage() {
         onOpenChange={(open) => !open && setDetailItem(null)}
         item={detailItem}
         onRemove={() => detailItem && handleRemove(detailItem)}
+        onUpdate={handleUpdateRecurring}
       />
 
       <HistoryModal
@@ -1302,6 +1670,114 @@ export default function RecurringPage() {
         recurring={recurring}
         onViewDetails={setDetailItem}
       />
+
+      {/* Add Recurring Modal */}
+      <AddRecurringModal
+        open={addRecurringOpen}
+        onOpenChange={setAddRecurringOpen}
+        onSuccess={handleAddSuccess}
+      />
+
+      {/* AI Analysis Modal */}
+      <Dialog open={analysisModalOpen} onOpenChange={(open) => !analysisStarted && setAnalysisModalOpen(open)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <SterlingIcon size="md" />
+              AI Recurring Detection
+            </DialogTitle>
+            <DialogDescription>
+              {!analysisStarted ? (
+                <>
+                  Analyze your transaction history to detect recurring bills, subscriptions, and income.
+                  This typically takes <strong>30-60 seconds</strong>.
+                </>
+              ) : (
+                'Analyzing your transactions...'
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            {!analysisStarted ? (
+              <div className="space-y-4">
+                <div className="p-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+                  <div className="flex items-start gap-3">
+                    <Zap className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
+                        AI-Powered Detection
+                      </p>
+                      <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                        Sterling will analyze patterns in your transactions to identify bills, subscriptions, and regular income.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Progress</span>
+                    <span className="font-medium">{analysisProgress}%</span>
+                  </div>
+                  <Progress value={analysisProgress} className="h-3" />
+                  <p className="text-xs text-muted-foreground text-center">
+                    {analysisResult?.error ? (
+                      <span className="text-red-600 dark:text-red-400 font-medium">
+                        {analysisResult.error}
+                      </span>
+                    ) : analysisProgress === 100 && analysisResult ? (
+                      <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                        Complete! Detected {analysisResult.count} recurring transactions.
+                      </span>
+                    ) : (
+                      <>Analyzing transaction patterns...</>
+                    )}
+                  </p>
+                </div>
+
+                {analysisProgress < 100 && !analysisResult?.error && (
+                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Please wait, this may take up to a minute...</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            {!analysisStarted ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => setAnalysisModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={runAnalysis}
+                  className="bg-gradient-to-r from-slate-500 to-slate-700 hover:from-slate-600 hover:to-slate-800"
+                >
+                  <SterlingIcon size="sm" className="mr-2" />
+                  Start Analysis
+                </Button>
+              </>
+            ) : analysisResult?.error ? (
+              <Button onClick={() => setAnalysisModalOpen(false)}>
+                Close
+              </Button>
+            ) : analysisProgress === 100 && analysisResult ? (
+              <Button onClick={() => setAnalysisModalOpen(false)}>
+                <Check className="h-4 w-4 mr-2" />
+                Done
+              </Button>
+            ) : null}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

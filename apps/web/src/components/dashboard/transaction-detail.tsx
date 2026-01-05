@@ -33,6 +33,7 @@ import {
 import { SterlingIcon } from '@/components/ui/sterling-icon'
 import { CategorySelector } from './category-selector'
 import { MerchantLogo } from '@/components/ui/merchant-logo'
+import { toast } from 'sonner'
 
 interface AccountInfo {
   name: string
@@ -50,6 +51,7 @@ interface Transaction {
   category: string | null
   pending: boolean
   is_income?: boolean
+  income_type?: string
   ignore_type?: 'none' | 'budget' | 'all'
   display_name?: string | null
   plaid_account_id?: string
@@ -204,6 +206,7 @@ export function TransactionDetail({
   const [showRuleCreator, setShowRuleCreator] = useState(false)
   const [rulePattern, setRulePattern] = useState('')
   const [ruleName, setRuleName] = useState('')
+  const [ruleCategory, setRuleCategory] = useState('')
   const [ruleSetAsIncome, setRuleSetAsIncome] = useState(false)
   const [ruleSetAsIgnored, setRuleSetAsIgnored] = useState(false)
   const [creatingRule, setCreatingRule] = useState(false)
@@ -298,11 +301,17 @@ export function TransactionDetail({
     setEditedName('')
   }
 
-  const handleMarkAsIncome = async () => {
+  const handleFlipTransactionType = async () => {
     if (!transaction || !onUpdate) return
     setIsUpdating(true)
     try {
-      await onUpdate(transaction.id, { is_income: true })
+      // Flip the sign of the amount and update is_income flag accordingly
+      const newAmount = transaction.amount * -1
+      const newIsIncome = newAmount < 0 // Negative amounts are income in Plaid
+      await onUpdate(transaction.id, {
+        amount: newAmount,
+        is_income: newIsIncome
+      } as Partial<Transaction>)
     } finally {
       setIsUpdating(false)
     }
@@ -312,32 +321,53 @@ export function TransactionDetail({
     // Pre-fill with a pattern from the transaction name
     const name = transaction?.name || ''
     // Try to extract a meaningful pattern (e.g., company name)
-    const words = name.split(' ')
-    // Use the first few words as default pattern
-    const defaultPattern = words.slice(0, 3).join(' ')
+    // Remove numbers that look like transaction IDs (sequences of 4+ digits)
+    const cleanedName = name.replace(/\b\d{4,}\b/g, '').replace(/\s+/g, ' ').trim()
+    const words = cleanedName.split(' ')
+    // Use just the first 2 words for a broader match - less specific = more transactions matched
+    const defaultPattern = words.slice(0, 2).join(' ').trim()
     setRulePattern(defaultPattern)
     setRuleName(editedName || displayName)
-    setRuleSetAsIncome(isIncome || false)
+    setRuleCategory(transaction?.category || '')
+    // Default to false - user must explicitly enable recurring income
+    // Check if transaction is already marked as recurring income
+    setRuleSetAsIncome(transaction?.is_income || false)
     setRuleSetAsIgnored(false)
     setShowRuleCreator(true)
   }
 
   const handleCreateRule = async () => {
-    if (!rulePattern || (!ruleName && !ruleSetAsIgnored)) return
+    // Must have pattern and at least one action (name, category, or ignore)
+    if (!rulePattern || (!ruleName && !ruleCategory && !ruleSetAsIgnored)) return
     setCreatingRule(true)
     try {
+      // Build description based on what the rule does
+      let description = ''
+      if (ruleSetAsIgnored) {
+        description = `Auto-ignore transactions matching "${rulePattern}"`
+      } else {
+        const actions = []
+        if (ruleName) actions.push(`rename to "${ruleName}"`)
+        if (ruleCategory) actions.push(`categorize as "${ruleCategory}"`)
+        if (ruleSetAsIncome) actions.push('mark as income')
+        description = `"${rulePattern}": ${actions.join(', ')}`
+      }
+
+      // Determine if we need to unset income (user explicitly turned off toggle for an income transaction)
+      const shouldUnsetIncome = !ruleSetAsIncome && transaction?.is_income
+
       const response = await fetch('/api/transaction-rules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           match_field: 'name',
           match_pattern: rulePattern,
-          display_name: ruleSetAsIgnored ? null : ruleName,
+          display_name: ruleSetAsIgnored ? null : (ruleName || null),
+          set_category: ruleSetAsIgnored ? null : (ruleCategory || null),
           set_as_income: ruleSetAsIncome,
+          unset_income: shouldUnsetIncome, // Explicitly unset is_income and remove from recurring
           set_as_ignored: ruleSetAsIgnored,
-          description: ruleSetAsIgnored
-            ? `Auto-ignore transactions matching "${rulePattern}"`
-            : `Auto-rename "${rulePattern}" to "${ruleName}"`,
+          description,
           apply_to_existing: true,
         }),
       })
@@ -468,11 +498,11 @@ export function TransactionDetail({
         window.location.reload()
       } else {
         const data = await response.json()
-        alert(data.error || 'Failed to split transaction')
+        toast.error(data.error || 'Failed to split transaction')
       }
     } catch (error) {
       console.error('Error splitting transaction:', error)
-      alert('Failed to split transaction')
+      toast.error('Failed to split transaction')
     } finally {
       setIsSavingSplit(false)
     }
@@ -583,7 +613,7 @@ export function TransactionDetail({
             <div className="rounded-lg border border-emerald-500 bg-emerald-50 p-4 dark:bg-emerald-950/30">
               <div className="mb-3 flex items-center gap-2">
                 <Wand2 className="h-5 w-5 text-emerald-600" />
-                <span className="font-semibold">Create Renaming Rule</span>
+                <span className="font-semibold">Create Transaction Rule</span>
               </div>
               <div className="space-y-4">
                 <div>
@@ -591,21 +621,32 @@ export function TransactionDetail({
                   <Input
                     value={rulePattern}
                     onChange={(e) => setRulePattern(e.target.value)}
-                    placeholder="e.g., Phillips 66"
+                    placeholder="e.g., HB ACH TINKER"
                     className="mt-1"
                   />
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Transactions matching this pattern will be renamed
+                    All transactions matching this pattern will be updated
                   </p>
                 </div>
                 <div>
-                  <Label className="text-sm">Rename to:</Label>
+                  <Label className="text-sm">Rename to (optional):</Label>
                   <Input
                     value={ruleName}
                     onChange={(e) => setRuleName(e.target.value)}
-                    placeholder="e.g., Paycheck"
+                    placeholder="e.g., Tractor Payment"
                     className="mt-1"
+                    disabled={ruleSetAsIgnored}
                   />
+                </div>
+                <div>
+                  <Label className="text-sm">Set category (optional):</Label>
+                  <div className="mt-1">
+                    <CategorySelector
+                      value={ruleCategory}
+                      onChange={setRuleCategory}
+                      disabled={ruleSetAsIgnored}
+                    />
+                  </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <Label className="text-sm">Mark as recurring income</Label>
@@ -624,7 +665,11 @@ export function TransactionDetail({
                     checked={ruleSetAsIgnored}
                     onCheckedChange={(checked) => {
                       setRuleSetAsIgnored(checked)
-                      if (checked) setRuleSetAsIncome(false)
+                      if (checked) {
+                        setRuleSetAsIncome(false)
+                        setRuleName('')
+                        setRuleCategory('')
+                      }
                     }}
                     disabled={ruleSetAsIncome}
                   />
@@ -633,7 +678,7 @@ export function TransactionDetail({
                   <Button
                     className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
                     onClick={handleCreateRule}
-                    disabled={creatingRule || !rulePattern || (!ruleName && !ruleSetAsIgnored)}
+                    disabled={creatingRule || !rulePattern || (!ruleName && !ruleCategory && !ruleSetAsIgnored)}
                   >
                     {creatingRule ? 'Creating...' : 'Create Rule'}
                   </Button>
@@ -645,7 +690,7 @@ export function TransactionDetail({
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  This will also apply to all existing matching transactions
+                  This will apply to all existing and future matching transactions
                 </p>
               </div>
             </div>
@@ -656,7 +701,7 @@ export function TransactionDetail({
               onClick={handleStartRuleCreation}
             >
               <Wand2 className="mr-2 h-4 w-4" />
-              Create Auto-Rename Rule
+              Create Transaction Rule
             </Button>
           )}
 
@@ -785,12 +830,21 @@ export function TransactionDetail({
 
               <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-3">
                 <DollarSign className="h-5 w-5 text-muted-foreground" />
-                <div>
+                <div className="flex-1">
                   <p className="text-sm text-muted-foreground">Type</p>
                   <p className="font-medium">
                     {isIncome ? 'Income / Deposit' : 'Expense / Withdrawal'}
                   </p>
                 </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleFlipTransactionType}
+                  disabled={isUpdating}
+                  className="text-xs"
+                >
+                  {isUpdating ? 'Fixing...' : 'Fix Type'}
+                </Button>
               </div>
             </div>
           </div>
@@ -960,26 +1014,77 @@ export function TransactionDetail({
             </p>
           </div>
 
-          {/* Mark as Income button for deposits */}
-          {isIncome && !transaction.is_income && onUpdate && (
-            <Button
-              className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
-              onClick={handleMarkAsIncome}
-              disabled={isUpdating}
-            >
-              <Banknote className="mr-2 h-4 w-4" />
-              {isUpdating ? 'Saving...' : 'Mark as Recurring Income (Payday)'}
-            </Button>
-          )}
+          {/* Add to Income Sources - for deposits */}
+          {isIncome && (
+            <div className="space-y-2">
+              {transaction.income_type && transaction.income_type !== 'none' ? (
+                <div className="rounded-lg border border-green-500 bg-green-50 p-3 dark:bg-green-950/30">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-green-600">
+                      <Banknote className="h-5 w-5" />
+                      <span className="font-medium">
+                        Income Source: {transaction.income_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </span>
+                    </div>
+                    <a href="/dashboard/income" className="text-xs text-green-600 hover:underline">
+                      Manage →
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+                  onClick={async () => {
+                    setIsUpdating(true)
+                    try {
+                      const displayNameToUse = transaction.display_name || transaction.merchant_name || transaction.name
+                      // Detect income type from transaction name
+                      const nameLower = transaction.name.toLowerCase()
+                      let incomeType = 'payroll' // Default to payroll
+                      if (nameLower.includes('ssa') || nameLower.includes('ssi') || nameLower.includes('social sec') || nameLower.includes('irs')) {
+                        incomeType = 'government'
+                      } else if (nameLower.includes('pension') || nameLower.includes('401k') || nameLower.includes('retirement')) {
+                        incomeType = 'retirement'
+                      } else if (nameLower.includes('dividend') || nameLower.includes('interest')) {
+                        incomeType = 'investment'
+                      } else if (nameLower.includes('rent') || nameLower.includes('tenant')) {
+                        incomeType = 'rental'
+                      }
 
-          {transaction.is_income && (
-            <div className="rounded-lg border border-green-500 bg-green-50 p-3 dark:bg-green-950/30">
-              <div className="flex items-center gap-2 text-green-600">
-                <Banknote className="h-5 w-5" />
-                <span className="font-medium">
-                  This is marked as recurring income
-                </span>
-              </div>
+                      const response = await fetch('/api/income', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          name: displayNameToUse,
+                          incomeType,
+                          amount: Math.abs(transaction.amount),
+                          frequency: analysis?.frequency || 'bi-weekly',
+                          originalName: transaction.name,
+                        }),
+                      })
+                      if (response.ok) {
+                        toast.success(`Added "${displayNameToUse}" to Income`)
+                        // Update the transaction's income_type locally
+                        if (onUpdate) {
+                          await onUpdate(transaction.id, { income_type: incomeType, is_income: true })
+                        }
+                      } else {
+                        const error = await response.json()
+                        toast.error(error.details || error.error || 'Failed to add')
+                      }
+                    } catch (err) {
+                      console.error('Error:', err)
+                      toast.error('Failed to add to Income')
+                    } finally {
+                      setIsUpdating(false)
+                    }
+                  }}
+                  disabled={isUpdating}
+                >
+                  <Banknote className="mr-2 h-4 w-4" />
+                  {isUpdating ? 'Adding...' : 'Add to Income Sources'}
+                </Button>
+              )}
             </div>
           )}
 

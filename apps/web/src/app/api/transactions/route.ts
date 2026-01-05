@@ -10,7 +10,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   const body = await request.json()
-  const { id, category, is_income, ignore_type, notes, display_name, date, is_exceptional } = body
+  const { id, category, is_income, ignore_type, notes, display_name, date, is_exceptional, amount } = body
 
   if (!id) {
     return NextResponse.json({ error: 'Transaction ID is required' }, { status: 400 })
@@ -29,6 +29,7 @@ export async function PATCH(request: NextRequest) {
     updates.date = date
   }
   if (typeof is_exceptional === 'boolean') updates.is_exceptional = is_exceptional
+  if (typeof amount === 'number') updates.amount = amount
 
   const { data, error } = await supabase
     .from('transactions')

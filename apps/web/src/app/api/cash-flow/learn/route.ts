@@ -131,12 +131,13 @@ export async function POST(request: Request) {
   // ACTION: Analyze patterns from transaction history
   // -------------------------------------------------------------------------
   if (action === 'analyze_patterns') {
-    // Get all transactions for analysis
+    // Get all transactions for analysis (excluding ignored)
     const { data: transactions, error: txError } = await supabase
       .from('transactions')
       .select('id, amount, date, category, merchant_name, name, is_income')
       .eq('user_id', user.id)
       .neq('ignore_type', 'all')
+      .or('ignored.is.null,ignored.eq.false')
       .order('date', { ascending: false })
 
     if (txError) {
@@ -308,6 +309,7 @@ export async function POST(request: Request) {
       .eq('user_id', user.id)
       .gte('date', minDate)
       .lte('date', maxDate)
+      .or('ignored.is.null,ignored.eq.false')
 
     // Calculate daily actuals
     const dailyActuals: Map<string, { income: number; expenses: number }> = new Map()
@@ -398,13 +400,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'No prediction errors to analyze' })
     }
 
-    // Get transactions for context
+    // Get transactions for context (excluding ignored)
     const dates = predictions.map(p => p.prediction_date)
     const { data: transactions } = await supabase
       .from('transactions')
       .select('*')
       .eq('user_id', user.id)
       .in('date', dates)
+      .or('ignored.is.null,ignored.eq.false')
 
     // Use AI to analyze why predictions were off
     const prompt = `Analyze these cash flow prediction errors and explain WHY the predictions were wrong.
@@ -463,7 +466,14 @@ Format your response as JSON:
         throw new Error('Could not parse AI response')
       }
 
-      const analysis = JSON.parse(jsonMatch[0])
+      // Sanitize JSON string - remove control characters that break parsing
+      const sanitizedJson = jsonMatch[0]
+        .replace(/[\x00-\x1F\x7F]/g, ' ') // Replace control chars with space
+        .replace(/\n/g, ' ') // Replace newlines
+        .replace(/\r/g, ' ') // Replace carriage returns
+        .replace(/\t/g, ' ') // Replace tabs
+
+      const analysis = JSON.parse(sanitizedJson)
 
       // Update predictions with analysis
       for (const a of analysis.analyses) {

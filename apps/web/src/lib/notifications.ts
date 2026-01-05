@@ -14,6 +14,30 @@ interface NotificationData {
 const LOW_BALANCE_THRESHOLD = 100 // Alert when balance drops below $100
 const BUDGET_WARNING_THRESHOLD = 0.8 // Alert at 80% of budget
 const UPCOMING_PAYMENT_DAYS = 3 // Alert 3 days before recurring payment
+const TRANSFER_THRESHOLD = 10 // Alert when 10+ potential transfers detected
+
+// Keywords that indicate a transfer - must be more specific
+const TRANSFER_KEYWORDS = [
+  'transfer to',
+  'transfer from',
+  'online transfer',
+  'mobile transfer',
+  'internal transfer',
+  'bank transfer',
+  'xfer to',
+  'xfer from',
+  'from checking',
+  'to checking',
+  'from savings',
+  'to savings',
+  'sweep',
+  'move money',
+]
+
+const TRANSFER_CATEGORIES = [
+  'TRANSFER_IN',
+  'TRANSFER_OUT',
+]
 
 export async function generateNotifications(supabase: SupabaseClient, userId: string) {
   const notifications: NotificationData[] = []
@@ -43,6 +67,11 @@ export async function generateNotifications(supabase: SupabaseClient, userId: st
   // Check if recurring_payments alerts are enabled
   if (prefs.recurring_payments?.enabled !== false) {
     checks.push(checkUpcomingRecurringPayments(supabase, userId))
+  }
+
+  // Check for potential transfers to review
+  if (prefs.transfer_detection?.enabled !== false) {
+    checks.push(checkPotentialTransfers(supabase, userId))
   }
 
   const results = await Promise.all(checks)
@@ -153,7 +182,7 @@ async function checkBudgetWarnings(
 
   if (!budgets || budgets.length === 0) return notifications
 
-  // Get current month's transactions
+  // Get current month's transactions (excluding ignored)
   const now = new Date()
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
 
@@ -163,6 +192,7 @@ async function checkBudgetWarnings(
     .eq('user_id', userId)
     .gte('date', startOfMonth)
     .gt('amount', 0) // Only expenses
+    .or('ignored.is.null,ignored.eq.false')
 
   if (!transactions) return notifications
 
@@ -234,11 +264,55 @@ async function checkUpcomingRecurringPayments(
   // Detect recurring transactions
   const recurring = detectRecurringTransactions(transactions)
 
+  // Get dismissed patterns to exclude
+  const { data: dismissals } = await supabase
+    .from('recurring_dismissals')
+    .select('merchant_pattern')
+    .eq('user_id', userId)
+
+  const dismissedPatterns = new Set((dismissals || []).map(d => d.merchant_pattern))
+
+  // Sync detected patterns to recurring_patterns table (so recurring page shows them)
+  for (const r of recurring) {
+    // Skip if user dismissed this pattern
+    if (dismissedPatterns.has(r.merchantName)) continue
+
+    // Map frequency format (biweekly -> bi-weekly)
+    const frequencyMap: Record<string, string> = {
+      'biweekly': 'bi-weekly',
+      'weekly': 'weekly',
+      'monthly': 'monthly',
+      'quarterly': 'quarterly',
+      'yearly': 'yearly',
+    }
+
+    // Upsert to recurring_patterns table
+    await supabase.from('recurring_patterns').upsert({
+      user_id: userId,
+      name: r.merchantName,
+      display_name: capitalize(r.merchantName),
+      merchant_pattern: r.merchantName,
+      frequency: frequencyMap[r.frequency] || r.frequency,
+      amount: r.averageAmount,
+      average_amount: r.averageAmount,
+      is_income: false,
+      next_expected_date: r.nextExpectedDate,
+      last_seen_date: r.lastDate,
+      category: r.category || null,
+      confidence: r.confidence >= 80 ? 'high' : r.confidence >= 60 ? 'medium' : 'low',
+      occurrences: r.transactionCount,
+      ai_detected: false,
+    }, { onConflict: 'user_id,merchant_pattern' })
+  }
+
   // Check for upcoming payments
   const now = new Date()
   const upcomingThreshold = new Date(now.getTime() + UPCOMING_PAYMENT_DAYS * 24 * 60 * 60 * 1000)
 
   for (const r of recurring) {
+    // Skip dismissed patterns for notifications too
+    if (dismissedPatterns.has(r.merchantName)) continue
+
     const nextDate = new Date(r.nextExpectedDate)
 
     if (nextDate >= now && nextDate <= upcomingThreshold) {
@@ -249,7 +323,7 @@ async function checkUpcomingRecurringPayments(
         title: `Upcoming Payment: ${capitalize(r.merchantName)}`,
         message: `${capitalize(r.merchantName)} (~$${r.averageAmount.toFixed(0)}) is expected ${daysUntil === 0 ? 'today' : daysUntil === 1 ? 'tomorrow' : `in ${daysUntil} days`}.`,
         priority: daysUntil <= 1 ? 'high' : 'normal',
-        action_url: '/dashboard/transactions',
+        action_url: '/dashboard/recurring',
         metadata: {
           merchant: r.merchantName,
           expected_amount: r.averageAmount,
@@ -258,6 +332,73 @@ async function checkUpcomingRecurringPayments(
         },
       })
     }
+  }
+
+  return notifications
+}
+
+async function checkPotentialTransfers(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<NotificationData[]> {
+  const notifications: NotificationData[] = []
+
+  // Get transactions that aren't already ignored
+  const { data: transactions } = await supabase
+    .from('transactions')
+    .select('id, name, merchant_name, display_name, amount, date, category, ignored')
+    .eq('user_id', userId)
+    .or('ignored.is.null,ignored.eq.false')
+
+  if (!transactions || transactions.length === 0) return notifications
+
+  // Count potential transfers
+  let transferCount = 0
+
+  for (const tx of transactions) {
+    const name = (tx.display_name || tx.merchant_name || tx.name || '').toLowerCase().trim()
+    const category = (tx.category || '').toUpperCase()
+
+    // Check if it looks like a transfer - use strict matching
+    const isTransferCategory = TRANSFER_CATEGORIES.some(cat => category === cat)
+    const hasTransferKeyword = TRANSFER_KEYWORDS.some(kw => name.includes(kw))
+    const isExactTransfer = name === 'transfer' || name === 'xfer'
+
+    if (isTransferCategory || hasTransferKeyword || isExactTransfer) {
+      transferCount++
+    }
+  }
+
+  // Also count matching pairs (same amount, opposite signs, same day)
+  const byDate: Record<string, typeof transactions> = {}
+  for (const tx of transactions) {
+    if (!byDate[tx.date]) byDate[tx.date] = []
+    byDate[tx.date].push(tx)
+  }
+
+  for (const [, dayTxs] of Object.entries(byDate)) {
+    for (let i = 0; i < dayTxs.length; i++) {
+      for (let j = i + 1; j < dayTxs.length; j++) {
+        if (Math.abs(dayTxs[i].amount + dayTxs[j].amount) < 0.01) {
+          // Matching pair found
+          transferCount += 2
+        }
+      }
+    }
+  }
+
+  // Only notify if we found a significant number of transfers
+  if (transferCount >= TRANSFER_THRESHOLD) {
+    notifications.push({
+      type: 'transfer_detection',
+      title: `${transferCount} Potential Transfers Detected`,
+      message: `We found ${transferCount} transactions that look like internal transfers between your accounts. Would you like to review and ignore them?`,
+      priority: 'normal',
+      action_url: '/dashboard/transactions?review_transfers=true',
+      metadata: {
+        transfer_count: transferCount,
+      },
+    })
   }
 
   return notifications

@@ -14,6 +14,7 @@ import {
   Receipt,
   Smartphone,
   AlertCircle,
+  Banknote,
 } from 'lucide-react'
 import { SubscriptionBadge } from '@/components/subscription/subscription-badge'
 import { useSubscription } from '@/hooks/useSubscription'
@@ -34,6 +35,7 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, pro: false },
   { name: 'Transactions', href: '/dashboard/transactions', icon: Receipt, pro: false },
   { name: 'Spending', href: '/dashboard/spending', icon: ArrowLeftRight, pro: false },
+  { name: 'Income', href: '/dashboard/income', icon: Banknote, pro: false },
   { name: 'Recurring', href: '/dashboard/recurring', icon: Repeat, pro: false },
   { name: 'Budgets', href: '/dashboard/budgets', icon: PiggyBank, pro: false },
   { name: 'Sterling', href: '/dashboard/chat', icon: null, useLogo: true, pro: true },

@@ -87,27 +87,146 @@ function normalizeMerchant(name: string): string {
     .trim()
 }
 
+interface TransactionRule {
+  match_pattern: string
+  match_field: string
+  display_name: string | null
+  set_category: string | null
+  is_active: boolean
+}
+
+// Apply transaction rules to get the correct display name and category
+function applyRules(
+  originalName: string,
+  originalCategory: string | null,
+  rules: TransactionRule[]
+): { displayName: string; category: string | null } {
+  let displayName = originalName
+  let category = originalCategory
+
+  for (const rule of rules) {
+    if (!rule.is_active) continue
+
+    const pattern = rule.match_pattern.toLowerCase()
+    const name = originalName.toLowerCase()
+
+    if (name.includes(pattern)) {
+      if (rule.display_name) displayName = rule.display_name
+      if (rule.set_category) category = rule.set_category
+      break // First matching rule wins
+    }
+  }
+
+  return { displayName, category }
+}
+
 // Convert database pattern to API response format
-function patternToRecurring(pattern: RecurringPattern, transactions: Transaction[]): RecurringTransaction {
+function patternToRecurring(
+  pattern: RecurringPattern,
+  transactions: Transaction[],
+  rules: TransactionRule[] = []
+): RecurringTransaction {
+  // Match transactions using multiple strategies
+  const patternLower = (pattern.merchant_pattern || '').toLowerCase()
+  const patternName = (pattern.name || '').toLowerCase()
+  const patternDisplay = (pattern.display_name || '').toLowerCase()
+
+  // For manually added patterns, use stricter matching
+  const isManualPattern = !pattern.ai_detected
+
   const matchingTxs = transactions.filter(tx => {
-    const txMerchant = normalizeMerchant(tx.display_name || tx.merchant_name || tx.name)
-    return pattern.merchant_pattern && txMerchant.includes(pattern.merchant_pattern)
+    // For income patterns, only match income transactions
+    if (pattern.is_income && tx.amount > 0) return false
+    // For expense patterns, only match expense transactions
+    if (!pattern.is_income && tx.amount < 0) return false
+
+    const txName = (tx.name || '').toLowerCase()
+    const txMerchant = (tx.merchant_name || '').toLowerCase()
+    const txDisplay = (tx.display_name || '').toLowerCase()
+    const txNormalized = normalizeMerchant(tx.display_name || tx.merchant_name || tx.name)
+
+    // For manual patterns, use stricter matching (exact or very close)
+    if (isManualPattern) {
+      return (
+        txNormalized === patternLower ||
+        txDisplay === patternDisplay ||
+        txName.includes(patternDisplay) ||
+        txMerchant.includes(patternDisplay)
+      )
+    }
+
+    // For AI-detected patterns, use broader matching
+    return (
+      // Exact normalized match
+      txNormalized === patternLower ||
+      // Pattern contains check
+      txNormalized.includes(patternLower) ||
+      patternLower.includes(txNormalized) ||
+      // Original name contains pattern
+      txName.includes(patternLower) ||
+      txMerchant.includes(patternLower) ||
+      txDisplay.includes(patternLower) ||
+      // Pattern name/display matches
+      txName.includes(patternName) ||
+      txMerchant.includes(patternName) ||
+      txName.includes(patternDisplay) ||
+      txMerchant.includes(patternDisplay)
+    )
   })
+
+  // Apply transaction rules to get correct display name and category
+  // If we have matched transactions, prefer their display_name (which has rules applied)
+  let displayName = pattern.display_name || pattern.name
+  let category = pattern.category
+
+  if (matchingTxs.length > 0) {
+    // Use the first matched transaction's display_name if it exists (rules are applied to transactions)
+    const firstTx = matchingTxs[0]
+    if (firstTx.display_name) {
+      displayName = firstTx.display_name
+    }
+    // Also use transaction category if pattern doesn't have one
+    if (!category && firstTx.category) {
+      category = firstTx.category
+    }
+  } else {
+    // Fall back to applying rules to the pattern name
+    const applied = applyRules(pattern.display_name || pattern.name, pattern.category, rules)
+    displayName = applied.displayName
+    category = applied.category
+  }
+
+  // Use actual matched count, not stored occurrences
+  const actualOccurrences = matchingTxs.length > 0 ? matchingTxs.length : pattern.occurrences
+
+  // Detect if transactions are actually income (negative amounts in Plaid = deposits)
+  // For manually added patterns (ai_detected = false), always trust the stored is_income value
+  // For AI-detected patterns, recalculate based on transaction amounts
+  let isActuallyIncome = pattern.is_income
+  if (pattern.ai_detected && matchingTxs.length > 0) {
+    const incomeCount = matchingTxs.filter(tx => tx.amount < 0).length
+    isActuallyIncome = incomeCount > matchingTxs.length / 2
+  }
+
+  // Calculate actual average from matched transactions if available
+  const actualAverage = matchingTxs.length > 0
+    ? matchingTxs.reduce((sum, tx) => sum + Math.abs(tx.amount), 0) / matchingTxs.length
+    : Number(pattern.average_amount)
 
   return {
     id: pattern.id,
     name: pattern.name,
-    displayName: pattern.display_name,
+    displayName,
     amount: Number(pattern.amount),
-    averageAmount: Number(pattern.average_amount),
+    averageAmount: actualAverage,
     frequency: pattern.frequency as RecurringTransaction['frequency'],
     nextDate: pattern.next_expected_date || new Date().toISOString().split('T')[0],
     lastDate: pattern.last_seen_date || new Date().toISOString().split('T')[0],
-    category: pattern.category,
+    category,
     accountId: matchingTxs[0]?.plaid_account_id || '',
-    isIncome: pattern.is_income,
+    isIncome: isActuallyIncome,
     confidence: (pattern.confidence || 'medium') as RecurringTransaction['confidence'],
-    occurrences: pattern.occurrences,
+    occurrences: actualOccurrences,
     transactions: matchingTxs,
   }
 }
@@ -210,6 +329,22 @@ export async function GET() {
 
   const dismissedPatterns = (dismissals || []).map(d => d.merchant_pattern)
 
+  // Get transaction rules for applying display names and categories
+  const { data: rules } = await supabase
+    .from('transaction_rules')
+    .select('match_pattern, match_field, display_name, set_category, is_active')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .order('priority', { ascending: false })
+
+  const transactionRules: TransactionRule[] = (rules || []).map(r => ({
+    match_pattern: r.match_pattern,
+    match_field: r.match_field,
+    display_name: r.display_name,
+    set_category: r.set_category,
+    is_active: r.is_active,
+  }))
+
   // Check for cached AI patterns
   const { data: cachedPatterns } = await supabase
     .from('recurring_patterns')
@@ -226,6 +361,7 @@ export async function GET() {
     .eq('user_id', user.id)
     .gte('date', twelveMonthsAgo.toISOString().split('T')[0])
     .neq('ignore_type', 'all')
+    .or('ignored.is.null,ignored.eq.false')
     .order('date', { ascending: false })
 
   let recurring: RecurringTransaction[]
@@ -234,9 +370,10 @@ export async function GET() {
 
   if (cachedPatterns && cachedPatterns.length > 0) {
     // Use cached AI results, filtering out dismissed ones
+    // Apply transaction rules for display names and categories
     recurring = cachedPatterns
       .filter(p => !dismissedPatterns.includes(p.merchant_pattern || ''))
-      .map(p => patternToRecurring(p, transactions || []))
+      .map(p => patternToRecurring(p, transactions || [], transactionRules))
 
     aiPowered = cachedPatterns.some(p => p.ai_detected)
     lastAnalysis = cachedPatterns[0]?.last_ai_analysis || null
@@ -313,6 +450,7 @@ export async function POST() {
     .select('id, name, merchant_name, display_name, amount, date, category, is_income, plaid_account_id')
     .eq('user_id', user.id)
     .gte('date', sixMonthsAgo.toISOString().split('T')[0])
+    .or('ignored.is.null,ignored.eq.false')
     .order('date', { ascending: false })
     .limit(500)
 
@@ -406,12 +544,10 @@ export async function POST() {
       return NextResponse.json({ error: 'Failed to parse AI analysis', recurring: [] })
     }
 
-    // Clear old cached patterns
-    await supabase.from('recurring_patterns').delete().eq('user_id', user.id)
-
-    // Save new patterns
+    // Upsert AI patterns (merge with existing, don't delete basic detection patterns)
     const now = new Date().toISOString()
-    const patternsToInsert = aiRecurring.map(item => {
+
+    for (const item of aiRecurring) {
       const merchantKey = normalizeMerchant(item.name)
       const group = merchantGroups.get(merchantKey)
 
@@ -426,7 +562,7 @@ export async function POST() {
       const nextDate = new Date(lastDate)
       nextDate.setDate(nextDate.getDate() + daysToAdd)
 
-      return {
+      await supabase.from('recurring_patterns').upsert({
         user_id: user.id,
         name: item.name,
         display_name: item.displayName || item.name,
@@ -443,48 +579,47 @@ export async function POST() {
         bill_type: item.billType || null,
         ai_detected: true,
         last_ai_analysis: now,
-      }
-    })
-
-    if (patternsToInsert.length > 0) {
-      await supabase.from('recurring_patterns').insert(patternsToInsert)
+      }, { onConflict: 'user_id,merchant_pattern' })
     }
 
-    // Convert to response format
-    const recurring = aiRecurring.map(item => {
-      const merchantKey = normalizeMerchant(item.name)
-      const group = merchantGroups.get(merchantKey)
-      const matchingTxs = transactions.filter(tx =>
-        normalizeMerchant(tx.display_name || tx.merchant_name || tx.name) === merchantKey
-      )
+    // Fetch ALL patterns from database (includes both AI and basic detection)
+    const { data: allPatterns } = await supabase
+      .from('recurring_patterns')
+      .select('*')
+      .eq('user_id', user.id)
 
-      let daysToAdd = 30
-      if (item.frequency === 'weekly') daysToAdd = 7
-      else if (item.frequency === 'bi-weekly') daysToAdd = 14
-      else if (item.frequency === 'quarterly') daysToAdd = 90
-      else if (item.frequency === 'yearly') daysToAdd = 365
+    // Get transaction rules for applying display names and categories
+    const { data: rules } = await supabase
+      .from('transaction_rules')
+      .select('match_pattern, match_field, display_name, set_category, is_active')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .order('priority', { ascending: false })
 
-      const lastDate = group?.dates[0] ? new Date(group.dates[0]) : new Date()
-      const nextDate = new Date(lastDate)
-      nextDate.setDate(nextDate.getDate() + daysToAdd)
+    const transactionRules: TransactionRule[] = (rules || []).map(r => ({
+      match_pattern: r.match_pattern,
+      match_field: r.match_field,
+      display_name: r.display_name,
+      set_category: r.set_category,
+      is_active: r.is_active,
+    }))
 
-      return {
-        id: matchingTxs[0]?.id || item.name,
-        name: item.name,
-        displayName: item.displayName || item.name,
-        amount: item.amount,
-        averageAmount: item.averageAmount || item.amount,
-        frequency: item.frequency,
-        nextDate: nextDate.toISOString().split('T')[0],
-        lastDate: group?.dates[0] || new Date().toISOString().split('T')[0],
-        category: item.category || group?.category || null,
-        accountId: matchingTxs[0]?.plaid_account_id || '',
-        isIncome: item.isIncome || false,
-        confidence: item.confidence,
-        occurrences: group?.count || 0,
-        transactions: matchingTxs,
-      }
-    })
+    // Get 12 months of transactions for display
+    const twelveMonthsAgo = new Date()
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
+
+    const { data: allTransactions } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('user_id', user.id)
+      .gte('date', twelveMonthsAgo.toISOString().split('T')[0])
+      .or('ignored.is.null,ignored.eq.false')
+      .order('date', { ascending: false })
+
+    // Convert to response format (apply transaction rules for display names)
+    const recurring = (allPatterns || [])
+      .filter(p => !dismissedPatterns.includes(p.merchant_pattern || ''))
+      .map(p => patternToRecurring(p, allTransactions || [], transactionRules))
 
     // Calculate yearly spend
     const yearlySpend = recurring
@@ -498,22 +633,215 @@ export async function POST() {
         return sum + ((r.averageAmount || r.amount) * multiplier)
       }, 0)
 
+    const aiCount = aiRecurring.length
+    const totalCount = recurring.length
+
     return NextResponse.json({
       recurring,
       yearlySpend,
-      count: recurring.length,
+      count: totalCount,
       aiPowered: true,
       lastAnalysis: now,
-      message: `AI detected ${recurring.length} recurring bills/subscriptions`
+      message: `AI enhanced ${aiCount} patterns. Total: ${totalCount} recurring transactions.`
     })
 
-  } catch (aiError) {
+  } catch (aiError: unknown) {
     console.error('AI recurring detection error:', aiError)
+
+    // Check for rate limit error from Anthropic
+    if (aiError && typeof aiError === 'object' && 'status' in aiError && aiError.status === 429) {
+      return NextResponse.json({
+        error: 'AI rate limit reached. Please wait a minute and try again.',
+        recurring: []
+      }, { status: 429 })
+    }
+
     return NextResponse.json({
       error: 'AI analysis failed. Please try again later.',
       recurring: []
     }, { status: 500 })
   }
+}
+
+// PUT - Manually add a recurring pattern
+export async function PUT(request: Request) {
+  const supabase = await createClient()
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const body = await request.json()
+  const { name, amount, frequency, isIncome, category, nextDate, originalName } = body
+
+  if (!name || !amount || !frequency) {
+    return NextResponse.json({ error: 'name, amount, and frequency are required' }, { status: 400 })
+  }
+
+  const validFrequencies = ['weekly', 'bi-weekly', 'monthly', 'quarterly', 'yearly']
+  if (!validFrequencies.includes(frequency)) {
+    return NextResponse.json({ error: 'Invalid frequency' }, { status: 400 })
+  }
+
+  // For income patterns, use more of the original name for specific matching
+  // This prevents salary from matching gas station purchases with the same merchant
+  let merchantPattern: string
+  if (isIncome && originalName) {
+    // Use more words from the original name for income (up to 6 words)
+    merchantPattern = originalName
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '')
+      .split(/\s+/)
+      .slice(0, 6)
+      .join(' ')
+      .trim()
+  } else {
+    merchantPattern = normalizeMerchant(name)
+  }
+  const now = new Date().toISOString()
+
+  // Calculate next expected date if not provided
+  let nextExpectedDate = nextDate
+  if (!nextExpectedDate) {
+    const next = new Date()
+    switch (frequency) {
+      case 'weekly':
+        next.setDate(next.getDate() + 7)
+        break
+      case 'bi-weekly':
+        next.setDate(next.getDate() + 14)
+        break
+      case 'monthly':
+        next.setMonth(next.getMonth() + 1)
+        break
+      case 'quarterly':
+        next.setMonth(next.getMonth() + 3)
+        break
+      case 'yearly':
+        next.setFullYear(next.getFullYear() + 1)
+        break
+    }
+    nextExpectedDate = next.toISOString().split('T')[0]
+  }
+
+  // Remove from dismissals if previously dismissed
+  await supabase
+    .from('recurring_dismissals')
+    .delete()
+    .eq('user_id', user.id)
+    .eq('merchant_pattern', merchantPattern)
+
+  // Upsert the recurring pattern
+  const patternData = {
+    user_id: user.id,
+    name: name,
+    display_name: name,
+    merchant_pattern: merchantPattern,
+    frequency: frequency,
+    amount: Math.abs(amount),
+    average_amount: Math.abs(amount),
+    is_income: isIncome || false,
+    next_expected_date: nextExpectedDate,
+    last_seen_date: now.split('T')[0],
+    category: category || null,
+    confidence: 'high', // User-added is high confidence
+    occurrences: 1,
+    bill_type: isIncome ? 'income' : 'bill',
+    ai_detected: false, // Manual entry
+    last_ai_analysis: null,
+  }
+
+  console.log('Creating recurring pattern:', JSON.stringify(patternData, null, 2))
+
+  const { data, error } = await supabase.from('recurring_patterns').upsert(patternData, {
+    onConflict: 'user_id,merchant_pattern'
+  }).select()
+
+  if (error) {
+    console.error('Error adding recurring pattern:', error)
+    return NextResponse.json({ error: 'Failed to add recurring pattern', details: error.message }, { status: 500 })
+  }
+
+  console.log('Created recurring pattern:', data)
+
+  return NextResponse.json({ success: true, merchantPattern, pattern: data?.[0] })
+}
+
+// PATCH - Update a recurring pattern
+export async function PATCH(request: Request) {
+  const supabase = await createClient()
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const body = await request.json()
+  const { id, frequency, amount, nextDate } = body
+
+  if (!id) {
+    return NextResponse.json({ error: 'id is required' }, { status: 400 })
+  }
+
+  const updates: Record<string, unknown> = {}
+
+  if (frequency) {
+    const validFrequencies = ['weekly', 'bi-weekly', 'monthly', 'quarterly', 'yearly']
+    if (!validFrequencies.includes(frequency)) {
+      return NextResponse.json({ error: 'Invalid frequency' }, { status: 400 })
+    }
+    updates.frequency = frequency
+
+    // Recalculate next expected date based on new frequency
+    const { data: pattern } = await supabase
+      .from('recurring_patterns')
+      .select('last_seen_date')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single()
+
+    if (pattern?.last_seen_date) {
+      const lastDate = new Date(pattern.last_seen_date)
+      let daysToAdd = 30
+      if (frequency === 'weekly') daysToAdd = 7
+      else if (frequency === 'bi-weekly') daysToAdd = 14
+      else if (frequency === 'monthly') daysToAdd = 30
+      else if (frequency === 'quarterly') daysToAdd = 90
+      else if (frequency === 'yearly') daysToAdd = 365
+
+      const nextExpected = new Date(lastDate)
+      nextExpected.setDate(nextExpected.getDate() + daysToAdd)
+      updates.next_expected_date = nextExpected.toISOString().split('T')[0]
+    }
+  }
+
+  if (amount !== undefined) {
+    updates.amount = Math.abs(amount)
+    updates.average_amount = Math.abs(amount)
+  }
+
+  if (nextDate) {
+    updates.next_expected_date = nextDate
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: 'No valid updates provided' }, { status: 400 })
+  }
+
+  const { data, error } = await supabase
+    .from('recurring_patterns')
+    .update(updates)
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .select()
+
+  if (error) {
+    console.error('Error updating recurring pattern:', error)
+    return NextResponse.json({ error: 'Failed to update pattern' }, { status: 500 })
+  }
+
+  return NextResponse.json({ success: true, pattern: data?.[0] })
 }
 
 // DELETE - Dismiss a recurring pattern
@@ -531,6 +859,14 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'merchantPattern is required' }, { status: 400 })
   }
 
+  // Check if this was an income pattern before deleting
+  const { data: existingPattern } = await supabase
+    .from('recurring_patterns')
+    .select('is_income')
+    .eq('user_id', user.id)
+    .eq('merchant_pattern', merchantPattern)
+    .single()
+
   // Add to dismissals
   await supabase.from('recurring_dismissals').upsert({
     user_id: user.id,
@@ -546,6 +882,36 @@ export async function DELETE(request: Request) {
     .delete()
     .eq('user_id', user.id)
     .eq('merchant_pattern', merchantPattern)
+
+  // If this was an income pattern, also unset is_income on matching transactions
+  // This prevents basic detection from re-creating the pattern
+  if (existingPattern?.is_income) {
+    // Find and update transactions that match this pattern
+    const patternLower = merchantPattern.toLowerCase()
+    const { data: transactions } = await supabase
+      .from('transactions')
+      .select('id, name, merchant_name, display_name')
+      .eq('user_id', user.id)
+      .eq('is_income', true)
+
+    if (transactions) {
+      const matchingIds = transactions
+        .filter(tx => {
+          const txKey = normalizeMerchant(tx.display_name || tx.merchant_name || tx.name)
+          return txKey === patternLower || txKey.includes(patternLower) || patternLower.includes(txKey)
+        })
+        .map(tx => tx.id)
+
+      if (matchingIds.length > 0) {
+        await supabase
+          .from('transactions')
+          .update({ is_income: false })
+          .in('id', matchingIds)
+
+        console.log(`[recurring] Unset is_income on ${matchingIds.length} transactions for pattern "${merchantPattern}"`)
+      }
+    }
+  }
 
   return NextResponse.json({ success: true })
 }

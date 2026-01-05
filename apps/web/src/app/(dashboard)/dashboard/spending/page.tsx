@@ -529,15 +529,28 @@ export default function SpendingPage() {
   const [selectedMonth, setSelectedMonth] = useState(5) // Current month (last in array)
   const [includeBills, setIncludeBills] = useState(true)
 
-  // Custom date range state
-  const [customStartDate, setCustomStartDate] = useState(() => {
+  // Custom date range state - separate "pending" dates from "applied" dates
+  const [pendingStartDate, setPendingStartDate] = useState(() => {
     const date = new Date()
     date.setMonth(date.getMonth() - 1)
     return date.toISOString().split('T')[0]
   })
-  const [customEndDate, setCustomEndDate] = useState(() => {
+  const [pendingEndDate, setPendingEndDate] = useState(() => {
     return new Date().toISOString().split('T')[0]
   })
+  // Applied dates only update when user clicks "Apply"
+  const [appliedStartDate, setAppliedStartDate] = useState(pendingStartDate)
+  const [appliedEndDate, setAppliedEndDate] = useState(pendingEndDate)
+
+  const handleApplyCustomDates = () => {
+    setAppliedStartDate(pendingStartDate)
+    setAppliedEndDate(pendingEndDate)
+  }
+
+  // Check if pending dates differ from applied dates
+  const hasUnappliedChanges = period === 'custom' && (
+    pendingStartDate !== appliedStartDate || pendingEndDate !== appliedEndDate
+  )
 
   useEffect(() => {
     const fetchData = async () => {
@@ -545,7 +558,7 @@ export default function SpendingPage() {
       try {
         let url = `/api/spending?period=${period}`
         if (period === 'custom') {
-          url = `/api/spending?period=custom&start_date=${customStartDate}&end_date=${customEndDate}`
+          url = `/api/spending?period=custom&start_date=${appliedStartDate}&end_date=${appliedEndDate}`
         }
         const response = await fetch(url)
         if (response.ok) {
@@ -560,10 +573,17 @@ export default function SpendingPage() {
     }
 
     fetchData()
-  }, [period, customStartDate, customEndDate])
+  }, [period, appliedStartDate, appliedEndDate])
 
   const handleCategoryClick = (category: string) => {
-    router.push(`/dashboard/spending/category/${encodeURIComponent(category)}`)
+    // Pass current period and custom dates as query params
+    const params = new URLSearchParams()
+    params.set('period', period)
+    if (period === 'custom') {
+      params.set('start', appliedStartDate)
+      params.set('end', appliedEndDate)
+    }
+    router.push(`/dashboard/spending/category/${encodeURIComponent(category)}?${params.toString()}`)
   }
 
   const handleUpdateUncategorized = () => {
@@ -619,8 +639,8 @@ export default function SpendingPage() {
             <label className="text-sm text-muted-foreground">From:</label>
             <input
               type="date"
-              value={customStartDate}
-              onChange={(e) => setCustomStartDate(e.target.value)}
+              value={pendingStartDate}
+              onChange={(e) => setPendingStartDate(e.target.value)}
               className="px-3 py-1.5 text-sm border rounded-md bg-background"
             />
           </div>
@@ -628,11 +648,26 @@ export default function SpendingPage() {
             <label className="text-sm text-muted-foreground">To:</label>
             <input
               type="date"
-              value={customEndDate}
-              onChange={(e) => setCustomEndDate(e.target.value)}
+              value={pendingEndDate}
+              onChange={(e) => setPendingEndDate(e.target.value)}
               className="px-3 py-1.5 text-sm border rounded-md bg-background"
             />
           </div>
+          <Button
+            onClick={handleApplyCustomDates}
+            disabled={!hasUnappliedChanges}
+            className={hasUnappliedChanges
+              ? 'bg-emerald-600 hover:bg-emerald-700'
+              : ''
+            }
+          >
+            {hasUnappliedChanges ? 'Apply' : 'Applied'}
+          </Button>
+          {hasUnappliedChanges && (
+            <span className="text-xs text-amber-600 dark:text-amber-400">
+              Click Apply to load data
+            </span>
+          )}
         </div>
       )}
 

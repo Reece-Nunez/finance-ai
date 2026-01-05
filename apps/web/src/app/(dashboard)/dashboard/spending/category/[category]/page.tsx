@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useEffect, useState, useMemo } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -127,18 +127,40 @@ function CategoryBarChart({ data }: { data: MonthlyData[] }) {
 export default function CategoryDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const category = decodeURIComponent(params.category as string)
+
+  // Read URL params for date filtering
+  const periodParam = searchParams.get('period')
+  const startParam = searchParams.get('start')
+  const endParam = searchParams.get('end')
 
   const [data, setData] = useState<CategorySpendingData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [dateFilter, setDateFilter] = useState('this_month')
+
+  // Initialize dateFilter from URL params
+  const [dateFilter, setDateFilter] = useState(() => {
+    if (periodParam === 'custom') return 'custom'
+    if (periodParam) return periodParam
+    return 'this_month'
+  })
+
+  // Custom date state (strings like YYYY-MM-DD)
+  const [customStartDate, setCustomStartDate] = useState(() => startParam || '')
+  const [customEndDate, setCustomEndDate] = useState(() => endParam || '')
+
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
       try {
-        const response = await fetch(`/api/spending?period=${dateFilter}&category=${encodeURIComponent(category)}`)
+        // Build API URL with date params
+        let url = `/api/spending?period=${dateFilter}&category=${encodeURIComponent(category)}`
+        if (dateFilter === 'custom' && customStartDate && customEndDate) {
+          url += `&start_date=${customStartDate}&end_date=${customEndDate}`
+        }
+        const response = await fetch(url)
         if (response.ok) {
           const result = await response.json()
 
@@ -178,7 +200,50 @@ export default function CategoryDetailPage() {
     }
 
     fetchData()
-  }, [category, dateFilter])
+  }, [category, dateFilter, customStartDate, customEndDate])
+
+  // Filter transactions based on dateFilter - must be before early returns for hooks consistency
+  const filteredTransactions = useMemo(() => {
+    if (!data) return []
+    return data.transactions.filter(tx => {
+      const txDate = new Date(tx.date)
+      const now = new Date()
+
+      switch (dateFilter) {
+        case 'custom':
+          if (customStartDate && customEndDate) {
+            const start = new Date(customStartDate + 'T00:00:00')
+            const end = new Date(customEndDate + 'T23:59:59')
+            return txDate >= start && txDate <= end
+          }
+          return true
+        case 'last_7_days':
+          const sevenDaysAgo = new Date(now)
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+          return txDate >= sevenDaysAgo
+        case 'last_30_days':
+          const thirtyDaysAgo = new Date(now)
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+          return txDate >= thirtyDaysAgo
+        case 'last_90_days':
+          const ninetyDaysAgo = new Date(now)
+          ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+          return txDate >= ninetyDaysAgo
+        case 'this_year':
+          return txDate.getFullYear() === now.getFullYear()
+        case 'all':
+          return true
+        default: // this_month
+          return txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear()
+      }
+    })
+  }, [data, dateFilter, customStartDate, customEndDate])
+
+  const currentTotal = useMemo(() => {
+    return filteredTransactions
+      .filter(t => t.amount > 0)
+      .reduce((sum, t) => sum + t.amount, 0)
+  }, [filteredTransactions])
 
   const handleTransactionUpdate = async (id: string, updates: Partial<Transaction>) => {
     try {
@@ -228,37 +293,6 @@ export default function CategoryDetailPage() {
     )
   }
 
-  // Filter transactions based on dateFilter
-  const filteredTransactions = data.transactions.filter(tx => {
-    const txDate = new Date(tx.date)
-    const now = new Date()
-
-    switch (dateFilter) {
-      case 'last_7_days':
-        const sevenDaysAgo = new Date(now)
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-        return txDate >= sevenDaysAgo
-      case 'last_30_days':
-        const thirtyDaysAgo = new Date(now)
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-        return txDate >= thirtyDaysAgo
-      case 'last_90_days':
-        const ninetyDaysAgo = new Date(now)
-        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
-        return txDate >= ninetyDaysAgo
-      case 'this_year':
-        return txDate.getFullYear() === now.getFullYear()
-      case 'all':
-        return true
-      default: // this_month
-        return txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear()
-    }
-  })
-
-  const currentTotal = filteredTransactions
-    .filter(t => t.amount > 0)
-    .reduce((sum, t) => sum + t.amount, 0)
-
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
@@ -288,22 +322,48 @@ export default function CategoryDetailPage() {
       {/* Transactions */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle>Transactions</CardTitle>
-            <Select value={dateFilter} onValueChange={setDateFilter}>
-              <SelectTrigger className="w-[180px]">
-                <Calendar className="mr-2 h-4 w-4" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="this_month">This Month</SelectItem>
-                <SelectItem value="last_7_days">Last 7 Days</SelectItem>
-                <SelectItem value="last_30_days">Last 30 Days</SelectItem>
-                <SelectItem value="last_90_days">Last 90 Days</SelectItem>
-                <SelectItem value="this_year">This Year</SelectItem>
-                <SelectItem value="all">All Dates</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={dateFilter} onValueChange={setDateFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <Calendar className="mr-2 h-4 w-4" />
+                  <SelectValue>
+                    {dateFilter === 'custom' && customStartDate && customEndDate
+                      ? `${new Date(customStartDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${new Date(customEndDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                      : undefined}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg">
+                  <SelectItem value="this_month">This Month</SelectItem>
+                  <SelectItem value="last_7_days">Last 7 Days</SelectItem>
+                  <SelectItem value="last_30_days">Last 30 Days</SelectItem>
+                  <SelectItem value="last_90_days">Last 90 Days</SelectItem>
+                  <SelectItem value="this_year">This Year</SelectItem>
+                  <SelectItem value="all">All Dates</SelectItem>
+                  <SelectItem value="custom">Custom Range</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Custom Date Pickers */}
+              {dateFilter === 'custom' && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="px-3 py-1.5 text-sm border rounded-md bg-background"
+                  />
+                  <span className="text-muted-foreground">to</span>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="px-3 py-1.5 text-sm border rounded-md bg-background"
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>

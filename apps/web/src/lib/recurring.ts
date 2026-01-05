@@ -20,6 +20,49 @@ interface Transaction {
   category?: string | null
 }
 
+// Merchants/keywords that are shopping, NOT recurring bills
+const EXCLUDED_MERCHANTS = [
+  'walmart', 'target', 'costco', 'sams club', 'aldi', 'kroger', 'heb',
+  'hobby lobby', 'michaels', 'joann', 'dollar tree', 'dollar general',
+  'home depot', 'lowes', 'menards', 'ace hardware',
+  'amazon', 'ebay', 'etsy', // unless subscription
+  'mcdonalds', 'burger king', 'wendys', 'chick fil a', 'taco bell',
+  'starbucks', 'dunkin', 'sonic', 'whataburger', 'chipotle',
+  'gas', 'shell', 'exxon', 'chevron', 'bp ', 'quiktrip', 'racetrac',
+  'walgreens', 'cvs', 'rite aid',
+  'braums', 'sonic drive', 'dairy queen',
+  'publix', 'safeway', 'albertsons', 'food lion', 'piggly wiggly',
+  'whole foods', 'trader joes', 'sprouts',
+]
+
+// Categories that are typically shopping, not bills
+const EXCLUDED_CATEGORIES = [
+  'FOOD_AND_DRINK',
+  'MERCHANDISE',
+  'SHOPPING',
+  'GENERAL_MERCHANDISE',
+  'SUPERMARKETS_AND_GROCERIES',
+  'GAS_STATIONS',
+]
+
+function isExcludedMerchant(merchant: string, category?: string | null): boolean {
+  const lowerMerchant = merchant.toLowerCase()
+
+  // Check merchant name against excluded list
+  for (const excluded of EXCLUDED_MERCHANTS) {
+    if (lowerMerchant.includes(excluded)) {
+      return true
+    }
+  }
+
+  // Check category
+  if (category && EXCLUDED_CATEGORIES.includes(category)) {
+    return true
+  }
+
+  return false
+}
+
 export function detectRecurringTransactions(transactions: Transaction[]): RecurringTransaction[] {
   // Group transactions by normalized merchant name
   const merchantGroups: Record<string, Transaction[]> = {}
@@ -29,6 +72,10 @@ export function detectRecurringTransactions(transactions: Transaction[]): Recurr
     if (tx.amount <= 0) continue
 
     const merchant = normalizeMerchantName(tx.merchant_name || tx.name)
+
+    // Skip excluded merchants (retail, restaurants, gas stations, etc.)
+    if (isExcludedMerchant(tx.merchant_name || tx.name, tx.category)) continue
+
     if (!merchantGroups[merchant]) {
       merchantGroups[merchant] = []
     }

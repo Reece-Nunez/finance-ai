@@ -33,7 +33,7 @@ export async function GET() {
       .eq('user_id', user.id)
       .order('category')
 
-    // Fetch current month transactions (expenses only)
+    // Fetch current month transactions (expenses only, excluding ignored)
     const { data: currentTransactions } = await supabase
       .from('transactions')
       .select('id, name, merchant_name, amount, date, category, display_name')
@@ -42,9 +42,10 @@ export async function GET() {
       .lte('date', endOfMonth)
       .gt('amount', 0) // Expenses are positive
       .neq('ignore_type', 'all')
+      .or('ignored.is.null,ignored.eq.false')
       .order('date', { ascending: false })
 
-    // Fetch last month transactions for comparison
+    // Fetch last month transactions for comparison (excluding ignored)
     const { data: lastMonthTransactions } = await supabase
       .from('transactions')
       .select('category, amount')
@@ -53,6 +54,7 @@ export async function GET() {
       .lte('date', endOfLastMonth)
       .gt('amount', 0)
       .neq('ignore_type', 'all')
+      .or('ignored.is.null,ignored.eq.false')
 
     // Calculate spending by category for current month
     type TransactionType = NonNullable<typeof currentTransactions>[number]

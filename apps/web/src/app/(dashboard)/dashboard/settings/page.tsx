@@ -59,7 +59,10 @@ import {
   Crown,
   ExternalLink,
   Smartphone,
+  Wand2,
+  ChevronRight,
 } from 'lucide-react'
+import Link from 'next/link'
 import { MFASettings } from '@/components/settings/mfa-settings'
 import { useSubscription } from '@/hooks/useSubscription'
 import { Slider } from '@/components/ui/slider'
@@ -255,6 +258,25 @@ export default function SettingsPage() {
     }>
   } | null>(null)
 
+  // AI Usage tracking state
+  const [aiUsage, setAiUsage] = useState<{
+    isPro: boolean
+    date: string
+    stats: Array<{
+      feature: string
+      used: number
+      limit: number
+      remaining: number
+      percentage: number
+    }>
+    tokens: {
+      input: number
+      output: number
+      total: number
+    }
+  } | null>(null)
+  const [loadingUsage, setLoadingUsage] = useState(false)
+
   // Track if notification prefs are being saved
   const [savingNotifications, setSavingNotifications] = useState(false)
 
@@ -314,6 +336,25 @@ export default function SettingsPage() {
     }
     loadData()
   }, [supabase])
+
+  // Fetch AI usage stats
+  useEffect(() => {
+    async function fetchUsage() {
+      setLoadingUsage(true)
+      try {
+        const response = await fetch('/api/ai/usage')
+        if (response.ok) {
+          const data = await response.json()
+          setAiUsage(data)
+        }
+      } catch (error) {
+        console.error('Failed to fetch AI usage:', error)
+      } finally {
+        setLoadingUsage(false)
+      }
+    }
+    fetchUsage()
+  }, [])
 
   const formatPhoneNumber = (value: string) => {
     const digits = value.replace(/\D/g, '')
@@ -552,14 +593,22 @@ export default function SettingsPage() {
     setBatchProcessed(0)
     setCategorizationResult(null)
 
-    // Simulate progress updates while waiting for the API
+    // Simulate progress based on realistic batch processing time
+    // Each batch of 25 transactions takes ~3-5 seconds for AI processing
+    const batchSize = 25
+    const estimatedBatches = Math.ceil(batchTotal / batchSize)
+    const secondsPerBatch = 4 // Conservative estimate
+    let currentBatch = 0
+
+    // Update progress once per estimated batch completion
     const progressInterval = setInterval(() => {
-      setBatchProcessed(prev => {
-        // Gradually increase but never reach 100% until done
-        const increment = Math.max(1, Math.floor((batchTotal - prev) * 0.05))
-        return Math.min(prev + increment, Math.floor(batchTotal * 0.95))
-      })
-    }, 2000)
+      currentBatch++
+      if (currentBatch < estimatedBatches) {
+        // Show progress based on batches, cap at 90% until done
+        const progress = Math.min(currentBatch * batchSize, Math.floor(batchTotal * 0.9))
+        setBatchProcessed(progress)
+      }
+    }, secondsPerBatch * 1000)
 
     try {
       const response = await fetch('/api/ai/categorize', {
@@ -1812,6 +1861,92 @@ export default function SettingsPage() {
 
           <Separator />
 
+          {/* AI Usage Tracking */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <BarChart3 className="h-4 w-4 text-blue-500" />
+              <h4 className="text-sm font-medium">Daily Usage</h4>
+              {aiUsage && (
+                <Badge variant={aiUsage.isPro ? 'default' : 'secondary'} className="ml-auto text-xs">
+                  {aiUsage.isPro ? 'Pro' : 'Free'}
+                </Badge>
+              )}
+            </div>
+            <div className="space-y-3 pl-6">
+              {loadingUsage ? (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">Loading usage...</span>
+                </div>
+              ) : aiUsage ? (
+                <>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {aiUsage.stats.map((stat) => {
+                      const featureLabels: Record<string, string> = {
+                        categorization: 'Categorization',
+                        chat: 'AI Chat',
+                        recurring_detection: 'Recurring Detection',
+                        insights: 'Insights',
+                        search: 'Smart Search',
+                      }
+                      const isNearLimit = stat.percentage >= 80
+                      const isAtLimit = stat.percentage >= 100
+
+                      return (
+                        <div key={stat.feature} className="p-3 rounded-lg border">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium">
+                              {featureLabels[stat.feature] || stat.feature}
+                            </span>
+                            <span className={`text-xs ${isAtLimit ? 'text-red-500' : isNearLimit ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                              {stat.used}/{stat.limit}
+                            </span>
+                          </div>
+                          <Progress
+                            value={Math.min(stat.percentage, 100)}
+                            className={`h-2 ${isAtLimit ? '[&>div]:bg-red-500' : isNearLimit ? '[&>div]:bg-amber-500' : ''}`}
+                          />
+                          {stat.remaining > 0 ? (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {stat.remaining} remaining today
+                            </p>
+                          ) : (
+                            <p className="text-xs text-red-500 mt-1">
+                              Limit reached - resets at midnight
+                            </p>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 text-sm">
+                    <span className="text-muted-foreground">Tokens Used Today</span>
+                    <span className="font-medium tabular-nums">
+                      {aiUsage.tokens.total.toLocaleString()}
+                    </span>
+                  </div>
+                  {!aiUsage.isPro && (
+                    <div className="p-3 rounded-lg bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border border-emerald-200 dark:border-emerald-800">
+                      <div className="flex items-center gap-2">
+                        <Crown className="h-4 w-4 text-emerald-600" />
+                        <span className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
+                          Upgrade to Pro for higher limits
+                        </span>
+                      </div>
+                      <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1 ml-6">
+                        Get up to 10x more AI requests per day
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">Unable to load usage data</p>
+              )}
+            </div>
+          </div>
+
+          <Separator />
+
           {/* Privacy & Data */}
           <div>
             <div className="flex items-center gap-2 mb-3">
@@ -1862,6 +1997,33 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Transaction Rules */}
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-3">
+          <div className="rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 p-2.5">
+            <Wand2 className="h-5 w-5 text-white" />
+          </div>
+          <div className="flex-1">
+            <CardTitle>Transaction Rules</CardTitle>
+            <CardDescription>Auto-rename, categorize, or ignore transactions</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-4">
+            Create rules to automatically rename, categorize, mark as income, or ignore transactions that match specific patterns.
+          </p>
+          <Link href="/dashboard/settings/rules">
+            <Button variant="outline" className="w-full justify-between">
+              <span className="flex items-center gap-2">
+                <Wand2 className="h-4 w-4" />
+                Manage Transaction Rules
+              </span>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </Link>
         </CardContent>
       </Card>
 
@@ -2040,7 +2202,10 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Progress</span>
                     <span className="font-medium">
-                      {batchProcessed.toLocaleString()} / {batchTotal.toLocaleString()}
+                      {batchProcessed === batchTotal && categorizationResult
+                        ? `${batchTotal.toLocaleString()} / ${batchTotal.toLocaleString()}`
+                        : `~${batchProcessed.toLocaleString()} / ${batchTotal.toLocaleString()}`
+                      }
                     </span>
                   </div>
                   <Progress
@@ -2053,7 +2218,10 @@ export default function SettingsPage() {
                         Complete! Categorized {categorizationResult.categorized} transactions.
                       </span>
                     ) : (
-                      <>Processing transactions in batches...</>
+                      <>
+                        Processing batch ~{Math.ceil(batchProcessed / 25) + 1} of ~{Math.ceil(batchTotal / 25)}
+                        <span className="text-muted-foreground/60"> (estimated)</span>
+                      </>
                     )}
                   </p>
                 </div>

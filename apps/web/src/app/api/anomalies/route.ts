@@ -126,6 +126,7 @@ export async function POST(request: NextRequest) {
       .eq('user_id', user.id)
       .gte('date', sixMonthsAgo.toISOString().split('T')[0])
       .or('is_exceptional.is.null,is_exceptional.eq.false') // Exclude exceptional transactions
+      .or('ignored.is.null,ignored.eq.false') // Exclude ignored transfers
       .order('date', { ascending: false })
       .limit(1000)
 

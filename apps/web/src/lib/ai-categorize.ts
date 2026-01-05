@@ -135,13 +135,15 @@ export async function categorizeTransactions(
     query = query.in('id', transactionIds)
   } else if (options?.processAll) {
     // Process ALL uncategorized transactions (no limit, for batch processing)
-    query = query.or('ai_category.is.null,display_name.is.null').order('date', { ascending: false })
+    // Only check ai_category to avoid re-processing transactions that just don't have a display_name
+    query = query.is('ai_category', null).order('date', { ascending: false })
   } else if (options?.force) {
     // Force mode: get recent transactions regardless of AI category status
     query = query.order('date', { ascending: false }).limit(batchSize)
   } else {
-    // Normal mode: get transactions that haven't been AI-categorized OR don't have a display name yet
-    query = query.or('ai_category.is.null,display_name.is.null').limit(batchSize)
+    // Normal mode: get transactions that haven't been AI-categorized yet
+    // Only check ai_category to avoid re-processing transactions that just don't have a display_name
+    query = query.is('ai_category', null).limit(batchSize)
   }
 
   const { data: transactions, error } = await query
@@ -415,12 +417,12 @@ export async function categorizeAllTransactions(
 ): Promise<CategorizeResult> {
   const BATCH_SIZE = 25
 
-  // First, count total uncategorized transactions
+  // First, count total uncategorized transactions (only those without ai_category)
   const { count } = await supabase
     .from('transactions')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
-    .or('ai_category.is.null,display_name.is.null')
+    .is('ai_category', null)
 
   const totalUncategorized = count || 0
 
@@ -442,12 +444,12 @@ export async function categorizeAllTransactions(
 
   // Process in batches
   while (processed < totalUncategorized) {
-    // Get next batch of uncategorized transactions
+    // Get next batch of uncategorized transactions (only those without ai_category)
     const { data: batchIds } = await supabase
       .from('transactions')
       .select('id')
       .eq('user_id', userId)
-      .or('ai_category.is.null,display_name.is.null')
+      .is('ai_category', null)
       .order('date', { ascending: false })
       .limit(BATCH_SIZE)
 

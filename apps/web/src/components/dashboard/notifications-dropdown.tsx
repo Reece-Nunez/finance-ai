@@ -18,6 +18,7 @@ import {
   RotateCw,
   X,
   Trash2,
+  ArrowLeftRight,
 } from 'lucide-react'
 import { SterlingIcon } from '@/components/ui/sterling-icon'
 
@@ -50,6 +51,8 @@ function getNotificationIcon(type: string) {
       return <TrendingDown className="h-4 w-4 text-orange-500" />
     case 'large_deposit':
       return <DollarSign className="h-4 w-4 text-emerald-500" />
+    case 'transfer_detection':
+      return <ArrowLeftRight className="h-4 w-4 text-blue-500" />
     default:
       return <Bell className="h-4 w-4 text-muted-foreground" />
   }

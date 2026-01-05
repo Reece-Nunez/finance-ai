@@ -123,11 +123,14 @@ export function CashFlowForecast() {
   const [isLearning, setIsLearning] = useState(false)
   const [showBreakdown, setShowBreakdown] = useState(false)
 
-  const fetchForecast = async (store = false) => {
+  const fetchForecast = async (store = false, recalculate = false) => {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch(`/api/cash-flow/forecast?days=30${store ? '&store=true' : ''}`)
+      const params = new URLSearchParams({ days: '30' })
+      if (store) params.set('store', 'true')
+      if (recalculate) params.set('recalculate', 'true')
+      const response = await fetch(`/api/cash-flow/forecast?${params.toString()}`)
       if (!response.ok) {
         throw new Error('Failed to fetch forecast')
       }
@@ -146,9 +149,9 @@ export function CashFlowForecast() {
   }, [])
 
   const handleRefresh = async () => {
-    toast.info('Refreshing forecast...')
-    await fetchForecast(true)
-    toast.success('Forecast updated')
+    toast.info('Recalculating forecast (excluding ignored transfers)...')
+    await fetchForecast(true, true) // store=true, recalculate=true
+    toast.success('Forecast recalculated')
   }
 
   const handleLearn = async () => {
