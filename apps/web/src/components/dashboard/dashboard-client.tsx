@@ -137,7 +137,7 @@ export function DashboardClient({
           transactions={transactions}
           allTransactions={allTransactions}
         />
-        <UpcomingBills transactions={allTransactions} isPro={isPro} />
+        <UpcomingBills isPro={isPro} />
       </div>
 
       {/* Bottom Row: Budget Summary */}

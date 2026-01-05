@@ -34,7 +34,15 @@ export function Header({ user, userName }: HeaderProps) {
     } catch {
       // Ignore localStorage errors
     }
-    await supabase.auth.signOut()
+
+    // Use server-side signout to properly clear httpOnly cookies
+    try {
+      await fetch('/api/auth/signout', { method: 'POST' })
+    } catch {
+      // Fallback to client-side signout
+      await supabase.auth.signOut()
+    }
+
     router.push('/login?message=logged_out')
     router.refresh()
   }

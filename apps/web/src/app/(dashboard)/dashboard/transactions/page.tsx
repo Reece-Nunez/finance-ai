@@ -73,10 +73,19 @@ export default function TransactionsPage() {
   const [dateFilter, setDateFilter] = useState('This Month')
   const [visibleCount, setVisibleCount] = useState(50)
 
-  // Check for review_transfers query param
+  // Check for query params (review_transfers, search)
   useEffect(() => {
     if (searchParams.get('review_transfers') === 'true') {
       setTransferModalOpen(true)
+      // Clear the query param from URL without page reload
+      window.history.replaceState({}, '', '/dashboard/transactions')
+    }
+
+    // Handle search param from dashboard navigation
+    const searchParam = searchParams.get('search')
+    if (searchParam) {
+      setSearchQuery(searchParam)
+      setDateFilter('All Time') // Show all time when searching from dashboard
       // Clear the query param from URL without page reload
       window.history.replaceState({}, '', '/dashboard/transactions')
     }
@@ -87,10 +96,13 @@ export default function TransactionsPage() {
       setLoading(true)
 
       // Get total count
-      const { count } = await supabase
+      const { count, error: countError } = await supabase
         .from('transactions')
         .select('*', { count: 'exact', head: true })
 
+      if (countError) {
+        console.error('Error fetching transaction count:', countError)
+      }
       setTotalCount(count)
 
       const [txRes, accRes] = await Promise.all([
@@ -103,6 +115,10 @@ export default function TransactionsPage() {
           .from('accounts')
           .select('plaid_account_id, name, official_name, mask'),
       ])
+
+      if (txRes.error) {
+        console.error('Error fetching transactions:', txRes.error)
+      }
 
       if (txRes.data) {
         setTransactions(txRes.data)

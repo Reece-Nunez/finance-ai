@@ -4,9 +4,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { ChevronLeft, ChevronRight, Calendar, DollarSign, Loader2 } from 'lucide-react'
-import { SterlingIcon } from '@/components/ui/sterling-icon'
 import {
   Tooltip,
   TooltipContent,
@@ -15,39 +13,15 @@ import {
 } from '@/components/ui/tooltip'
 import { MerchantLogo } from '@/components/ui/merchant-logo'
 
-interface Transaction {
+interface RecurringBill {
   id: string
   name: string
-  display_name: string | null
-  merchant_name: string | null
+  displayName: string
   amount: number
-  date: string
-  category: string | null
-  is_income?: boolean
-}
-
-interface RecurringBill {
-  name: string
-  amount: number
-  dayOfMonth: number
-  category: string | null
-  isPayday?: boolean
-  confidence?: number
-  frequency?: string
-  amountVaries?: boolean
-  aiDetected?: boolean
-}
-
-interface AIRecurringItem {
-  name: string
-  type: 'expense' | 'income'
   frequency: string
-  typical_day: number
-  amount: number
-  amount_varies: boolean
-  confidence: number
-  next_expected_date: string
-  category: string
+  nextDate: string
+  category: string | null
+  isIncome: boolean
 }
 
 interface IncomeSource {
@@ -62,7 +36,6 @@ interface IncomeSource {
 }
 
 interface UpcomingBillsProps {
-  transactions: Transaction[]
   isPro?: boolean
 }
 
@@ -82,239 +55,96 @@ function formatCurrencyShort(amount: number) {
   return `$${Math.round(amount)}`
 }
 
-// Parse date string as local date (not UTC) to avoid timezone issues
-function parseLocalDate(dateStr: string): Date {
-  // dateStr is in format "YYYY-MM-DD"
-  const [year, month, day] = dateStr.split('-').map(Number)
-  return new Date(year, month - 1, day)
-}
-
-// Common shopping/retail merchants that should NOT be considered bills
-const SHOPPING_KEYWORDS = [
-  'walmart', 'target', 'costco', 'amazon', 'dollar general', 'dollar tree',
-  'family dollar', 'walgreens', 'cvs', 'rite aid', 'grocery', 'market',
-  'food', 'restaurant', 'cafe', 'coffee', 'pizza', 'burger', 'taco',
-  'mcdonald', 'wendys', 'subway', 'chipotle', 'starbucks', 'dunkin',
-  'gas', 'shell', 'exxon', 'chevron', 'bp', 'phillips', 'conoco', 'qt', 'quiktrip',
-  'circle k', '7-eleven', 'wawa', 'sheetz', 'oncue', 'loves', 'pilot',
-  'staples', 'office depot', 'best buy', 'home depot', 'lowes', 'menards',
-  'braums', 'sonic', 'arbys', 'chick-fil-a', 'popeyes', 'kfc',
-  'hobby lobby', 'michaels', 'joann', 'petsmart', 'petco',
-  'ross', 'marshalls', 'tjmaxx', 'burlington', 'goodwill',
-]
-
-// Categories that are typically shopping, not bills
-const SHOPPING_CATEGORIES = [
-  'FOOD_AND_DRINK', 'SHOPPING', 'TRANSPORTATION', // gas is transportation
-  'PERSONAL_CARE', 'ENTERTAINMENT', // unless it's a subscription
-]
-
-function detectRecurringBills(transactions: Transaction[]): RecurringBill[] {
-  // Group transactions by merchant/name
-  const merchantMap: Record<string, { amounts: number[]; dates: string[]; category: string | null; name: string }> = {}
-
-  transactions.forEach((tx) => {
-    if (tx.amount <= 0) return // Skip income
-    const key = (tx.display_name || tx.merchant_name || tx.name).toLowerCase()
-    const displayName = tx.display_name || tx.merchant_name || tx.name
-
-    // Skip common shopping/retail merchants
-    if (SHOPPING_KEYWORDS.some(keyword => key.includes(keyword))) return
-
-    // Skip shopping categories (but allow subscriptions and utilities)
-    if (tx.category && SHOPPING_CATEGORIES.includes(tx.category)) {
-      // Exception: allow if amount is exactly the same (likely a subscription)
-      // Check later in the grouping logic
-    }
-
-    if (!merchantMap[key]) {
-      merchantMap[key] = { amounts: [], dates: [], category: tx.category, name: displayName }
-    }
-    merchantMap[key].amounts.push(tx.amount)
-    merchantMap[key].dates.push(tx.date)
-  })
-
-  const recurring: RecurringBill[] = []
-
-  Object.entries(merchantMap).forEach(([, data]) => {
-    if (data.amounts.length >= 2) {
-      // Check if amounts are similar (within 10% for potential bills)
-      const avgAmount = data.amounts.reduce((a, b) => a + b, 0) / data.amounts.length
-      const allSimilar = data.amounts.every(
-        (a) => Math.abs(a - avgAmount) / avgAmount < 0.1
-      )
-
-      // For shopping categories, require EXACT same amount (subscription)
-      const isShoppingCategory = data.category && SHOPPING_CATEGORIES.includes(data.category)
-      const allExact = data.amounts.every((a) => Math.abs(a - data.amounts[0]) < 0.01)
-
-      // Skip if it's a shopping category and amounts aren't exactly the same
-      if (isShoppingCategory && !allExact) return
-
-      if (allSimilar) {
-        // Check if dates are roughly monthly (within same week each month)
-        const sortedDates = data.dates.map(d => parseLocalDate(d)).sort((a, b) => b.getTime() - a.getTime())
-        if (sortedDates.length >= 2) {
-          const days = sortedDates.map(d => d.getDate())
-          const dayVariance = Math.max(...days) - Math.min(...days)
-
-          // If day of month varies by more than 10 days, probably not a bill
-          if (dayVariance > 10) return
-        }
-
-        const lastDate = parseLocalDate(data.dates[0])
-        recurring.push({
-          name: data.name,
-          amount: avgAmount,
-          dayOfMonth: lastDate.getDate(),
-          category: data.category,
-        })
-      }
-    }
-  })
-
-  return recurring.sort((a, b) => a.dayOfMonth - b.dayOfMonth)
-}
-
-function detectPaydays(transactions: Transaction[]): number[] {
-  // First, look for transactions explicitly marked as income
-  const markedIncomeTransactions = transactions.filter((tx) => tx.is_income === true)
-
-  // If we have marked income transactions, use those
-  if (markedIncomeTransactions.length > 0) {
-    const dayMap: Record<number, number> = {}
-    markedIncomeTransactions.forEach((tx) => {
-      const day = parseLocalDate(tx.date).getDate()
-      dayMap[day] = (dayMap[day] || 0) + 1
-    })
-    // Return days that appear at least once (since they're explicitly marked)
-    return Object.entries(dayMap)
-      .filter(([, count]) => count >= 1)
-      .map(([day]) => parseInt(day))
+function getOrdinalSuffix(day: number): string {
+  if (day > 3 && day < 21) return 'th'
+  switch (day % 10) {
+    case 1: return 'st'
+    case 2: return 'nd'
+    case 3: return 'rd'
+    default: return 'th'
   }
-
-  // Fallback: Look for large deposits (income) based on amount
-  const incomeTransactions = transactions.filter((tx) => tx.amount < 0 && Math.abs(tx.amount) > 500)
-
-  const dayMap: Record<number, number> = {}
-  incomeTransactions.forEach((tx) => {
-    const day = parseLocalDate(tx.date).getDate()
-    dayMap[day] = (dayMap[day] || 0) + 1
-  })
-
-  // Return days that appear more than once
-  return Object.entries(dayMap)
-    .filter(([, count]) => count >= 2)
-    .map(([day]) => parseInt(day))
 }
 
-export function UpcomingBills({ transactions, isPro = false }: UpcomingBillsProps) {
+export function UpcomingBills({ isPro = false }: UpcomingBillsProps) {
   const router = useRouter()
   const [weekOffset, setWeekOffset] = useState(0)
-  const [aiRecurringBills, setAiRecurringBills] = useState<RecurringBill[]>([])
-  const [aiPaydays, setAiPaydays] = useState<number[]>([])
+  const [recurringBills, setRecurringBills] = useState<RecurringBill[]>([])
   const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([])
-  const [loadingAI, setLoadingAI] = useState(false)
-  const [usingAI, setUsingAI] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  // Fetch income sources for accurate payday info
+  // Fetch recurring bills from database
   useEffect(() => {
-    const fetchIncomeSources = async () => {
+    const fetchData = async () => {
+      setLoading(true)
       try {
-        const response = await fetch('/api/income')
-        if (response.ok) {
-          const data = await response.json()
+        const [recurringRes, incomeRes] = await Promise.all([
+          fetch('/api/recurring'),
+          fetch('/api/income'),
+        ])
+
+        if (recurringRes.ok) {
+          const data = await recurringRes.json()
+          // Filter to only expenses (not income)
+          const expenses = (data.recurring || []).filter((r: RecurringBill) => !r.isIncome)
+          setRecurringBills(expenses)
+        }
+
+        if (incomeRes.ok) {
+          const data = await incomeRes.json()
           setIncomeSources(data.sources || [])
         }
       } catch (error) {
-        console.error('Failed to fetch income sources:', error)
+        console.error('Failed to fetch data:', error)
+      } finally {
+        setLoading(false)
       }
     }
 
-    fetchIncomeSources()
+    fetchData()
   }, [])
 
-  // Fetch AI-detected recurring bills for Pro users
-  useEffect(() => {
-    if (!isPro) return
+  // Get paydays from income sources
+  const paydays = useMemo(() => {
+    const days: number[] = []
 
-    const fetchAIRecurring = async () => {
-      setLoadingAI(true)
-      try {
-        const response = await fetch('/api/recurring/detect')
-        if (response.ok) {
-          const data = await response.json()
-          if (data.aiPowered && data.recurring?.length > 0) {
-            // Convert AI results to RecurringBill format
-            const bills: RecurringBill[] = []
-            // Don't use AI for paydays - we'll use income sources instead
+    incomeSources.forEach(source => {
+      // Skip irregular income - no set payday
+      if (source.frequency === 'irregular') return
+      // Skip far-future placeholder dates
+      if (source.next_expected_date?.startsWith('9999')) return
 
-            data.recurring.forEach((item: AIRecurringItem) => {
-              // Skip income items - we get those from income sources
-              if (item.type !== 'income') {
-                bills.push({
-                  name: item.name,
-                  amount: item.amount,
-                  dayOfMonth: item.typical_day,
-                  category: item.category,
-                  confidence: item.confidence,
-                  frequency: item.frequency,
-                  amountVaries: item.amount_varies,
-                  aiDetected: true,
-                })
-              }
-            })
-
-            setAiRecurringBills(bills)
-            setUsingAI(true)
-          }
+      if (source.next_expected_date) {
+        const [, , day] = source.next_expected_date.split('-').map(Number)
+        if (!days.includes(day)) {
+          days.push(day)
         }
-      } catch (error) {
-        console.error('Failed to fetch AI recurring:', error)
-      } finally {
-        setLoadingAI(false)
+      } else if (source.last_received_date) {
+        // Fallback to last received date
+        const [, , day] = source.last_received_date.split('-').map(Number)
+        if (!days.includes(day)) {
+          days.push(day)
+        }
       }
-    }
+    })
 
-    fetchAIRecurring()
-  }, [isPro])
-
-  // Get paydays from income sources (more accurate than AI guessing)
-  useEffect(() => {
-    if (incomeSources.length > 0) {
-      const paydays: number[] = []
-
-      incomeSources.forEach(source => {
-        // Skip irregular income - no set payday
-        if (source.frequency === 'irregular') return
-        // Skip far-future placeholder dates
-        if (source.next_expected_date?.startsWith('9999')) return
-
-        if (source.next_expected_date) {
-          const [, , day] = source.next_expected_date.split('-').map(Number)
-          if (!paydays.includes(day)) {
-            paydays.push(day)
-          }
-        } else if (source.last_received_date) {
-          // Fallback to last received date
-          const [, , day] = source.last_received_date.split('-').map(Number)
-          if (!paydays.includes(day)) {
-            paydays.push(day)
-          }
-        }
-      })
-
-      setAiPaydays(paydays)
-    }
+    return days
   }, [incomeSources])
 
-  // Use AI results if available, otherwise fall back to basic pattern matching
-  const basicRecurringBills = useMemo(() => detectRecurringBills(transactions), [transactions])
-  const basicPaydays = useMemo(() => detectPaydays(transactions), [transactions])
+  // Convert recurring bills to day-of-month format for calendar display
+  const billsByDay = useMemo(() => {
+    const map: Record<number, RecurringBill[]> = {}
 
-  const recurringBills = usingAI ? aiRecurringBills : basicRecurringBills
-  // Prioritize income sources for paydays (most accurate), then AI, then basic detection
-  const paydays = aiPaydays.length > 0 ? aiPaydays : basicPaydays
+    recurringBills.forEach(bill => {
+      if (!bill.nextDate) return
+
+      // Get day of month from next expected date
+      const [, , day] = bill.nextDate.split('-').map(Number)
+      if (!map[day]) map[day] = []
+      map[day].push(bill)
+    })
+
+    return map
+  }, [recurringBills])
 
   // Get the week's dates
   const today = new Date()
@@ -330,7 +160,7 @@ export function UpcomingBills({ transactions, isPro = false }: UpcomingBillsProp
   // Get bills for each day
   const getBillsForDay = (date: Date) => {
     const dayOfMonth = date.getDate()
-    return recurringBills.filter((bill) => bill.dayOfMonth === dayOfMonth)
+    return billsByDay[dayOfMonth] || []
   }
 
   const isPayday = (date: Date) => {
@@ -385,33 +215,35 @@ export function UpcomingBills({ transactions, isPro = false }: UpcomingBillsProp
     return minDays === Infinity ? null : minDays
   }, [paydays, today])
 
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Upcoming</CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <TooltipProvider>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <div>
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-lg">Upcoming</CardTitle>
-              {loadingAI && (
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              )}
-              {usingAI && !loadingAI && (
-                <Badge variant="secondary" className="text-xs gap-1 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
-                  <SterlingIcon size="sm" />
-                  AI Enhanced
-                </Badge>
-              )}
-            </div>
+            <CardTitle className="text-lg">Upcoming</CardTitle>
             <p className="text-sm text-muted-foreground">
               {upcomingCount > 0
                 ? `${upcomingCount} bill${upcomingCount > 1 ? 's' : ''} due this week totaling ${formatCurrency(totalUpcoming)}`
-                : 'No upcoming bills detected this week'}
+                : 'No upcoming bills this week'}
             </p>
             {daysUntilPayday !== null && (
               <p className="text-sm font-medium text-green-600 dark:text-green-400">
                 {daysUntilPayday === 0
-                  ? '🎉 Today is payday!'
-                  : `Payday is in ${daysUntilPayday} day${daysUntilPayday > 1 ? 's' : ''}`}
+                  ? 'Today is payday!'
+                  : `Payday in ${daysUntilPayday} day${daysUntilPayday > 1 ? 's' : ''}`}
               </p>
             )}
           </div>
@@ -495,14 +327,14 @@ export function UpcomingBills({ transactions, isPro = false }: UpcomingBillsProp
                           <Tooltip key={idx}>
                             <TooltipTrigger>
                               <MerchantLogo
-                                merchantName={bill.name}
+                                merchantName={bill.displayName || bill.name}
                                 category={bill.category}
                                 size="sm"
                                 className="h-5 w-5"
                               />
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p className="font-medium">{bill.name}</p>
+                              <p className="font-medium">{bill.displayName || bill.name}</p>
                               <p className="text-red-400">{formatCurrency(bill.amount)}</p>
                             </TooltipContent>
                           </Tooltip>
@@ -543,66 +375,67 @@ export function UpcomingBills({ transactions, isPro = false }: UpcomingBillsProp
           {recurringBills.length > 0 && (
             <div className="mt-4 flex-1 space-y-2">
               <p className="text-xs font-medium text-muted-foreground">
-                Detected Recurring Bills ({recurringBills.length})
-                {usingAI && <span className="ml-1 text-purple-600">- AI Powered</span>}
+                Recurring Bills ({recurringBills.length})
               </p>
               <div className="max-h-[400px] space-y-1.5 overflow-y-auto">
-                {recurringBills.map((bill, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => router.push(`/dashboard/recurring?highlight=${encodeURIComponent(bill.name)}`)}
-                    className="flex w-full items-center justify-between rounded-lg bg-muted/50 px-3 py-2.5 text-sm hover:bg-muted transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <MerchantLogo
-                        merchantName={bill.name}
-                        category={bill.category}
-                        size="sm"
-                      />
-                      <div className="flex flex-col items-start min-w-0">
-                        <span className="truncate">{bill.name}</span>
-                        {bill.aiDetected && (
-                          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                            {bill.frequency && (
-                              <span className="capitalize">{bill.frequency}</span>
-                            )}
-                            {bill.amountVaries && (
-                              <span className="text-amber-600">~varies</span>
-                            )}
-                            {bill.confidence && (
-                              <span className={bill.confidence >= 90 ? 'text-green-600' : bill.confidence >= 75 ? 'text-amber-600' : 'text-muted-foreground'}>
-                                {bill.confidence}% sure
-                              </span>
-                            )}
-                          </div>
-                        )}
+                {recurringBills.map((bill) => {
+                  // Get day from next date
+                  const dayOfMonth = bill.nextDate
+                    ? parseInt(bill.nextDate.split('-')[2])
+                    : 1
+
+                  return (
+                    <button
+                      key={bill.id}
+                      onClick={() => router.push(`/dashboard/recurring?highlight=${encodeURIComponent(bill.name)}`)}
+                      className="flex w-full items-center justify-between rounded-lg bg-muted/50 px-3 py-2.5 text-sm hover:bg-muted transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <MerchantLogo
+                          merchantName={bill.displayName || bill.name}
+                          category={bill.category}
+                          size="sm"
+                        />
+                        <div className="flex flex-col items-start min-w-0">
+                          <span className="truncate">{bill.displayName || bill.name}</span>
+                          <span className="text-[10px] text-muted-foreground capitalize">
+                            {bill.frequency}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-xs text-muted-foreground">
-                        {bill.dayOfMonth}{getOrdinalSuffix(bill.dayOfMonth)}
-                      </span>
-                      <span className="font-semibold text-red-600 dark:text-red-400">
-                        {bill.amountVaries ? '~' : ''}{formatCurrency(bill.amount)}
-                      </span>
-                    </div>
-                  </button>
-                ))}
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-xs text-muted-foreground">
+                          {dayOfMonth}{getOrdinalSuffix(dayOfMonth)}
+                        </span>
+                        <span className="font-semibold text-red-600 dark:text-red-400">
+                          {formatCurrency(bill.amount)}
+                        </span>
+                      </div>
+                    </button>
+                  )
+                })}
               </div>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {recurringBills.length === 0 && incomeSources.length === 0 && (
+            <div className="mt-4 text-center py-4">
+              <p className="text-sm text-muted-foreground">
+                No recurring bills or income set up yet.
+              </p>
+              <Button
+                variant="link"
+                size="sm"
+                onClick={() => router.push('/dashboard/recurring')}
+                className="mt-1"
+              >
+                Add recurring bills
+              </Button>
             </div>
           )}
         </CardContent>
       </Card>
     </TooltipProvider>
   )
-}
-
-function getOrdinalSuffix(day: number): string {
-  if (day > 3 && day < 21) return 'th'
-  switch (day % 10) {
-    case 1: return 'st'
-    case 2: return 'nd'
-    case 3: return 'rd'
-    default: return 'th'
-  }
 }

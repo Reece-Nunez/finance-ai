@@ -3,8 +3,10 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { SECURITY_HEADERS } from '@/lib/security/session-config'
 
 // Secure cookie options for auth cookies
+// NOTE: Do NOT set httpOnly: true for Supabase auth cookies!
+// The browser client needs to read these cookies to authenticate.
+// Supabase handles security through short-lived JWTs and refresh tokens.
 const SECURE_COOKIE_OPTIONS = {
-  httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
   sameSite: 'lax' as const,
   path: '/',

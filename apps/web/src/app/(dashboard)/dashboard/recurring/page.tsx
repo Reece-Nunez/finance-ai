@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -157,12 +158,16 @@ function RecurringItem({
   onViewHistory,
   onRemove,
   showAsCharged = false,
+  highlighted = false,
+  highlightRef,
 }: {
   item: RecurringTransaction
   onViewDetails: () => void
   onViewHistory: () => void
   onRemove: () => void
   showAsCharged?: boolean
+  highlighted?: boolean
+  highlightRef?: React.RefObject<HTMLDivElement | null>
 }) {
   const daysUntil = getDaysUntil(item.nextDate)
   const isOverdue = daysUntil < 0
@@ -192,7 +197,12 @@ function RecurringItem({
   }
 
   return (
-    <div className="flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/50">
+    <div
+      ref={highlighted ? highlightRef : undefined}
+      className={`flex items-center justify-between rounded-lg border p-4 transition-all hover:bg-muted/50 ${
+        highlighted ? 'ring-2 ring-emerald-500 bg-emerald-50 dark:bg-emerald-950/30' : ''
+      }`}
+    >
       <div className="flex items-center gap-4">
         <MerchantLogo
           merchantName={item.displayName || item.name}
@@ -256,11 +266,15 @@ function UpcomingTab({
   onViewDetails,
   onViewHistory,
   onRemove,
+  highlightedName,
+  highlightRef,
 }: {
   recurring: RecurringTransaction[]
   onViewDetails: (item: RecurringTransaction) => void
   onViewHistory: (item: RecurringTransaction) => void
   onRemove: (item: RecurringTransaction) => void
+  highlightedName?: string | null
+  highlightRef?: React.RefObject<HTMLDivElement | null>
 }) {
   // Recently charged (overdue items - already happened)
   const recentlyCharged = recurring
@@ -301,16 +315,22 @@ function UpcomingTab({
             </Badge>
           </div>
           <div className="space-y-2">
-            {recentlyCharged.map((item) => (
-              <RecurringItem
-                key={item.id}
-                item={item}
-                onViewDetails={() => onViewDetails(item)}
-                onViewHistory={() => onViewHistory(item)}
-                onRemove={() => onRemove(item)}
-                showAsCharged={true}
-              />
-            ))}
+            {recentlyCharged.map((item) => {
+              const isHighlighted = highlightedName?.toLowerCase() === item.name.toLowerCase() ||
+                highlightedName?.toLowerCase() === item.displayName?.toLowerCase()
+              return (
+                <RecurringItem
+                  key={item.id}
+                  item={item}
+                  onViewDetails={() => onViewDetails(item)}
+                  onViewHistory={() => onViewHistory(item)}
+                  onRemove={() => onRemove(item)}
+                  showAsCharged={true}
+                  highlighted={isHighlighted}
+                  highlightRef={isHighlighted ? highlightRef : undefined}
+                />
+              )
+            })}
           </div>
         </div>
       )}
@@ -344,15 +364,21 @@ function UpcomingTab({
           </Card>
         ) : (
           <div className="space-y-2">
-            {next7Days.map((item) => (
-              <RecurringItem
-                key={item.id}
-                item={item}
-                onViewDetails={() => onViewDetails(item)}
-                onViewHistory={() => onViewHistory(item)}
-                onRemove={() => onRemove(item)}
-              />
-            ))}
+            {next7Days.map((item) => {
+              const isHighlighted = highlightedName?.toLowerCase() === item.name.toLowerCase() ||
+                highlightedName?.toLowerCase() === item.displayName?.toLowerCase()
+              return (
+                <RecurringItem
+                  key={item.id}
+                  item={item}
+                  onViewDetails={() => onViewDetails(item)}
+                  onViewHistory={() => onViewHistory(item)}
+                  onRemove={() => onRemove(item)}
+                  highlighted={isHighlighted}
+                  highlightRef={isHighlighted ? highlightRef : undefined}
+                />
+              )
+            })}
           </div>
         )}
       </div>
@@ -377,15 +403,21 @@ function UpcomingTab({
           </Card>
         ) : (
           <div className="space-y-2">
-            {comingLater.slice(0, 10).map((item) => (
-              <RecurringItem
-                key={item.id}
-                item={item}
-                onViewDetails={() => onViewDetails(item)}
-                onViewHistory={() => onViewHistory(item)}
-                onRemove={() => onRemove(item)}
-              />
-            ))}
+            {comingLater.slice(0, 10).map((item) => {
+              const isHighlighted = highlightedName?.toLowerCase() === item.name.toLowerCase() ||
+                highlightedName?.toLowerCase() === item.displayName?.toLowerCase()
+              return (
+                <RecurringItem
+                  key={item.id}
+                  item={item}
+                  onViewDetails={() => onViewDetails(item)}
+                  onViewHistory={() => onViewHistory(item)}
+                  onRemove={() => onRemove(item)}
+                  highlighted={isHighlighted}
+                  highlightRef={isHighlighted ? highlightRef : undefined}
+                />
+              )
+            })}
             {comingLater.length > 10 && (
               <p className="text-center text-sm text-muted-foreground">
                 +{comingLater.length - 10} more recurring transactions
@@ -1337,10 +1369,13 @@ function AddRecurringModal({
 
 // Main Page Component
 export default function RecurringPage() {
+  const searchParams = useSearchParams()
   const [recurring, setRecurring] = useState<RecurringTransaction[]>([])
   const [yearlySpend, setYearlySpend] = useState(0)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('upcoming')
+  const [highlightedName, setHighlightedName] = useState<string | null>(null)
+  const highlightRef = useRef<HTMLDivElement>(null)
 
   // AI status
   const [aiPowered, setAiPowered] = useState(false)
@@ -1388,6 +1423,28 @@ export default function RecurringPage() {
 
     fetchRecurring()
   }, [])
+
+  // Handle highlight param from dashboard navigation
+  useEffect(() => {
+    const highlightParam = searchParams.get('highlight')
+    if (highlightParam) {
+      setHighlightedName(highlightParam)
+      // Clear the query param from URL without page reload
+      window.history.replaceState({}, '', '/dashboard/recurring')
+
+      // Scroll to the highlighted item after a short delay (wait for render)
+      setTimeout(() => {
+        if (highlightRef.current) {
+          highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }, 300)
+
+      // Clear highlight after 3 seconds
+      setTimeout(() => {
+        setHighlightedName(null)
+      }, 3000)
+    }
+  }, [searchParams, recurring])
 
   // Open analysis modal
   const openAnalysisModal = () => {
@@ -1622,6 +1679,8 @@ export default function RecurringPage() {
             onViewDetails={setDetailItem}
             onViewHistory={setHistoryItem}
             onRemove={handleRemove}
+            highlightedName={highlightedName}
+            highlightRef={highlightRef}
           />
         </TabsContent>
 
