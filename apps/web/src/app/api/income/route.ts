@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { getApiUser } from '@/lib/supabase/api'
+import { NextRequest, NextResponse } from 'next/server'
 
 // Industry-standard income type detection keywords
 const INCOME_KEYWORDS: Record<string, string[]> = {
@@ -107,12 +108,27 @@ function calculateNextDate(lastDate: string, frequency: string, payDay?: number)
 }
 
 // GET - Fetch income sources and stats
-export async function GET() {
-  const supabase = await createClient()
+export async function GET(request: NextRequest) {
+  // Check for Bearer token first (mobile), then fall back to cookies (web)
+  const authHeader = request.headers.get('authorization')
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  let supabase
+  let user
+
+  if (authHeader?.startsWith('Bearer ')) {
+    const result = await getApiUser(request)
+    if (result.error || !result.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    supabase = result.supabase
+    user = result.user
+  } else {
+    supabase = await createClient()
+    const { data: { user: cookieUser }, error: authError } = await supabase.auth.getUser()
+    if (authError || !cookieUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    user = cookieUser
   }
 
   // Fetch income sources
@@ -206,12 +222,27 @@ export async function GET() {
 }
 
 // POST - Detect income patterns from transactions
-export async function POST() {
-  const supabase = await createClient()
+export async function POST(request: NextRequest) {
+  // Check for Bearer token first (mobile), then fall back to cookies (web)
+  const authHeader = request.headers.get('authorization')
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  let supabase
+  let user
+
+  if (authHeader?.startsWith('Bearer ')) {
+    const result = await getApiUser(request)
+    if (result.error || !result.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    supabase = result.supabase
+    user = result.user
+  } else {
+    supabase = await createClient()
+    const { data: { user: cookieUser }, error: authError } = await supabase.auth.getUser()
+    if (authError || !cookieUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    user = cookieUser
   }
 
   // Get all income transactions (negative amounts in Plaid)
@@ -332,12 +363,27 @@ export async function POST() {
 }
 
 // PUT - Add or update an income source
-export async function PUT(request: Request) {
-  const supabase = await createClient()
+export async function PUT(request: NextRequest) {
+  // Check for Bearer token first (mobile), then fall back to cookies (web)
+  const authHeader = request.headers.get('authorization')
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  let supabase
+  let user
+
+  if (authHeader?.startsWith('Bearer ')) {
+    const result = await getApiUser(request)
+    if (result.error || !result.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    supabase = result.supabase
+    user = result.user
+  } else {
+    supabase = await createClient()
+    const { data: { user: cookieUser }, error: authError } = await supabase.auth.getUser()
+    if (authError || !cookieUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    user = cookieUser
   }
 
   const body = await request.json()
@@ -458,12 +504,27 @@ export async function PUT(request: Request) {
 }
 
 // PATCH - Update an income source
-export async function PATCH(request: Request) {
-  const supabase = await createClient()
+export async function PATCH(request: NextRequest) {
+  // Check for Bearer token first (mobile), then fall back to cookies (web)
+  const authHeader = request.headers.get('authorization')
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  let supabase
+  let user
+
+  if (authHeader?.startsWith('Bearer ')) {
+    const result = await getApiUser(request)
+    if (result.error || !result.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    supabase = result.supabase
+    user = result.user
+  } else {
+    supabase = await createClient()
+    const { data: { user: cookieUser }, error: authError } = await supabase.auth.getUser()
+    if (authError || !cookieUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    user = cookieUser
   }
 
   let body
@@ -556,12 +617,27 @@ export async function PATCH(request: Request) {
 }
 
 // DELETE - Remove an income source
-export async function DELETE(request: Request) {
-  const supabase = await createClient()
+export async function DELETE(request: NextRequest) {
+  // Check for Bearer token first (mobile), then fall back to cookies (web)
+  const authHeader = request.headers.get('authorization')
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  let supabase
+  let user
+
+  if (authHeader?.startsWith('Bearer ')) {
+    const result = await getApiUser(request)
+    if (result.error || !result.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    supabase = result.supabase
+    user = result.user
+  } else {
+    supabase = await createClient()
+    const { data: { user: cookieUser }, error: authError } = await supabase.auth.getUser()
+    if (authError || !cookieUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    user = cookieUser
   }
 
   const { id } = await request.json()

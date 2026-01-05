@@ -1,16 +1,28 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getApiUser } from '@/lib/supabase/api'
 import { getUserSubscription } from '@/lib/subscription'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    // Check for Bearer token first (mobile), then fall back to cookies (web)
+    const authHeader = request.headers.get('authorization')
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    let user
+
+    if (authHeader?.startsWith('Bearer ')) {
+      const result = await getApiUser(request)
+      if (result.error || !result.user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+      user = result.user
+    } else {
+      const supabase = await createClient()
+      const { data: { user: cookieUser }, error: authError } = await supabase.auth.getUser()
+      if (authError || !cookieUser) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+      user = cookieUser
     }
 
     const subscription = await getUserSubscription(user.id)

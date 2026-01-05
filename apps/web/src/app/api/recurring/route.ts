@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { getApiUser } from '@/lib/supabase/api'
+import { NextRequest, NextResponse } from 'next/server'
 import { getUserSubscription, canAccessFeature } from '@/lib/subscription'
 import { anthropic } from '@/lib/ai'
 import { checkAndIncrementUsage, rateLimitResponse } from '@/lib/ai-usage'
@@ -313,12 +314,27 @@ function analyzeRecurringPatterns(transactions: Transaction[], dismissedPatterns
 }
 
 // GET - Load recurring patterns (from cache or basic detection)
-export async function GET() {
-  const supabase = await createClient()
+export async function GET(request: NextRequest) {
+  // Check for Bearer token first (mobile), then fall back to cookies (web)
+  const authHeader = request.headers.get('authorization')
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  let supabase
+  let user
+
+  if (authHeader?.startsWith('Bearer ')) {
+    const result = await getApiUser(request)
+    if (result.error || !result.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    supabase = result.supabase
+    user = result.user
+  } else {
+    supabase = await createClient()
+    const { data: { user: cookieUser }, error: authError } = await supabase.auth.getUser()
+    if (authError || !cookieUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    user = cookieUser
   }
 
   // Get dismissed patterns
@@ -405,12 +421,27 @@ export async function GET() {
 }
 
 // POST - Re-analyze with AI (explicit user action)
-export async function POST() {
-  const supabase = await createClient()
+export async function POST(request: NextRequest) {
+  // Check for Bearer token first (mobile), then fall back to cookies (web)
+  const authHeader = request.headers.get('authorization')
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  let supabase
+  let user
+
+  if (authHeader?.startsWith('Bearer ')) {
+    const result = await getApiUser(request)
+    if (result.error || !result.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    supabase = result.supabase
+    user = result.user
+  } else {
+    supabase = await createClient()
+    const { data: { user: cookieUser }, error: authError } = await supabase.auth.getUser()
+    if (authError || !cookieUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    user = cookieUser
   }
 
   // Check subscription
@@ -664,12 +695,27 @@ export async function POST() {
 }
 
 // PUT - Manually add a recurring pattern
-export async function PUT(request: Request) {
-  const supabase = await createClient()
+export async function PUT(request: NextRequest) {
+  // Check for Bearer token first (mobile), then fall back to cookies (web)
+  const authHeader = request.headers.get('authorization')
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  let supabase
+  let user
+
+  if (authHeader?.startsWith('Bearer ')) {
+    const result = await getApiUser(request)
+    if (result.error || !result.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    supabase = result.supabase
+    user = result.user
+  } else {
+    supabase = await createClient()
+    const { data: { user: cookieUser }, error: authError } = await supabase.auth.getUser()
+    if (authError || !cookieUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    user = cookieUser
   }
 
   const body = await request.json()
@@ -769,12 +815,27 @@ export async function PUT(request: Request) {
 }
 
 // PATCH - Update a recurring pattern
-export async function PATCH(request: Request) {
-  const supabase = await createClient()
+export async function PATCH(request: NextRequest) {
+  // Check for Bearer token first (mobile), then fall back to cookies (web)
+  const authHeader = request.headers.get('authorization')
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  let supabase
+  let user
+
+  if (authHeader?.startsWith('Bearer ')) {
+    const result = await getApiUser(request)
+    if (result.error || !result.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    supabase = result.supabase
+    user = result.user
+  } else {
+    supabase = await createClient()
+    const { data: { user: cookieUser }, error: authError } = await supabase.auth.getUser()
+    if (authError || !cookieUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    user = cookieUser
   }
 
   const body = await request.json()
@@ -845,12 +906,27 @@ export async function PATCH(request: Request) {
 }
 
 // DELETE - Dismiss a recurring pattern
-export async function DELETE(request: Request) {
-  const supabase = await createClient()
+export async function DELETE(request: NextRequest) {
+  // Check for Bearer token first (mobile), then fall back to cookies (web)
+  const authHeader = request.headers.get('authorization')
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  let supabase
+  let user
+
+  if (authHeader?.startsWith('Bearer ')) {
+    const result = await getApiUser(request)
+    if (result.error || !result.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    supabase = result.supabase
+    user = result.user
+  } else {
+    supabase = await createClient()
+    const { data: { user: cookieUser }, error: authError } = await supabase.auth.getUser()
+    if (authError || !cookieUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    user = cookieUser
   }
 
   const { merchantPattern, originalName, reason } = await request.json()
