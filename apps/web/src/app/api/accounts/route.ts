@@ -62,10 +62,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ account })
   }
 
-  // Fetch all accounts
+  // Fetch all accounts with institution name from plaid_items
   const { data: accounts, error } = await supabase
     .from('accounts')
-    .select('*')
+    .select(`
+      *,
+      plaid_items!accounts_plaid_item_id_fkey (
+        institution_name
+      )
+    `)
     .eq('user_id', user.id)
     .order('name')
 
@@ -73,5 +78,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ accounts: accounts || [] })
+  // Flatten institution_name from the join
+  const accountsWithInstitution = (accounts || []).map(account => ({
+    ...account,
+    institution_name: account.plaid_items?.institution_name || 'Unknown Institution',
+    plaid_items: undefined, // Remove the nested object
+  }))
+
+  return NextResponse.json({ accounts: accountsWithInstitution })
 }
