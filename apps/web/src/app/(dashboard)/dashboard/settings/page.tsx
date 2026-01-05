@@ -1030,41 +1030,43 @@ export default function SettingsPage() {
                 />
               </div>
               {profile.notification_preferences.low_balance.enabled && (
-                <div className="flex items-center gap-4 px-4 pb-4 pt-0">
+                <div className="px-4 pb-4 pt-0 space-y-2">
                   <span className="text-xs text-muted-foreground">Notify via:</span>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={profile.notification_preferences.low_balance.email}
-                      onChange={(e) => handleAlertToggle('low_balance', 'email', e.target.checked)}
-                      disabled={savingNotifications}
-                      className="rounded border-gray-300"
-                    />
-                    <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-xs">Email</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={profile.notification_preferences.low_balance.push}
-                      onChange={(e) => handleAlertToggle('low_balance', 'push', e.target.checked)}
-                      disabled={savingNotifications}
-                      className="rounded border-gray-300"
-                    />
-                    <Bell className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-xs">Push</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={profile.notification_preferences.low_balance.sms}
-                      onChange={(e) => handleAlertToggle('low_balance', 'sms', e.target.checked)}
-                      disabled={savingNotifications || !profile.phone}
-                      className="rounded border-gray-300"
-                    />
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-xs">SMS</span>
-                  </label>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={profile.notification_preferences.low_balance.email}
+                        onChange={(e) => handleAlertToggle('low_balance', 'email', e.target.checked)}
+                        disabled={savingNotifications}
+                        className="rounded border-gray-300"
+                      />
+                      <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-xs">Email</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={profile.notification_preferences.low_balance.push}
+                        onChange={(e) => handleAlertToggle('low_balance', 'push', e.target.checked)}
+                        disabled={savingNotifications}
+                        className="rounded border-gray-300"
+                      />
+                      <Bell className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-xs">Push</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={profile.notification_preferences.low_balance.sms}
+                        onChange={(e) => handleAlertToggle('low_balance', 'sms', e.target.checked)}
+                        disabled={savingNotifications || !profile.phone}
+                        className="rounded border-gray-300"
+                      />
+                      <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-xs">SMS</span>
+                    </label>
+                  </div>
                 </div>
               )}
             </div>
@@ -1088,20 +1090,22 @@ export default function SettingsPage() {
                 />
               </div>
               {profile.notification_preferences.overdraft.enabled && (
-                <div className="flex items-center gap-4 px-4 pb-4 pt-0">
+                <div className="px-4 pb-4 pt-0 space-y-2">
                   <span className="text-xs text-muted-foreground">Notify via:</span>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="checkbox" checked={profile.notification_preferences.overdraft.email} onChange={(e) => handleAlertToggle('overdraft', 'email', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
-                    <Mail className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Email</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="checkbox" checked={profile.notification_preferences.overdraft.push} onChange={(e) => handleAlertToggle('overdraft', 'push', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
-                    <Bell className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Push</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="checkbox" checked={profile.notification_preferences.overdraft.sms} onChange={(e) => handleAlertToggle('overdraft', 'sms', e.target.checked)} disabled={savingNotifications || !profile.phone} className="rounded border-gray-300" />
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">SMS</span>
-                  </label>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={profile.notification_preferences.overdraft.email} onChange={(e) => handleAlertToggle('overdraft', 'email', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                      <Mail className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Email</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={profile.notification_preferences.overdraft.push} onChange={(e) => handleAlertToggle('overdraft', 'push', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                      <Bell className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Push</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={profile.notification_preferences.overdraft.sms} onChange={(e) => handleAlertToggle('overdraft', 'sms', e.target.checked)} disabled={savingNotifications || !profile.phone} className="rounded border-gray-300" />
+                      <Phone className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">SMS</span>
+                    </label>
+                  </div>
                 </div>
               )}
             </div>
@@ -1125,20 +1129,22 @@ export default function SettingsPage() {
                 />
               </div>
               {profile.notification_preferences.large_withdrawal.enabled && (
-                <div className="flex items-center gap-4 px-4 pb-4 pt-0">
+                <div className="px-4 pb-4 pt-0 space-y-2">
                   <span className="text-xs text-muted-foreground">Notify via:</span>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="checkbox" checked={profile.notification_preferences.large_withdrawal.email} onChange={(e) => handleAlertToggle('large_withdrawal', 'email', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
-                    <Mail className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Email</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="checkbox" checked={profile.notification_preferences.large_withdrawal.push} onChange={(e) => handleAlertToggle('large_withdrawal', 'push', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
-                    <Bell className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Push</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="checkbox" checked={profile.notification_preferences.large_withdrawal.sms} onChange={(e) => handleAlertToggle('large_withdrawal', 'sms', e.target.checked)} disabled={savingNotifications || !profile.phone} className="rounded border-gray-300" />
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">SMS</span>
-                  </label>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={profile.notification_preferences.large_withdrawal.email} onChange={(e) => handleAlertToggle('large_withdrawal', 'email', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                      <Mail className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Email</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={profile.notification_preferences.large_withdrawal.push} onChange={(e) => handleAlertToggle('large_withdrawal', 'push', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                      <Bell className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Push</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={profile.notification_preferences.large_withdrawal.sms} onChange={(e) => handleAlertToggle('large_withdrawal', 'sms', e.target.checked)} disabled={savingNotifications || !profile.phone} className="rounded border-gray-300" />
+                      <Phone className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">SMS</span>
+                    </label>
+                  </div>
                 </div>
               )}
             </div>
@@ -1162,20 +1168,22 @@ export default function SettingsPage() {
                 />
               </div>
               {profile.notification_preferences.large_deposit.enabled && (
-                <div className="flex items-center gap-4 px-4 pb-4 pt-0">
+                <div className="px-4 pb-4 pt-0 space-y-2">
                   <span className="text-xs text-muted-foreground">Notify via:</span>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="checkbox" checked={profile.notification_preferences.large_deposit.email} onChange={(e) => handleAlertToggle('large_deposit', 'email', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
-                    <Mail className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Email</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="checkbox" checked={profile.notification_preferences.large_deposit.push} onChange={(e) => handleAlertToggle('large_deposit', 'push', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
-                    <Bell className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Push</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="checkbox" checked={profile.notification_preferences.large_deposit.sms} onChange={(e) => handleAlertToggle('large_deposit', 'sms', e.target.checked)} disabled={savingNotifications || !profile.phone} className="rounded border-gray-300" />
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">SMS</span>
-                  </label>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={profile.notification_preferences.large_deposit.email} onChange={(e) => handleAlertToggle('large_deposit', 'email', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                      <Mail className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Email</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={profile.notification_preferences.large_deposit.push} onChange={(e) => handleAlertToggle('large_deposit', 'push', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                      <Bell className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Push</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={profile.notification_preferences.large_deposit.sms} onChange={(e) => handleAlertToggle('large_deposit', 'sms', e.target.checked)} disabled={savingNotifications || !profile.phone} className="rounded border-gray-300" />
+                      <Phone className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">SMS</span>
+                    </label>
+                  </div>
                 </div>
               )}
             </div>
@@ -1199,20 +1207,22 @@ export default function SettingsPage() {
                 />
               </div>
               {profile.notification_preferences.suspicious_activity.enabled && (
-                <div className="flex items-center gap-4 px-4 pb-4 pt-0">
+                <div className="px-4 pb-4 pt-0 space-y-2">
                   <span className="text-xs text-muted-foreground">Notify via:</span>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="checkbox" checked={profile.notification_preferences.suspicious_activity.email} onChange={(e) => handleAlertToggle('suspicious_activity', 'email', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
-                    <Mail className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Email</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="checkbox" checked={profile.notification_preferences.suspicious_activity.push} onChange={(e) => handleAlertToggle('suspicious_activity', 'push', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
-                    <Bell className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Push</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="checkbox" checked={profile.notification_preferences.suspicious_activity.sms} onChange={(e) => handleAlertToggle('suspicious_activity', 'sms', e.target.checked)} disabled={savingNotifications || !profile.phone} className="rounded border-gray-300" />
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">SMS</span>
-                  </label>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={profile.notification_preferences.suspicious_activity.email} onChange={(e) => handleAlertToggle('suspicious_activity', 'email', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                      <Mail className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Email</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={profile.notification_preferences.suspicious_activity.push} onChange={(e) => handleAlertToggle('suspicious_activity', 'push', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                      <Bell className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Push</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={profile.notification_preferences.suspicious_activity.sms} onChange={(e) => handleAlertToggle('suspicious_activity', 'sms', e.target.checked)} disabled={savingNotifications || !profile.phone} className="rounded border-gray-300" />
+                      <Phone className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">SMS</span>
+                    </label>
+                  </div>
                 </div>
               )}
             </div>
@@ -1236,20 +1246,22 @@ export default function SettingsPage() {
                 />
               </div>
               {profile.notification_preferences.budget_alerts.enabled && (
-                <div className="flex items-center gap-4 px-4 pb-4 pt-0">
+                <div className="px-4 pb-4 pt-0 space-y-2">
                   <span className="text-xs text-muted-foreground">Notify via:</span>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="checkbox" checked={profile.notification_preferences.budget_alerts.email} onChange={(e) => handleAlertToggle('budget_alerts', 'email', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
-                    <Mail className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Email</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="checkbox" checked={profile.notification_preferences.budget_alerts.push} onChange={(e) => handleAlertToggle('budget_alerts', 'push', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
-                    <Bell className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Push</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="checkbox" checked={profile.notification_preferences.budget_alerts.sms} onChange={(e) => handleAlertToggle('budget_alerts', 'sms', e.target.checked)} disabled={savingNotifications || !profile.phone} className="rounded border-gray-300" />
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">SMS</span>
-                  </label>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={profile.notification_preferences.budget_alerts.email} onChange={(e) => handleAlertToggle('budget_alerts', 'email', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                      <Mail className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Email</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={profile.notification_preferences.budget_alerts.push} onChange={(e) => handleAlertToggle('budget_alerts', 'push', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                      <Bell className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Push</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={profile.notification_preferences.budget_alerts.sms} onChange={(e) => handleAlertToggle('budget_alerts', 'sms', e.target.checked)} disabled={savingNotifications || !profile.phone} className="rounded border-gray-300" />
+                      <Phone className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">SMS</span>
+                    </label>
+                  </div>
                 </div>
               )}
             </div>
@@ -1273,20 +1285,22 @@ export default function SettingsPage() {
                 />
               </div>
               {profile.notification_preferences.recurring_payments.enabled && (
-                <div className="flex items-center gap-4 px-4 pb-4 pt-0">
+                <div className="px-4 pb-4 pt-0 space-y-2">
                   <span className="text-xs text-muted-foreground">Notify via:</span>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="checkbox" checked={profile.notification_preferences.recurring_payments.email} onChange={(e) => handleAlertToggle('recurring_payments', 'email', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
-                    <Mail className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Email</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="checkbox" checked={profile.notification_preferences.recurring_payments.push} onChange={(e) => handleAlertToggle('recurring_payments', 'push', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
-                    <Bell className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Push</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="checkbox" checked={profile.notification_preferences.recurring_payments.sms} onChange={(e) => handleAlertToggle('recurring_payments', 'sms', e.target.checked)} disabled={savingNotifications || !profile.phone} className="rounded border-gray-300" />
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">SMS</span>
-                  </label>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={profile.notification_preferences.recurring_payments.email} onChange={(e) => handleAlertToggle('recurring_payments', 'email', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                      <Mail className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Email</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={profile.notification_preferences.recurring_payments.push} onChange={(e) => handleAlertToggle('recurring_payments', 'push', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                      <Bell className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Push</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={profile.notification_preferences.recurring_payments.sms} onChange={(e) => handleAlertToggle('recurring_payments', 'sms', e.target.checked)} disabled={savingNotifications || !profile.phone} className="rounded border-gray-300" />
+                      <Phone className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">SMS</span>
+                    </label>
+                  </div>
                 </div>
               )}
             </div>
@@ -1310,20 +1324,22 @@ export default function SettingsPage() {
                 />
               </div>
               {profile.notification_preferences.weekly_summary.enabled && (
-                <div className="flex items-center gap-4 px-4 pb-4 pt-0">
+                <div className="px-4 pb-4 pt-0 space-y-2">
                   <span className="text-xs text-muted-foreground">Notify via:</span>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="checkbox" checked={profile.notification_preferences.weekly_summary.email} onChange={(e) => handleAlertToggle('weekly_summary', 'email', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
-                    <Mail className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Email</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="checkbox" checked={profile.notification_preferences.weekly_summary.push} onChange={(e) => handleAlertToggle('weekly_summary', 'push', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
-                    <Bell className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Push</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="checkbox" checked={profile.notification_preferences.weekly_summary.sms} onChange={(e) => handleAlertToggle('weekly_summary', 'sms', e.target.checked)} disabled={savingNotifications || !profile.phone} className="rounded border-gray-300" />
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">SMS</span>
-                  </label>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={profile.notification_preferences.weekly_summary.email} onChange={(e) => handleAlertToggle('weekly_summary', 'email', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                      <Mail className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Email</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={profile.notification_preferences.weekly_summary.push} onChange={(e) => handleAlertToggle('weekly_summary', 'push', e.target.checked)} disabled={savingNotifications} className="rounded border-gray-300" />
+                      <Bell className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">Push</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={profile.notification_preferences.weekly_summary.sms} onChange={(e) => handleAlertToggle('weekly_summary', 'sms', e.target.checked)} disabled={savingNotifications || !profile.phone} className="rounded border-gray-300" />
+                      <Phone className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs">SMS</span>
+                    </label>
+                  </div>
                 </div>
               )}
             </div>
