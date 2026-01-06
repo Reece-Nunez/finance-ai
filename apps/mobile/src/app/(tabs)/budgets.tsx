@@ -139,11 +139,11 @@ export default function BudgetsScreen() {
               <View
                 className="h-full rounded-full"
                 style={{
-                  width: `${Math.min(data.summary.percentUsed, 100)}%`,
+                  width: `${Math.min(data.summary.percentUsed ?? 0, 100)}%`,
                   backgroundColor:
-                    data.summary.percentUsed > 100
+                    (data.summary.percentUsed ?? 0) > 100
                       ? '#ef4444'
-                      : data.summary.percentUsed > 80
+                      : (data.summary.percentUsed ?? 0) > 80
                       ? '#f59e0b'
                       : '#22c55e',
                 }}
@@ -152,10 +152,10 @@ export default function BudgetsScreen() {
 
             <View className="flex-row justify-between mt-2">
               <Text className="text-slate-500 text-sm">
-                {data.summary.percentUsed.toFixed(0)}% used
+                {(data.summary.percentUsed ?? 0).toFixed(0)}% used
               </Text>
               <Text className="text-slate-500 text-sm">
-                {formatCurrency(data.summary.remaining)} remaining
+                {formatCurrency(data.summary.remaining ?? 0)} remaining
               </Text>
             </View>
           </View>
