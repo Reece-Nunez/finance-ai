@@ -122,7 +122,7 @@ export default function DashboardScreen() {
           {/* Health Score */}
           <TouchableOpacity
             className="flex-1 bg-slate-900 rounded-2xl p-4 border border-slate-800"
-            onPress={() => router.push('/chat')}
+            onPress={() => router.push('/health')}
           >
             <View className="flex-row items-center justify-between">
               <Text className="text-slate-400 text-sm">Health Score</Text>
