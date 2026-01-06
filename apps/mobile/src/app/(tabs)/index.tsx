@@ -90,11 +90,14 @@ export default function DashboardScreen() {
           </View>
           <Text className="text-slate-400 text-sm">Welcome back,</Text>
           <Text className="text-white text-2xl font-bold">
-            {user?.user_metadata?.firstName ||
-             user?.user_metadata?.first_name ||
-             user?.user_metadata?.full_name?.split(' ')[0] ||
-             user?.email?.split('@')[0] ||
-             'User'}
+            {(() => {
+              const name = user?.user_metadata?.firstName ||
+                user?.user_metadata?.first_name ||
+                user?.user_metadata?.full_name?.split(' ')[0] ||
+                user?.email?.split('@')[0] ||
+                'User'
+              return name.charAt(0).toUpperCase() + name.slice(1)
+            })()}
           </Text>
         </View>
 
