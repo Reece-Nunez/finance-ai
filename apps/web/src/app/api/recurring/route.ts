@@ -444,8 +444,8 @@ export async function POST(request: NextRequest) {
     user = cookieUser
   }
 
-  // Check subscription
-  const subscription = await getUserSubscription(user.id)
+  // Check subscription (pass supabase client for mobile auth)
+  const subscription = await getUserSubscription(user.id, supabase)
   const isPro = canAccessFeature(subscription, 'ai_suggestions')
 
   if (!isPro) {

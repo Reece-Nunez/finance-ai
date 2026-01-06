@@ -35,7 +35,8 @@
       "Bash(adb devices:*)",
       "Bash(file:*)",
       "Bash(git checkout:*)",
-      "Bash(netsh advfirewall firewall:*)"
+      "Bash(netsh advfirewall firewall:*)",
+      "Bash(grep:*)"
     ]
   }
 }

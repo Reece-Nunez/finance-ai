@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type SubscriptionTier = 'free' | 'pro'
 export type SubscriptionStatus = 'none' | 'trialing' | 'active' | 'past_due' | 'canceled'
@@ -27,8 +28,9 @@ const PRO_FEATURES = [
 
 export type ProFeature = (typeof PRO_FEATURES)[number]
 
-export async function getUserSubscription(userId: string): Promise<UserSubscription> {
-  const supabase = await createClient()
+// Pass supabaseClient for mobile auth, omit for web cookie auth
+export async function getUserSubscription(userId: string, supabaseClient?: SupabaseClient): Promise<UserSubscription> {
+  const supabase = supabaseClient || await createClient()
 
   const { data: profile } = await supabase
     .from('user_profiles')

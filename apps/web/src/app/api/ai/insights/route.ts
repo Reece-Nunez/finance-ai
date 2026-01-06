@@ -28,8 +28,8 @@ export async function GET(request: NextRequest) {
       user = cookieUser
     }
 
-    // Check subscription for health score access
-    const subscription = await getUserSubscription(user.id)
+    // Check subscription for health score access (pass supabase client for mobile auth)
+    const subscription = await getUserSubscription(user.id, supabase)
     if (!canAccessFeature(subscription, 'health_score')) {
       return NextResponse.json(
         { error: 'upgrade_required', message: 'Financial Health Score requires a Pro subscription' },
