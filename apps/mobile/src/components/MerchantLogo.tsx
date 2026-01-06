@@ -9,6 +9,9 @@ interface MerchantLogoProps {
 export function MerchantLogo({ name, size = 40 }: MerchantLogoProps) {
   const [error, setError] = useState(false)
 
+  // Handle undefined/null name
+  const safeName = name || 'Unknown'
+
   // Generate initials for fallback
   const getInitials = (name: string) => {
     const words = name.split(' ').filter(Boolean)
@@ -38,21 +41,21 @@ export function MerchantLogo({ name, size = 40 }: MerchantLogoProps) {
   }
 
   // Clean merchant name for Clearbit URL
-  const cleanName = name
+  const cleanName = safeName
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '')
     .slice(0, 20)
 
   const logoUrl = `https://logo.clearbit.com/${cleanName}.com`
 
-  if (error) {
+  if (error || !cleanName) {
     return (
       <View
         style={{
           width: size,
           height: size,
           borderRadius: size / 2,
-          backgroundColor: getColor(name),
+          backgroundColor: getColor(safeName),
           alignItems: 'center',
           justifyContent: 'center',
         }}
@@ -64,7 +67,7 @@ export function MerchantLogo({ name, size = 40 }: MerchantLogoProps) {
             fontWeight: '600',
           }}
         >
-          {getInitials(name)}
+          {getInitials(safeName)}
         </Text>
       </View>
     )
