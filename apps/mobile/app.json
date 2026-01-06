@@ -29,6 +29,10 @@
       "edgeToEdgeEnabled": true,
       "permissions": ["USE_BIOMETRIC", "USE_FINGERPRINT"]
     },
+    "androidStatusBar": {
+      "barStyle": "light-content",
+      "backgroundColor": "#020617"
+    },
     "web": {
       "bundler": "metro",
       "output": "static",
