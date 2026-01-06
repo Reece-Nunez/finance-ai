@@ -127,7 +127,7 @@ export default function SpendingScreen() {
         </View>
 
         {/* Uncategorized Alert */}
-        {data?.uncategorizedCount && data.uncategorizedCount > 0 && (
+        {(data?.uncategorizedCount ?? 0) > 0 && (
           <TouchableOpacity
             className="mx-5 mt-3 bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex-row items-center"
             onPress={() => router.push('/uncategorized')}

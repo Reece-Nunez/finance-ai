@@ -29,7 +29,13 @@
       "Bash(amplify status:*)",
       "Bash(amplify env:*)",
       "Bash(aws amplify:*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(ipconfig:*)",
+      "Bash(tasklist:*)",
+      "Bash(adb devices:*)",
+      "Bash(file:*)",
+      "Bash(git checkout:*)",
+      "Bash(netsh advfirewall firewall:*)"
     ]
   }
 }

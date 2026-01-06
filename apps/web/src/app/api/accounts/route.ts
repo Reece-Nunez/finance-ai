@@ -62,15 +62,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ account })
   }
 
-  // Fetch all accounts with institution name from plaid_items
+  // Fetch all accounts
   const { data: accounts, error } = await supabase
     .from('accounts')
-    .select(`
-      *,
-      plaid_items!accounts_plaid_item_id_fkey (
-        institution_name
-      )
-    `)
+    .select('*')
     .eq('user_id', user.id)
     .order('name')
 
@@ -78,11 +73,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Flatten institution_name from the join
+  // Fetch plaid_items to get institution names
+  const { data: plaidItems } = await supabase
+    .from('plaid_items')
+    .select('item_id, institution_name')
+    .eq('user_id', user.id)
+
+  // Create a map of plaid item_id to institution_name
+  const institutionMap = new Map(
+    (plaidItems || []).map(item => [item.item_id, item.institution_name])
+  )
+
+  // Add institution_name to each account
   const accountsWithInstitution = (accounts || []).map(account => ({
     ...account,
-    institution_name: account.plaid_items?.institution_name || 'Unknown Institution',
-    plaid_items: undefined, // Remove the nested object
+    institution_name: institutionMap.get(account.plaid_item_id) || 'Unknown Institution',
   }))
 
   return NextResponse.json({ accounts: accountsWithInstitution })
