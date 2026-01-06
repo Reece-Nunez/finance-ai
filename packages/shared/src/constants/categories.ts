@@ -57,3 +57,44 @@ export const DEFAULT_CATEGORIES = [
   'Fees & Charges',
   'Other',
 ] as const
+
+// Map Plaid's SCREAMING_SNAKE_CASE categories to display names
+export const PLAID_CATEGORY_MAP: Record<string, string> = {
+  FOOD_AND_DRINK: 'Food & Dining',
+  GENERAL_MERCHANDISE: 'Shopping',
+  GENERAL_SERVICES: 'Services',
+  TRANSPORTATION: 'Transportation',
+  TRAVEL: 'Travel',
+  RENT_AND_UTILITIES: 'Housing & Utilities',
+  HOME_IMPROVEMENT: 'Home Improvement',
+  ENTERTAINMENT: 'Entertainment',
+  PERSONAL_CARE: 'Personal Care',
+  MEDICAL: 'Healthcare',
+  EDUCATION: 'Education',
+  GOVERNMENT_AND_NON_PROFIT: 'Government & Non-Profit',
+  BANK_FEES: 'Fees & Charges',
+  LOAN_PAYMENTS: 'Loans',
+  TRANSFER_IN: 'Transfer',
+  TRANSFER_OUT: 'Transfer',
+  INCOME: 'Income',
+}
+
+// Format a category name for display
+export function formatCategoryName(category: string): string {
+  // Check if it's in our Plaid mapping
+  if (PLAID_CATEGORY_MAP[category]) {
+    return PLAID_CATEGORY_MAP[category]
+  }
+
+  // Check if it's already a properly formatted name
+  if (DEFAULT_CATEGORIES.includes(category as typeof DEFAULT_CATEGORIES[number])) {
+    return category
+  }
+
+  // Convert SCREAMING_SNAKE_CASE to Title Case
+  return category
+    .toLowerCase()
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}

@@ -13,7 +13,7 @@ import { useRouter } from 'expo-router'
 
 import { useSpending } from '@/hooks/useApi'
 import { formatCurrency, formatPercent } from '@/utils/format'
-import { CATEGORY_COLORS } from '@sterling/shared'
+import { CATEGORY_COLORS, formatCategoryName } from '@sterling/shared'
 
 type Period = 'this_month' | 'last_month' | 'last_3_months'
 
@@ -172,7 +172,7 @@ export default function SpendingScreen() {
                 </View>
                 <View className="flex-1 ml-3">
                   <Text className="text-white text-base font-medium">
-                    {category.category}
+                    {formatCategoryName(category.category)}
                   </Text>
                   <Text className="text-slate-500 text-sm">
                     {category.transactionCount} transactions
@@ -183,7 +183,7 @@ export default function SpendingScreen() {
                     {formatCurrency(category.amount)}
                   </Text>
                   <Text className="text-slate-500 text-sm">
-                    {category.percentage.toFixed(0)}%
+                    {(category.percentage ?? 0).toFixed(0)}%
                   </Text>
                 </View>
               </TouchableOpacity>

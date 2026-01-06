@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons'
 
 import { useBudgets, useCreateBudget, useDeleteBudget } from '@/hooks/useApi'
 import { formatCurrency } from '@/utils/format'
-import { CATEGORY_COLORS, DEFAULT_CATEGORIES } from '@sterling/shared'
+import { CATEGORY_COLORS, DEFAULT_CATEGORIES, formatCategoryName } from '@sterling/shared'
 
 export default function BudgetsScreen() {
   const [refreshing, setRefreshing] = useState(false)
@@ -62,7 +62,7 @@ export default function BudgetsScreen() {
   const handleDeleteBudget = (id: string, category: string) => {
     Alert.alert(
       'Delete Budget',
-      `Are you sure you want to delete the budget for ${category}?`,
+      `Are you sure you want to delete the budget for ${formatCategoryName(category)}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -192,7 +192,7 @@ export default function BudgetsScreen() {
                         }}
                       />
                       <Text className="text-white text-base font-medium">
-                        {budget.category}
+                        {formatCategoryName(budget.category)}
                       </Text>
                     </View>
                     <Text
