@@ -97,11 +97,26 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const supabase = await createClient()
+  // Check for Bearer token first (mobile), then fall back to cookies (web)
+  const authHeader = request.headers.get('authorization')
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  let supabase
+  let user
+
+  if (authHeader?.startsWith('Bearer ')) {
+    const result = await getApiUser(request)
+    if (result.error || !result.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    supabase = result.supabase
+    user = result.user
+  } else {
+    supabase = await createClient()
+    const { data: { user: cookieUser }, error: authError } = await supabase.auth.getUser()
+    if (authError || !cookieUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    user = cookieUser
   }
 
   const body = await request.json()
@@ -113,7 +128,7 @@ export async function PATCH(request: NextRequest) {
 
   // Build update object with only provided fields
   const updates: Record<string, unknown> = {}
-  if (typeof category === 'string') updates.category = category
+  if (typeof category === 'string' || category === null) updates.category = category
   if (typeof is_income === 'boolean') updates.is_income = is_income
   if (typeof ignore_type === 'string' && ['none', 'budget', 'all'].includes(ignore_type)) {
     updates.ignore_type = ignore_type

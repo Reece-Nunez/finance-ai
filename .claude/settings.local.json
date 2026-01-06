@@ -36,7 +36,8 @@
       "Bash(file:*)",
       "Bash(git checkout:*)",
       "Bash(netsh advfirewall firewall:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(npm run typecheck:*)"
     ]
   }
 }

@@ -145,6 +145,49 @@ export const api = {
   getRecurring: () =>
     apiClient<RecurringResponse>('/recurring'),
 
+  updateRecurring: (id: string, updates: { frequency?: string; amount?: number; nextDate?: string }) =>
+    apiClient<{ success: boolean; pattern: unknown }>('/recurring', {
+      method: 'PATCH',
+      body: JSON.stringify({ id, ...updates }),
+    }),
+
+  deleteRecurring: (merchantPattern: string, originalName?: string) =>
+    apiClient<{ success: boolean }>('/recurring', {
+      method: 'DELETE',
+      body: JSON.stringify({ merchantPattern, originalName, reason: 'User deleted from mobile' }),
+    }),
+
+  // Transaction Rules
+  getTransactionRules: () =>
+    apiClient<{ rules: Array<{
+      id: string
+      match_field: string
+      match_pattern: string
+      display_name: string | null
+      set_category: string | null
+      set_as_income: boolean
+      is_active: boolean
+      priority: number
+    }> }>('/transaction-rules'),
+
+  createTransactionRule: (rule: {
+    match_pattern: string
+    match_field?: string
+    display_name?: string
+    set_category?: string
+    set_as_income?: boolean
+    apply_to_existing?: boolean
+  }) =>
+    apiClient<{ rule: unknown }>('/transaction-rules', {
+      method: 'POST',
+      body: JSON.stringify(rule),
+    }),
+
+  deleteTransactionRule: (id: string) =>
+    apiClient<{ success: boolean }>(`/transaction-rules?id=${id}`, {
+      method: 'DELETE',
+    }),
+
   // AI (Pro features)
   getInsights: () =>
     apiClient<{
@@ -248,4 +291,64 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(updates),
     }),
+
+  // Anomaly Detection (Pro feature)
+  getAnomalies: (status = 'pending') =>
+    apiClient<{
+      anomalies: Array<{
+        id: string
+        transaction_id: string | null
+        anomaly_type: string
+        severity: 'low' | 'medium' | 'high' | 'critical'
+        title: string
+        description: string
+        merchant_name: string | null
+        amount: number | null
+        expected_amount: number | null
+        deviation_percent: number | null
+        status: string
+        detected_at: string
+      }>
+    }>(`/anomalies?status=${status}`),
+
+  updateAnomaly: (id: string, status: string, feedback?: string) =>
+    apiClient<{ success: boolean }>('/anomalies', {
+      method: 'PATCH',
+      body: JSON.stringify({ id, status, user_feedback: feedback }),
+    }),
+
+  // Cash Flow Forecast (Pro feature)
+  getCashFlowForecast: (days = 30) =>
+    apiClient<{
+      forecast: {
+        currentBalance: number
+        projectedEndBalance: number
+        lowestBalance: number
+        lowestBalanceDate: string
+        totalIncome: number
+        totalExpenses: number
+        netCashFlow: number
+        dailyForecasts: Array<{
+          date: string
+          projectedBalance: number
+          isLowBalance: boolean
+          isNegative: boolean
+        }>
+        alerts: Array<{
+          type: string
+          message: string
+          severity: 'warning' | 'critical'
+        }>
+        confidence: 'high' | 'medium' | 'low'
+      }
+      summary: string
+      dailySpendingRate: number
+      upcomingRecurring: Array<{
+        id: string
+        name: string
+        amount: number
+        nextDate: string
+        isIncome: boolean
+      }>
+    }>(`/cash-flow/forecast?days=${days}`),
 }

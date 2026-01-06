@@ -50,11 +50,12 @@ export default function HealthScreen() {
   const strokeDashoffset = circumference - (score / 100) * circumference
 
   // Calculate individual factor scores
-  const stats = insights?.stats || {}
-  const budgetPercentUsed = stats.budgetPercentUsed ?? 0
-  const spendingChange = stats.spendingChange ?? 0
-  const netCashFlow = stats.netCashFlow ?? 0
-  const categoriesOverBudget = stats.categoriesOverBudget ?? []
+  const stats = insights?.stats
+  const budgetPercentUsed = stats?.budgetPercentUsed ?? 0
+  const spendingChange = stats?.spendingChange ?? 0
+  const netCashFlow = stats?.netCashFlow ?? 0
+  const categoriesOverBudget = stats?.categoriesOverBudget ?? 0
+  const totalBudgeted = stats?.totalBudgeted ?? 0
 
   // Factor breakdown
   const factors = [
@@ -62,7 +63,7 @@ export default function HealthScreen() {
       name: 'Budget Adherence',
       score: budgetPercentUsed <= 80 ? 100 : budgetPercentUsed <= 100 ? 70 : 40,
       status: budgetPercentUsed <= 80 ? 'On Track' : budgetPercentUsed <= 100 ? 'Near Limit' : 'Over Budget',
-      detail: stats.totalBudgeted > 0
+      detail: totalBudgeted > 0
         ? `${Math.round(budgetPercentUsed)}% of budget used`
         : 'No budget set',
       icon: 'wallet-outline' as const,
@@ -88,13 +89,13 @@ export default function HealthScreen() {
     },
     {
       name: 'Category Control',
-      score: categoriesOverBudget.length === 0 ? 100 : Math.max(0, 100 - categoriesOverBudget.length * 30),
-      status: categoriesOverBudget.length === 0 ? 'All Good' : `${categoriesOverBudget.length} Over`,
-      detail: categoriesOverBudget.length === 0
+      score: categoriesOverBudget === 0 ? 100 : Math.max(0, 100 - categoriesOverBudget * 30),
+      status: categoriesOverBudget === 0 ? 'All Good' : `${categoriesOverBudget} Over`,
+      detail: categoriesOverBudget === 0
         ? 'All categories within budget'
-        : `${categoriesOverBudget.map(c => formatCategoryName(c)).join(', ')} over budget`,
+        : `${categoriesOverBudget} ${categoriesOverBudget === 1 ? 'category' : 'categories'} over budget`,
       icon: 'pie-chart-outline' as const,
-      color: categoriesOverBudget.length === 0 ? '#22c55e' : '#ef4444',
+      color: categoriesOverBudget === 0 ? '#22c55e' : '#ef4444',
     },
   ]
 
@@ -131,8 +132,8 @@ export default function HealthScreen() {
       >
         {/* Score Circle */}
         <View className="items-center py-6">
-          <View className="relative">
-            <Svg width={140} height={140} className="-rotate-90">
+          <View style={{ width: 140, height: 140, alignItems: 'center', justifyContent: 'center' }}>
+            <Svg width={140} height={140} style={{ position: 'absolute' }}>
               {/* Background circle */}
               <Circle
                 cx={70}
@@ -153,9 +154,11 @@ export default function HealthScreen() {
                 strokeDasharray={circumference}
                 strokeDashoffset={strokeDashoffset}
                 strokeLinecap="round"
+                rotation={-90}
+                origin="70, 70"
               />
             </Svg>
-            <View className="absolute inset-0 items-center justify-center">
+            <View style={{ alignItems: 'center' }}>
               <Text className="text-4xl font-bold" style={{ color: scoreColor }}>
                 {score}
               </Text>
@@ -213,13 +216,13 @@ export default function HealthScreen() {
               <View className="w-1/2 mb-4">
                 <Text className="text-slate-400 text-xs">Income</Text>
                 <Text className="text-emerald-500 text-lg font-semibold">
-                  +{formatCurrency(stats.currentIncome ?? 0)}
+                  +{formatCurrency(stats?.currentIncome ?? 0)}
                 </Text>
               </View>
               <View className="w-1/2 mb-4">
                 <Text className="text-slate-400 text-xs">Spending</Text>
                 <Text className="text-white text-lg font-semibold">
-                  {formatCurrency(stats.currentSpending ?? 0)}
+                  {formatCurrency(stats?.currentSpending ?? 0)}
                 </Text>
               </View>
               <View className="w-1/2">
@@ -234,7 +237,7 @@ export default function HealthScreen() {
               <View className="w-1/2">
                 <Text className="text-slate-400 text-xs">Daily Average</Text>
                 <Text className="text-white text-lg font-semibold">
-                  {formatCurrency(stats.dailyAverage ?? 0)}
+                  {formatCurrency(stats?.dailyAverage ?? 0)}
                 </Text>
               </View>
             </View>
@@ -242,29 +245,29 @@ export default function HealthScreen() {
         </View>
 
         {/* Budget Overview */}
-        {(stats.totalBudgeted ?? 0) > 0 && (
+        {totalBudgeted > 0 && (
           <View className="mx-5 mb-4">
             <Text className="text-white text-lg font-semibold mb-3">Budget Status</Text>
             <View className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
               <View className="flex-row justify-between mb-3">
                 <Text className="text-slate-400">Total Budget</Text>
                 <Text className="text-white font-semibold">
-                  {formatCurrency(stats.totalBudgeted ?? 0)}
+                  {formatCurrency(totalBudgeted)}
                 </Text>
               </View>
               <View className="flex-row justify-between mb-3">
                 <Text className="text-slate-400">Spent</Text>
                 <Text className="text-white font-semibold">
-                  {formatCurrency(stats.currentSpending ?? 0)}
+                  {formatCurrency(stats?.currentSpending ?? 0)}
                 </Text>
               </View>
               <View className="flex-row justify-between mb-4">
                 <Text className="text-slate-400">Remaining</Text>
                 <Text
                   className="font-semibold"
-                  style={{ color: (stats.budgetRemaining ?? 0) >= 0 ? '#22c55e' : '#ef4444' }}
+                  style={{ color: (stats?.budgetRemaining ?? 0) >= 0 ? '#22c55e' : '#ef4444' }}
                 >
-                  {formatCurrency(stats.budgetRemaining ?? 0)}
+                  {formatCurrency(stats?.budgetRemaining ?? 0)}
                 </Text>
               </View>
               {/* Progress bar */}
@@ -341,15 +344,15 @@ export default function HealthScreen() {
                     </View>
                   </View>
                 )}
-                {categoriesOverBudget.length > 0 && (
+                {categoriesOverBudget > 0 && (
                   <View className="p-4 flex-row">
                     <View className="w-10 h-10 bg-purple-500/20 rounded-full items-center justify-center">
                       <Ionicons name="pie-chart" size={24} color="#a855f7" />
                     </View>
                     <View className="ml-3 flex-1">
-                      <Text className="text-white font-medium">Watch These Categories</Text>
+                      <Text className="text-white font-medium">Watch Your Categories</Text>
                       <Text className="text-slate-400 text-sm">
-                        {categoriesOverBudget.map(c => formatCategoryName(c)).join(', ')} are over budget.
+                        {categoriesOverBudget} {categoriesOverBudget === 1 ? 'category is' : 'categories are'} over budget.
                       </Text>
                     </View>
                   </View>

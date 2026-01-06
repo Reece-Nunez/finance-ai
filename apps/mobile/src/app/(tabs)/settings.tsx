@@ -209,6 +209,25 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* Data Section */}
+        <View className="mt-6">
+          <Text className="text-slate-500 text-xs font-semibold uppercase px-5 mb-2">
+            Data
+          </Text>
+          <View className="mx-5 bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+            <SettingsItem
+              icon="git-branch-outline"
+              label="Transaction Rules"
+              onPress={() => router.push('/rules')}
+            />
+            <SettingsItem
+              icon="repeat-outline"
+              label="Recurring Bills"
+              onPress={() => router.push('/recurring')}
+            />
+          </View>
+        </View>
+
         {/* Security Section */}
         <View className="mt-6">
           <Text className="text-slate-500 text-xs font-semibold uppercase px-5 mb-2">

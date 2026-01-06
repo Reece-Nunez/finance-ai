@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { View, Image, Text } from 'react-native'
+import { getMerchantDomain } from '@sterling/shared'
 
 interface MerchantLogoProps {
   name: string
@@ -40,15 +41,13 @@ export function MerchantLogo({ name, size = 40 }: MerchantLogoProps) {
     return colors[Math.abs(hash) % colors.length]
   }
 
-  // Clean merchant name for Clearbit URL
-  const cleanName = safeName
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '')
-    .slice(0, 20)
+  const domain = getMerchantDomain(safeName)
+  // Use Google's favicon service for reliable logo fetching
+  const logoUrl = domain
+    ? `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
+    : null
 
-  const logoUrl = `https://logo.clearbit.com/${cleanName}.com`
-
-  if (error || !cleanName) {
+  if (error || !logoUrl) {
     return (
       <View
         style={{
@@ -74,15 +73,26 @@ export function MerchantLogo({ name, size = 40 }: MerchantLogoProps) {
   }
 
   return (
-    <Image
-      source={{ uri: logoUrl }}
+    <View
       style={{
         width: size,
         height: size,
         borderRadius: size / 2,
         backgroundColor: '#1e293b',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
       }}
-      onError={() => setError(true)}
-    />
+    >
+      <Image
+        source={{ uri: logoUrl }}
+        style={{
+          width: size * 0.7,
+          height: size * 0.7,
+        }}
+        resizeMode="contain"
+        onError={() => setError(true)}
+      />
+    </View>
   )
 }

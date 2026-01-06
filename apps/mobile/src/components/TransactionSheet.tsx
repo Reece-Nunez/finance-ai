@@ -246,11 +246,6 @@ export function TransactionSheet({ transaction, visible, onClose }: TransactionS
                 <Text className="text-slate-400 text-sm mb-3">Details</Text>
 
                 <View className="flex-row justify-between py-2 border-b border-slate-700">
-                  <Text className="text-slate-400">Account</Text>
-                  <Text className="text-white">{transaction.account_name || 'Unknown'}</Text>
-                </View>
-
-                <View className="flex-row justify-between py-2 border-b border-slate-700">
                   <Text className="text-slate-400">Type</Text>
                   <Text className="text-white">
                     {transaction.is_income ? 'Income' : 'Expense'}

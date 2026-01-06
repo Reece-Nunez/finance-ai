@@ -88,6 +88,57 @@ export function useRecurring() {
   })
 }
 
+export function useUpdateRecurring() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: { frequency?: string; amount?: number; nextDate?: string } }) =>
+      api.updateRecurring(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.recurring })
+    },
+  })
+}
+
+export function useDeleteRecurring() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ merchantPattern, originalName }: { merchantPattern: string; originalName?: string }) =>
+      api.deleteRecurring(merchantPattern, originalName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.recurring })
+    },
+  })
+}
+
+// Transaction Rules
+export function useTransactionRules() {
+  return useQuery({
+    queryKey: ['transactionRules'] as const,
+    queryFn: api.getTransactionRules,
+  })
+}
+
+export function useCreateTransactionRule() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: api.createTransactionRule,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactionRules'] })
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
+    },
+  })
+}
+
+export function useDeleteTransactionRule() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: api.deleteTransactionRule,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactionRules'] })
+    },
+  })
+}
+
 // AI Insights
 export function useInsights() {
   return useQuery({

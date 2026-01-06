@@ -1,35 +1,83 @@
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Image } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Image, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Link, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { useCallback, useState } from 'react'
+import { useCallback, useState, useMemo } from 'react'
+import Svg, { Circle } from 'react-native-svg'
 
-import { useAccounts, useTransactions, useInsights } from '@/hooks/useApi'
+import { useAccounts, useTransactions, useInsights, useRecurring, useSubscription } from '@/hooks/useApi'
 import { useAuth } from '@/hooks/useAuth'
 import { MerchantLogo } from '@/components/MerchantLogo'
+import { AnomalyAlerts } from '@/components/AnomalyAlerts'
+import { CashFlowForecast } from '@/components/CashFlowForecast'
 import { formatCurrency, formatDate } from '@/utils/format'
 import { formatCategoryName } from '@sterling/shared'
+import { api } from '@/services/api'
 
 // Sterling logo
 const sterlingLogo = require('../../../assets/sterlinglogo.png')
+
+// Time-based greeting
+function getGreeting(): string {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 17) return 'Good afternoon'
+  return 'Good evening'
+}
 
 export default function DashboardScreen() {
   const router = useRouter()
   const { user } = useAuth()
   const [refreshing, setRefreshing] = useState(false)
+  const [syncing, setSyncing] = useState(false)
 
   const { data: accountsData, refetch: refetchAccounts } = useAccounts()
   const { data: transactionsData, refetch: refetchTransactions } = useTransactions({ limit: 5 })
-  const { data: insightsData, refetch: refetchInsights } = useInsights()
+  const { data: insightsData, refetch: refetchInsights, isLoading: insightsLoading } = useInsights()
+  const { data: recurringData, refetch: refetchRecurring } = useRecurring()
+  const { data: subscriptionData } = useSubscription()
+
+  const isPro = subscriptionData?.tier === 'pro'
 
   const accounts = accountsData?.accounts || []
   const transactions = transactionsData?.transactions || []
   const insights = insightsData
 
+  // Sync all accounts
+  const handleSync = async () => {
+    setSyncing(true)
+    try {
+      await api.syncTransactions()
+      await Promise.all([refetchAccounts(), refetchTransactions(), refetchInsights()])
+    } catch (error) {
+      console.error('Sync failed:', error)
+    }
+    setSyncing(false)
+  }
+
+  // Calculate upcoming bills (next 14 days)
+  const upcomingBills = useMemo(() => {
+    if (!recurringData?.recurring) return []
+
+    const now = new Date()
+    const fourteenDaysFromNow = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000)
+
+    return recurringData.recurring
+      .filter((item: { nextDate?: string; isIncome?: boolean; averageAmount?: number; displayName?: string }) => {
+        if (!item.nextDate || item.isIncome || !item.displayName) return false
+        if ((item.averageAmount ?? 0) === 0) return false
+        const nextDate = new Date(item.nextDate)
+        return nextDate >= now && nextDate <= fourteenDaysFromNow
+      })
+      .sort((a: { nextDate?: string }, b: { nextDate?: string }) => {
+        const dateA = new Date(a.nextDate || 0)
+        const dateB = new Date(b.nextDate || 0)
+        return dateA.getTime() - dateB.getTime()
+      })
+      .slice(0, 3)
+  }, [recurringData?.recurring])
+
   // Calculate balances by account type
-  // Depository (checking/savings) = spendable cash
-  // Credit/Loan = debt (shown as negative in Plaid)
-  // Investment = assets
   const cashBalance = accounts
     .filter(acc => acc.type === 'depository')
     .reduce((sum, acc) => sum + (acc.current_balance || 0), 0)
@@ -42,14 +90,17 @@ export default function DashboardScreen() {
     .filter(acc => acc.type === 'credit' || acc.type === 'loan')
     .reduce((sum, acc) => sum + Math.abs(acc.current_balance || 0), 0)
 
-  // Total balance = cash + investments (what user "has")
-  const totalBalance = cashBalance + investmentBalance
+  // Net worth = assets - liabilities
+  const netWorth = cashBalance + investmentBalance - debtBalance
+
+  // Cash flow this month
+  const cashFlow = (insights?.stats?.currentIncome || 0) - (insights?.stats?.currentSpending || 0)
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
-    await Promise.all([refetchAccounts(), refetchTransactions(), refetchInsights()])
+    await Promise.all([refetchAccounts(), refetchTransactions(), refetchInsights(), refetchRecurring()])
     setRefreshing(false)
-  }, [refetchAccounts, refetchTransactions, refetchInsights])
+  }, [refetchAccounts, refetchTransactions, refetchInsights, refetchRecurring])
 
   const getHealthScoreColor = (score: number) => {
     if (score >= 80) return '#22c55e'
@@ -71,8 +122,8 @@ export default function DashboardScreen() {
         }
       >
         {/* Header with Logo */}
-        <View className="px-5 pt-4 pb-6">
-          <View className="flex-row items-center justify-between mb-4">
+        <View className="px-5 pt-4 pb-4">
+          <View className="flex-row items-center justify-between mb-3">
             <View className="flex-row items-center">
               <Image
                 source={sterlingLogo}
@@ -81,14 +132,28 @@ export default function DashboardScreen() {
               />
               <Text className="text-white text-xl font-bold ml-2">Sterling</Text>
             </View>
-            <TouchableOpacity
-              onPress={() => router.push('/profile')}
-              className="w-10 h-10 bg-slate-900 rounded-full items-center justify-center"
-            >
-              <Ionicons name="person-outline" size={20} color="#94a3b8" />
-            </TouchableOpacity>
+            <View className="flex-row items-center">
+              {/* Sync Button */}
+              <TouchableOpacity
+                onPress={handleSync}
+                disabled={syncing}
+                className="w-10 h-10 bg-slate-900 rounded-full items-center justify-center mr-2"
+              >
+                {syncing ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Ionicons name="sync-outline" size={20} color="#94a3b8" />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => router.push('/profile')}
+                className="w-10 h-10 bg-slate-900 rounded-full items-center justify-center"
+              >
+                <Ionicons name="person-outline" size={20} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
           </View>
-          <Text className="text-slate-400 text-sm">Welcome back,</Text>
+          <Text className="text-slate-400 text-sm">{getGreeting()},</Text>
           <Text className="text-white text-2xl font-bold">
             {(() => {
               const name = user?.user_metadata?.firstName ||
@@ -101,58 +166,135 @@ export default function DashboardScreen() {
           </Text>
         </View>
 
-        {/* Total Balance Card */}
-        <View className="mx-5 bg-slate-900 rounded-2xl p-5 border border-slate-800">
-          <Text className="text-slate-400 text-sm mb-1">Total Balance</Text>
+        {/* Net Worth Card with Gradient */}
+        <View className="mx-5 bg-gradient-to-br from-emerald-600 to-teal-700 rounded-2xl p-5 overflow-hidden">
+          <View className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
+          <Text className="text-emerald-100 text-sm mb-1">Net Worth</Text>
           <Text className="text-white text-3xl font-bold">
-            {formatCurrency(totalBalance)}
+            {formatCurrency(netWorth)}
           </Text>
-          <View className="flex-row items-center mt-3">
-            <View className="flex-row items-center bg-slate-800 rounded-full px-3 py-1">
-              <Ionicons name="trending-up" size={14} color="#22c55e" />
-              <Text className="text-emerald-500 text-xs ml-1 font-medium">
-                {accounts.length} {accounts.length === 1 ? 'account' : 'accounts'} linked
+          <View className="flex-row items-center mt-3 flex-wrap">
+            <View className="flex-row items-center bg-white/20 rounded-full px-3 py-1 mr-2 mb-1">
+              <Ionicons name="wallet-outline" size={12} color="#fff" />
+              <Text className="text-white text-xs ml-1">
+                Cash: {formatCurrency(cashBalance, { compact: true })}
               </Text>
             </View>
+            {investmentBalance > 0 && (
+              <View className="flex-row items-center bg-white/20 rounded-full px-3 py-1 mr-2 mb-1">
+                <Ionicons name="trending-up-outline" size={12} color="#fff" />
+                <Text className="text-white text-xs ml-1">
+                  Invest: {formatCurrency(investmentBalance, { compact: true })}
+                </Text>
+              </View>
+            )}
+            {debtBalance > 0 && (
+              <View className="flex-row items-center bg-red-500/30 rounded-full px-3 py-1 mb-1">
+                <Ionicons name="card-outline" size={12} color="#fca5a5" />
+                <Text className="text-red-200 text-xs ml-1">
+                  Debt: {formatCurrency(debtBalance, { compact: true })}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
-        {/* Health Score & Quick Stats */}
-        <View className="flex-row mx-5 mt-4 space-x-3">
-          {/* Health Score */}
-          <TouchableOpacity
-            className="flex-1 bg-slate-900 rounded-2xl p-4 border border-slate-800"
-            onPress={() => router.push('/health')}
-          >
-            <View className="flex-row items-center justify-between">
-              <Text className="text-slate-400 text-sm">Health Score</Text>
-              <Ionicons name="heart" size={16} color={getHealthScoreColor(insights?.healthScore || 0)} />
-            </View>
+        {/* Health Score with Ring */}
+        <TouchableOpacity
+          className="mx-5 mt-4 bg-slate-900 rounded-2xl p-4 border border-slate-800 flex-row items-center"
+          onPress={() => router.push('/health')}
+        >
+          {/* Health Ring */}
+          <View style={{ width: 70, height: 70, alignItems: 'center', justifyContent: 'center' }}>
+            <Svg width={70} height={70} style={{ position: 'absolute' }}>
+              <Circle
+                cx={35}
+                cy={35}
+                r={28}
+                stroke="#1e293b"
+                strokeWidth={6}
+                fill="transparent"
+              />
+              <Circle
+                cx={35}
+                cy={35}
+                r={28}
+                stroke={getHealthScoreColor(insights?.healthScore || 0)}
+                strokeWidth={6}
+                fill="transparent"
+                strokeDasharray={2 * Math.PI * 28}
+                strokeDashoffset={2 * Math.PI * 28 * (1 - (insights?.healthScore || 0) / 100)}
+                strokeLinecap="round"
+                rotation={-90}
+                origin="35, 35"
+              />
+            </Svg>
             <Text
-              className="text-3xl font-bold mt-2"
+              className="text-xl font-bold"
               style={{ color: getHealthScoreColor(insights?.healthScore || 0) }}
             >
               {insights?.healthScore || '--'}
             </Text>
-            <Text className="text-slate-500 text-xs capitalize mt-1">
+          </View>
+          <View className="flex-1 ml-4">
+            <Text className="text-white text-lg font-semibold">Financial Health</Text>
+            <Text className="text-slate-400 text-sm capitalize mt-0.5">
               {insights?.healthStatus?.replace('_', ' ') || 'Loading...'}
             </Text>
-          </TouchableOpacity>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#475569" />
+        </TouchableOpacity>
 
+        {/* Stats Grid */}
+        <View className="flex-row mx-5 mt-3">
           {/* Monthly Spending */}
-          <View className="flex-1 bg-slate-900 rounded-2xl p-4 border border-slate-800 ml-3">
+          <View className="flex-1 bg-slate-900 rounded-xl p-3.5 border border-slate-800">
             <View className="flex-row items-center justify-between">
-              <Text className="text-slate-400 text-sm">This Month</Text>
-              <Ionicons name="arrow-down" size={16} color="#ef4444" />
+              <Text className="text-slate-400 text-xs">Spending</Text>
+              <Ionicons
+                name={(insights?.stats?.spendingChange ?? 0) >= 0 ? 'arrow-up' : 'arrow-down'}
+                size={12}
+                color={(insights?.stats?.spendingChange ?? 0) >= 0 ? '#ef4444' : '#22c55e'}
+              />
             </View>
-            <Text className="text-white text-2xl font-bold mt-2">
+            <Text className="text-white text-lg font-bold mt-1">
               {formatCurrency(insights?.stats?.currentSpending || 0, { compact: true })}
             </Text>
-            <Text className="text-slate-500 text-xs mt-1">
+            <Text className={`text-xs mt-0.5 ${(insights?.stats?.spendingChange ?? 0) >= 0 ? 'text-red-400' : 'text-emerald-400'}`}>
               {insights?.stats?.spendingChange !== undefined
-                ? `${insights.stats.spendingChange >= 0 ? '+' : ''}${insights.stats.spendingChange.toFixed(0)}% vs last month`
-                : 'Spending'}
+                ? `${insights.stats.spendingChange >= 0 ? '+' : ''}${insights.stats.spendingChange.toFixed(0)}%`
+                : ''}
             </Text>
+          </View>
+
+          {/* Income */}
+          <View className="flex-1 bg-slate-900 rounded-xl p-3.5 border border-slate-800 ml-2">
+            <View className="flex-row items-center justify-between">
+              <Text className="text-slate-400 text-xs">Income</Text>
+              <Ionicons name="arrow-up" size={12} color="#22c55e" />
+            </View>
+            <Text className="text-emerald-500 text-lg font-bold mt-1">
+              {formatCurrency(insights?.stats?.currentIncome || 0, { compact: true })}
+            </Text>
+            <Text className="text-slate-500 text-xs mt-0.5">This month</Text>
+          </View>
+
+          {/* Cash Flow */}
+          <View className="flex-1 bg-slate-900 rounded-xl p-3.5 border border-slate-800 ml-2">
+            <View className="flex-row items-center justify-between">
+              <Text className="text-slate-400 text-xs">Cash Flow</Text>
+              <Ionicons
+                name={cashFlow >= 0 ? 'trending-up' : 'trending-down'}
+                size={12}
+                color={cashFlow >= 0 ? '#22c55e' : '#ef4444'}
+              />
+            </View>
+            <Text
+              className={`text-lg font-bold mt-1 ${cashFlow >= 0 ? 'text-emerald-500' : 'text-red-500'}`}
+            >
+              {cashFlow >= 0 ? '+' : ''}{formatCurrency(cashFlow, { compact: true })}
+            </Text>
+            <Text className="text-slate-500 text-xs mt-0.5">Net</Text>
           </View>
         </View>
 
@@ -188,6 +330,50 @@ export default function DashboardScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Pro Features - Anomaly Detection & Cash Flow */}
+        {isPro && (
+          <View className="mx-5 mt-4 gap-4">
+            <AnomalyAlerts />
+            <CashFlowForecast />
+          </View>
+        )}
+
+        {/* Upcoming Bills */}
+        {upcomingBills.length > 0 && (
+          <View className="mt-6">
+            <View className="flex-row items-center justify-between px-5 mb-3">
+              <Text className="text-white text-lg font-semibold">Upcoming Bills</Text>
+              <TouchableOpacity onPress={() => router.push('/recurring')}>
+                <Text className="text-slate-400 text-sm">See All</Text>
+              </TouchableOpacity>
+            </View>
+            <View className="mx-5 bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+              {upcomingBills.map((item: { id: string; displayName: string; nextDate: string; averageAmount: number }, index: number) => (
+                <TouchableOpacity
+                  key={item.id}
+                  className={`flex-row items-center p-4 ${
+                    index > 0 ? 'border-t border-slate-800' : ''
+                  }`}
+                  onPress={() => router.push('/recurring')}
+                >
+                  <MerchantLogo name={item.displayName} size={40} />
+                  <View className="flex-1 ml-3">
+                    <Text className="text-white text-sm font-medium" numberOfLines={1}>
+                      {item.displayName}
+                    </Text>
+                    <Text className="text-slate-500 text-xs mt-0.5">
+                      {formatDate(item.nextDate)}
+                    </Text>
+                  </View>
+                  <Text className="text-white text-sm font-semibold">
+                    {formatCurrency(Math.abs(item.averageAmount ?? 0))}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Accounts */}
         {accounts.length > 0 && (

@@ -13,7 +13,12 @@
     "build": "turbo build",
     "build:web": "turbo build --filter=@sterling/web",
     "lint": "turbo lint",
-    "typecheck": "turbo typecheck"
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "test:web": "turbo test --filter=@sterling/web",
+    "test:mobile": "turbo test --filter=@sterling/mobile",
+    "test:coverage": "turbo test:coverage",
+    "test:ci": "turbo test:ci"
   },
   "devDependencies": {
     "turbo": "^2.3.0"

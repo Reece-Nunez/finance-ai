@@ -120,12 +120,12 @@ export default function BillingScreen() {
             </View>
           </View>
 
-          {isPro && subscription?.current_period_end && (
+          {isPro && subscription?.currentPeriodEnd && (
             <View className="bg-slate-900/50 rounded-xl p-3 mt-2">
               <Text className="text-slate-400 text-sm">
                 {isTrialing ? 'Trial ends' : 'Renews'} on{' '}
                 <Text className="text-white">
-                  {new Date(subscription.current_period_end).toLocaleDateString()}
+                  {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
                 </Text>
               </Text>
             </View>

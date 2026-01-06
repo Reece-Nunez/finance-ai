@@ -9,6 +9,10 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { AuthProvider } from '@/hooks/useAuth'
+import { initSentry } from '@/lib/sentry'
+
+// Initialize Sentry as early as possible
+initSentry()
 
 // Prevent the splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync()

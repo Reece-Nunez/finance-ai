@@ -46,6 +46,13 @@
         {
           "faceIDPermission": "Allow Sterling to use Face ID for authentication"
         }
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "sterling",
+          "project": "sterling-mobile"
+        }
       ]
     ],
     "experiments": {
