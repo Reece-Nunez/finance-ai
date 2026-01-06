@@ -166,18 +166,47 @@ export default function AccountsScreen() {
           </View>
         ) : (
           <>
-            {/* Total Balance */}
-            <View className="mx-5 mb-6 bg-slate-900 rounded-2xl p-5 border border-slate-800">
-              <Text className="text-slate-400 text-sm mb-1">Total Balance</Text>
-              <Text className="text-white text-3xl font-bold">
-                {formatCurrency(
-                  accounts.reduce((sum, acc) => sum + (acc.current_balance || 0), 0)
-                )}
-              </Text>
-              <Text className="text-slate-500 text-sm mt-2">
-                Across {accounts.length} account{accounts.length !== 1 ? 's' : ''}
-              </Text>
-            </View>
+            {/* Balance Summary */}
+            {(() => {
+              const cashBalance = accounts
+                .filter(acc => acc.type === 'depository')
+                .reduce((sum, acc) => sum + (acc.current_balance || 0), 0)
+              const investmentBalance = accounts
+                .filter(acc => acc.type === 'investment')
+                .reduce((sum, acc) => sum + (acc.current_balance || 0), 0)
+              const debtBalance = accounts
+                .filter(acc => acc.type === 'credit' || acc.type === 'loan')
+                .reduce((sum, acc) => sum + Math.abs(acc.current_balance || 0), 0)
+              const netWorth = cashBalance + investmentBalance - debtBalance
+
+              return (
+                <View className="mx-5 mb-6 bg-slate-900 rounded-2xl p-5 border border-slate-800">
+                  <Text className="text-slate-400 text-sm mb-1">Cash & Investments</Text>
+                  <Text className="text-white text-3xl font-bold">
+                    {formatCurrency(cashBalance + investmentBalance)}
+                  </Text>
+                  {debtBalance > 0 && (
+                    <View className="flex-row items-center mt-3 pt-3 border-t border-slate-800">
+                      <View className="flex-1">
+                        <Text className="text-slate-500 text-xs">Debt</Text>
+                        <Text className="text-red-400 text-base font-semibold">
+                          -{formatCurrency(debtBalance)}
+                        </Text>
+                      </View>
+                      <View className="flex-1 items-end">
+                        <Text className="text-slate-500 text-xs">Net Worth</Text>
+                        <Text className={`text-base font-semibold ${netWorth >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+                          {formatCurrency(netWorth)}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                  <Text className="text-slate-500 text-sm mt-3">
+                    {accounts.length} account{accounts.length !== 1 ? 's' : ''} connected
+                  </Text>
+                </View>
+              )
+            })()}
 
             {/* Accounts by Institution */}
             {Object.entries(accountsByInstitution).map(([institution, instAccounts]) => (
@@ -226,21 +255,32 @@ export default function AccountsScreen() {
                         </Text>
                       </View>
                       <View className="items-end">
-                        <Text
-                          className={`text-lg font-semibold ${
-                            (account.current_balance || 0) < 0
-                              ? 'text-red-500'
-                              : 'text-white'
-                          }`}
-                        >
-                          {formatCurrency(account.current_balance || 0)}
-                        </Text>
-                        {account.available_balance !== null &&
-                          account.available_balance !== account.current_balance && (
-                            <Text className="text-slate-500 text-xs">
-                              {formatCurrency(account.available_balance)} available
+                        {account.type === 'loan' || account.type === 'credit' ? (
+                          <>
+                            <Text className="text-red-400 text-lg font-semibold">
+                              -{formatCurrency(Math.abs(account.current_balance || 0))}
                             </Text>
-                          )}
+                            <Text className="text-slate-500 text-xs">owed</Text>
+                          </>
+                        ) : (
+                          <>
+                            <Text
+                              className={`text-lg font-semibold ${
+                                (account.current_balance || 0) < 0
+                                  ? 'text-red-500'
+                                  : 'text-white'
+                              }`}
+                            >
+                              {formatCurrency(account.current_balance || 0)}
+                            </Text>
+                            {account.available_balance !== null &&
+                              account.available_balance !== account.current_balance && (
+                                <Text className="text-slate-500 text-xs">
+                                  {formatCurrency(account.available_balance)} available
+                                </Text>
+                              )}
+                          </>
+                        )}
                       </View>
                     </View>
                   ))}

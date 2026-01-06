@@ -23,8 +23,24 @@ export default function DashboardScreen() {
   const transactions = transactionsData?.transactions || []
   const insights = insightsData
 
-  // Calculate total balance
-  const totalBalance = accounts.reduce((sum, acc) => sum + (acc.current_balance || 0), 0)
+  // Calculate balances by account type
+  // Depository (checking/savings) = spendable cash
+  // Credit/Loan = debt (shown as negative in Plaid)
+  // Investment = assets
+  const cashBalance = accounts
+    .filter(acc => acc.type === 'depository')
+    .reduce((sum, acc) => sum + (acc.current_balance || 0), 0)
+
+  const investmentBalance = accounts
+    .filter(acc => acc.type === 'investment')
+    .reduce((sum, acc) => sum + (acc.current_balance || 0), 0)
+
+  const debtBalance = accounts
+    .filter(acc => acc.type === 'credit' || acc.type === 'loan')
+    .reduce((sum, acc) => sum + Math.abs(acc.current_balance || 0), 0)
+
+  // Total balance = cash + investments (what user "has")
+  const totalBalance = cashBalance + investmentBalance
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)

@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Info,
   Landmark,
+  Banknote,
 } from 'lucide-react'
 import {
   Tooltip,
@@ -119,6 +120,7 @@ export function AccountsOverview({
     (a) => a.type === 'depository' && (a.subtype === 'savings' || a.subtype === 'money market' || a.subtype === 'cd')
   )
   const creditAccounts = accounts.filter((a) => a.type === 'credit')
+  const loanAccounts = accounts.filter((a) => a.type === 'loan')
   const investmentAccounts = accounts.filter((a) => a.type === 'investment' || a.type === 'brokerage')
 
   // Other accounts that don't fit the above categories
@@ -126,6 +128,7 @@ export function AccountsOverview({
     ...checkingAccounts.map(a => a.id),
     ...savingsAccounts.map(a => a.id),
     ...creditAccounts.map(a => a.id),
+    ...loanAccounts.map(a => a.id),
     ...investmentAccounts.map(a => a.id),
   ])
   const otherAccounts = accounts.filter((a) => !categorizedIds.has(a.id))
@@ -140,7 +143,11 @@ export function AccountsOverview({
     0
   )
   const creditTotal = creditAccounts.reduce(
-    (sum, a) => sum + (a.current_balance || 0),
+    (sum, a) => sum + Math.abs(a.current_balance || 0),
+    0
+  )
+  const loanTotal = loanAccounts.reduce(
+    (sum, a) => sum + Math.abs(a.current_balance || 0),
     0
   )
   const investmentTotal = investmentAccounts.reduce(
@@ -152,8 +159,11 @@ export function AccountsOverview({
     0
   )
 
-  // Net cash = checking + savings - credit card balances
+  // Net cash = checking + savings - credit card balances (loans excluded as they're long-term debt)
   const netCash = checkingTotal + savingsTotal - creditTotal
+
+  // Total debt = credit cards + loans
+  const totalDebt = creditTotal + loanTotal
 
   // Format last synced time
   const formatLastSynced = () => {
@@ -200,10 +210,18 @@ export function AccountsOverview({
         <AccountCategory
           title="Card Balance"
           icon={CreditCard}
-          total={creditTotal}
-          accounts={creditAccounts}
+          total={-creditTotal}
+          accounts={creditAccounts.map(a => ({ ...a, current_balance: -Math.abs(a.current_balance || 0) }))}
           iconBgColor="bg-orange-100 dark:bg-orange-900/30"
           iconColor="text-orange-600 dark:text-orange-400"
+        />
+        <AccountCategory
+          title="Loans"
+          icon={Banknote}
+          total={-loanTotal}
+          accounts={loanAccounts.map(a => ({ ...a, current_balance: -Math.abs(a.current_balance || 0) }))}
+          iconBgColor="bg-red-100 dark:bg-red-900/30"
+          iconColor="text-red-600 dark:text-red-400"
         />
 
         {/* Net Cash with tooltip */}
