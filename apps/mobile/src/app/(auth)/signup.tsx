@@ -9,12 +9,15 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Image,
 } from 'react-native'
 import { Link } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 
 import { useAuth } from '@/hooks/useAuth'
+
+const sterlingLogo = require('../../../assets/sterlinglogo.png')
 
 export default function SignupScreen() {
   const [firstName, setFirstName] = useState('')
@@ -77,9 +80,11 @@ export default function SignupScreen() {
           <View className="px-6 py-8">
             {/* Logo and Title */}
             <View className="items-center mb-8">
-              <View className="w-16 h-16 bg-white rounded-2xl items-center justify-center mb-4">
-                <Ionicons name="analytics" size={32} color="#020617" />
-              </View>
+              <Image
+                source={sterlingLogo}
+                className="w-20 h-20 rounded-2xl mb-4"
+                resizeMode="contain"
+              />
               <Text className="text-3xl font-bold text-white mb-2">
                 Create Account
               </Text>

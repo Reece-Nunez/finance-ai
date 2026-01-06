@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Image } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Link, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -9,6 +9,9 @@ import { useAuth } from '@/hooks/useAuth'
 import { MerchantLogo } from '@/components/MerchantLogo'
 import { formatCurrency, formatDate } from '@/utils/format'
 import { formatCategoryName } from '@sterling/shared'
+
+// Sterling logo
+const sterlingLogo = require('../../../assets/sterlinglogo.png')
 
 export default function DashboardScreen() {
   const router = useRouter()
@@ -67,11 +70,31 @@ export default function DashboardScreen() {
           />
         }
       >
-        {/* Header */}
+        {/* Header with Logo */}
         <View className="px-5 pt-4 pb-6">
+          <View className="flex-row items-center justify-between mb-4">
+            <View className="flex-row items-center">
+              <Image
+                source={sterlingLogo}
+                className="w-10 h-10 rounded-xl"
+                resizeMode="contain"
+              />
+              <Text className="text-white text-xl font-bold ml-2">Sterling</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => router.push('/profile')}
+              className="w-10 h-10 bg-slate-900 rounded-full items-center justify-center"
+            >
+              <Ionicons name="person-outline" size={20} color="#94a3b8" />
+            </TouchableOpacity>
+          </View>
           <Text className="text-slate-400 text-sm">Welcome back,</Text>
           <Text className="text-white text-2xl font-bold">
-            {user?.user_metadata?.firstName || 'User'}
+            {user?.user_metadata?.firstName ||
+             user?.user_metadata?.first_name ||
+             user?.user_metadata?.full_name?.split(' ')[0] ||
+             user?.email?.split('@')[0] ||
+             'User'}
           </Text>
         </View>
 

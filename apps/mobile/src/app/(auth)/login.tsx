@@ -8,12 +8,15 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native'
 import { Link } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 
 import { useAuth } from '@/hooks/useAuth'
+
+const sterlingLogo = require('../../../assets/sterlinglogo.png')
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('')
@@ -56,9 +59,11 @@ export default function LoginScreen() {
         <View className="flex-1 justify-center px-6">
           {/* Logo and Title */}
           <View className="items-center mb-10">
-            <View className="w-16 h-16 bg-white rounded-2xl items-center justify-center mb-4">
-              <Ionicons name="analytics" size={32} color="#020617" />
-            </View>
+            <Image
+              source={sterlingLogo}
+              className="w-20 h-20 rounded-2xl mb-4"
+              resizeMode="contain"
+            />
             <Text className="text-3xl font-bold text-white mb-2">Sterling</Text>
             <Text className="text-slate-400 text-center">
               Sign in to manage your finances
