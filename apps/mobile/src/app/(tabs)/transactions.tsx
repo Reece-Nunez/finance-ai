@@ -16,6 +16,7 @@ import { api } from '@/services/api'
 import { MerchantLogo } from '@/components/MerchantLogo'
 import { TransactionSheet } from '@/components/TransactionSheet'
 import { formatCurrency, formatDate } from '@/utils/format'
+import { formatCategoryName } from '@sterling/shared'
 import type { Transaction } from '@sterling/shared'
 
 type FilterType = 'all' | 'income' | 'expense'
@@ -111,7 +112,7 @@ export default function TransactionsScreen() {
         </Text>
         <View className="flex-row items-center mt-0.5">
           {transaction.category ? (
-            <Text className="text-slate-500 text-sm">{transaction.category}</Text>
+            <Text className="text-slate-500 text-sm">{formatCategoryName(transaction.category)}</Text>
           ) : (
             <Text className="text-amber-500 text-sm">Uncategorized</Text>
           )}

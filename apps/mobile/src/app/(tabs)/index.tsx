@@ -8,6 +8,7 @@ import { useAccounts, useTransactions, useInsights } from '@/hooks/useApi'
 import { useAuth } from '@/hooks/useAuth'
 import { MerchantLogo } from '@/components/MerchantLogo'
 import { formatCurrency, formatDate } from '@/utils/format'
+import { formatCategoryName } from '@sterling/shared'
 
 export default function DashboardScreen() {
   const router = useRouter()
@@ -226,7 +227,7 @@ export default function DashboardScreen() {
                     </Text>
                     <Text className="text-slate-500 text-xs mt-0.5">
                       {formatDate(transaction.date)}
-                      {transaction.category && ` • ${transaction.category}`}
+                      {transaction.category && ` • ${formatCategoryName(transaction.category)}`}
                     </Text>
                   </View>
                   <Text

@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useUpdateTransaction } from '@/hooks/useApi'
 import { MerchantLogo } from '@/components/MerchantLogo'
 import { formatCurrency, formatDate } from '@/utils/format'
-import { DEFAULT_CATEGORIES, CATEGORY_COLORS } from '@sterling/shared'
+import { DEFAULT_CATEGORIES, CATEGORY_COLORS, formatCategoryName } from '@sterling/shared'
 import type { Transaction } from '@sterling/shared'
 
 interface TransactionSheetProps {
@@ -159,7 +159,7 @@ export function TransactionSheet({ transaction, visible, onClose }: TransactionS
                         className="w-3 h-3 rounded-full mr-2"
                         style={{ backgroundColor: getCategoryColor(category) }}
                       />
-                      <Text className="text-white">{category}</Text>
+                      <Text className="text-white">{formatCategoryName(category)}</Text>
                     </View>
                   ) : (
                     <Text className="text-slate-400">Select category</Text>
