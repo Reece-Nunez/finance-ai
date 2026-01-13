@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState, useMemo, useRef } from 'react'
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -253,10 +254,14 @@ function BudgetCategoryCard({
   category,
   onUpdateBudget,
   onDeleteBudget,
+  isHighlighted,
+  cardRef,
 }: {
   category: BudgetCategory
   onUpdateBudget: (category: string, amount: number) => void
   onDeleteBudget: (budgetId: string) => void
+  isHighlighted?: boolean
+  cardRef?: (el: HTMLDivElement | null) => void
 }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -289,7 +294,12 @@ function BudgetCategoryCard({
   }
 
   return (
-    <div className={`rounded-xl border transition-all ${getStatusBg()}`}>
+    <div
+      ref={cardRef}
+      className={`rounded-xl border transition-all ${getStatusBg()} ${
+        isHighlighted ? 'ring-2 ring-emerald-500 shadow-lg' : ''
+      }`}
+    >
       {/* Main Row */}
       <div className="p-4">
         <div className="flex items-center gap-4">
@@ -597,10 +607,13 @@ function AddBudgetSection({
 
 // Main Page
 export default function BudgetsPage() {
+  const searchParams = useSearchParams()
   const [data, setData] = useState<BudgetData | null>(null)
   const [loading, setLoading] = useState(true)
   const [showAddBudget, setShowAddBudget] = useState(false)
   const [showUnbudgeted, setShowUnbudgeted] = useState(false)
+  const [highlightedBudgetId, setHighlightedBudgetId] = useState<string | null>(null)
+  const budgetRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   const fetchData = async () => {
     setLoading(true)
@@ -620,6 +633,35 @@ export default function BudgetsPage() {
   useEffect(() => {
     fetchData()
   }, [])
+
+  // Handle deep link from notifications
+  useEffect(() => {
+    const budgetId = searchParams.get('id')
+    if (budgetId && data) {
+      // Find the budget category with this ID
+      const targetCategory = data.categories.find((c) => c.budgetId === budgetId)
+      if (targetCategory) {
+        // Highlight and scroll to the budget
+        setHighlightedBudgetId(budgetId)
+
+        // Scroll to the budget after a brief delay to allow render
+        setTimeout(() => {
+          const ref = budgetRefs.current[budgetId]
+          if (ref) {
+            ref.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          }
+        }, 100)
+
+        // Clear highlight after 3 seconds
+        setTimeout(() => {
+          setHighlightedBudgetId(null)
+        }, 3000)
+
+        // Clear URL
+        window.history.replaceState({}, '', '/dashboard/budgets')
+      }
+    }
+  }, [searchParams, data])
 
   const handleUpdateBudget = async (category: string, amount: number) => {
     await fetch('/api/budgets', {
@@ -822,6 +864,8 @@ export default function BudgetsPage() {
                     category={category}
                     onUpdateBudget={handleUpdateBudget}
                     onDeleteBudget={handleDeleteBudget}
+                    isHighlighted={highlightedBudgetId === category.budgetId}
+                    cardRef={category.budgetId ? (el) => { budgetRefs.current[category.budgetId!] = el } : undefined}
                   />
                 ))}
               </div>

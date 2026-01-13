@@ -30,6 +30,10 @@ interface Notification {
   priority: 'low' | 'normal' | 'high' | 'urgent'
   read: boolean
   action_url?: string
+  metadata?: {
+    transaction_id?: string
+    [key: string]: unknown
+  }
   created_at: string
 }
 
@@ -159,7 +163,7 @@ export function NotificationsDropdown() {
     }
   }
 
-  const deleteNotification = async (id: string, e: React.MouseEvent) => {
+  const deleteNotification = async (id: string, e: React.MouseEvent | React.KeyboardEvent) => {
     e.stopPropagation() // Prevent triggering the parent click handler
     try {
       await fetch('/api/notifications', {
@@ -281,7 +285,17 @@ export function NotificationsDropdown() {
                 onClick={() => {
                   if (!notification.read) markAsRead(notification.id)
                   if (notification.action_url) {
-                    window.location.href = notification.action_url
+                    let url = notification.action_url
+                    // If this is a transaction notification with metadata but URL doesn't have ?id=
+                    // append the transaction ID for deep linking
+                    if (
+                      notification.metadata?.transaction_id &&
+                      url.includes('/dashboard/transactions') &&
+                      !url.includes('?id=')
+                    ) {
+                      url = `${url}?id=${notification.metadata.transaction_id}`
+                    }
+                    window.location.href = url
                     setOpen(false)
                   }
                 }}

@@ -73,7 +73,7 @@ export default function TransactionsPage() {
   const [dateFilter, setDateFilter] = useState('This Month')
   const [visibleCount, setVisibleCount] = useState(50)
 
-  // Check for query params (review_transfers, search)
+  // Check for query params (review_transfers, search, id)
   useEffect(() => {
     if (searchParams.get('review_transfers') === 'true') {
       setTransferModalOpen(true)
@@ -89,7 +89,34 @@ export default function TransactionsPage() {
       // Clear the query param from URL without page reload
       window.history.replaceState({}, '', '/dashboard/transactions')
     }
-  }, [searchParams])
+
+    // Handle direct transaction link (from notifications)
+    const transactionId = searchParams.get('id')
+    if (transactionId) {
+      // Try to find in loaded transactions first
+      const found = transactions.find(t => t.id === transactionId)
+      if (found) {
+        setSelectedTransaction(found)
+        // Clear the query param from URL without page reload
+        window.history.replaceState({}, '', '/dashboard/transactions')
+      } else if (!loading) {
+        // Fetch the specific transaction
+        supabase
+          .from('transactions')
+          .select('*')
+          .eq('id', transactionId)
+          .single()
+          .then(({ data, error }) => {
+            if (data && !error) {
+              setSelectedTransaction(data)
+            }
+            // Clear URL after fetch attempt (whether successful or not)
+            window.history.replaceState({}, '', '/dashboard/transactions')
+          })
+      }
+      // If still loading, don't clear URL - let it re-run when loading completes
+    }
+  }, [searchParams, transactions, loading, supabase])
 
   useEffect(() => {
     async function loadData() {
@@ -508,28 +535,21 @@ export default function TransactionsPage() {
             </div>
           ))}
 
-          {/* Load More - for visible count within loaded transactions */}
-          {visibleCount < filteredTransactions.length && (
+          {/* Show More Activity - single button like Chase.com */}
+          {(visibleCount < filteredTransactions.length || hasMore) && (
             <div className="pt-6 pb-4 text-center">
               <Button
                 variant="outline"
-                onClick={() => setVisibleCount(prev => prev + 50)}
-                className="rounded-xl px-8"
-              >
-                Show More
-              </Button>
-              <p className="text-xs text-muted-foreground mt-2">
-                Showing {Math.min(visibleCount, filteredTransactions.length)} of {filteredTransactions.length} loaded
-              </p>
-            </div>
-          )}
-
-          {/* Load More from Database */}
-          {visibleCount >= filteredTransactions.length && hasMore && (
-            <div className="pt-6 pb-4 text-center">
-              <Button
-                variant="outline"
-                onClick={loadMoreTransactions}
+                onClick={async () => {
+                  // If we have more loaded transactions to show, reveal them
+                  if (visibleCount < filteredTransactions.length) {
+                    setVisibleCount(prev => prev + 50)
+                  }
+                  // If we're near the end of loaded transactions and there's more in DB, fetch more
+                  if (visibleCount + 50 >= filteredTransactions.length && hasMore && !loadingMore) {
+                    await loadMoreTransactions()
+                  }
+                }}
                 disabled={loadingMore}
                 className="rounded-xl px-8"
               >
@@ -539,17 +559,17 @@ export default function TransactionsPage() {
                     Loading...
                   </>
                 ) : (
-                  'Load More Transactions'
+                  'Show More Activity'
                 )}
               </Button>
               <p className="text-xs text-muted-foreground mt-2">
-                Loaded {transactions.length}{totalCount ? ` of ${totalCount}` : ''} transactions
+                Showing {Math.min(visibleCount, filteredTransactions.length)} of {totalCount || transactions.length} transactions
               </p>
             </div>
           )}
 
           {/* All loaded message */}
-          {!hasMore && transactions.length > 0 && (
+          {visibleCount >= filteredTransactions.length && !hasMore && transactions.length > 0 && (
             <div className="pt-6 pb-4 text-center">
               <p className="text-xs text-muted-foreground">
                 All {transactions.length} transactions loaded

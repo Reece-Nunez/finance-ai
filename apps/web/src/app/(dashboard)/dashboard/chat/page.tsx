@@ -403,7 +403,7 @@ export default function ChatPage() {
     setMessages([])
   }
 
-  const deleteSession = async (sessionId: string, e: React.MouseEvent) => {
+  const deleteSession = async (sessionId: string, e: React.MouseEvent | React.KeyboardEvent) => {
     e.stopPropagation()
     try {
       await fetch(`/api/ai/chat?session_id=${sessionId}`, { method: 'DELETE' })

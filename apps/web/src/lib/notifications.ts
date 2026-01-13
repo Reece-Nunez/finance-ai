@@ -138,7 +138,7 @@ async function checkLowBalances(
           title: `Low Balance: ${account.name}`,
           message: `Your ${account.name} account balance is $${balance.toFixed(2)}. Consider transferring funds to avoid overdraft.`,
           priority: balance < 50 ? 'urgent' : 'high',
-          action_url: '/dashboard/accounts',
+          action_url: `/dashboard/accounts?id=${account.id}`,
           metadata: {
             account_id: account.id,
             balance,
@@ -154,7 +154,7 @@ async function checkLowBalances(
           title: `Overdraft Alert: ${account.name}`,
           message: `Your ${account.name} account is overdrawn by $${Math.abs(balance).toFixed(2)}. Immediate action required.`,
           priority: 'urgent',
-          action_url: '/dashboard/accounts',
+          action_url: `/dashboard/accounts?id=${account.id}`,
           metadata: {
             account_id: account.id,
             balance,
@@ -215,7 +215,7 @@ async function checkBudgetWarnings(
         title: `Budget Exceeded: ${budget.category}`,
         message: `You've spent $${spent.toFixed(0)} of your $${budget.amount} ${budget.category} budget (${Math.round(percentUsed * 100)}%).`,
         priority: 'high',
-        action_url: '/dashboard/budgets',
+        action_url: `/dashboard/budgets?id=${budget.id}`,
         metadata: {
           budget_id: budget.id,
           category: budget.category,
@@ -231,7 +231,7 @@ async function checkBudgetWarnings(
         title: `Budget Warning: ${budget.category}`,
         message: `You've used ${Math.round(percentUsed * 100)}% of your $${budget.amount} ${budget.category} budget. $${(budget.amount - spent).toFixed(0)} remaining.`,
         priority: 'normal',
-        action_url: '/dashboard/budgets',
+        action_url: `/dashboard/budgets?id=${budget.id}`,
         metadata: {
           budget_id: budget.id,
           category: budget.category,
@@ -323,7 +323,7 @@ async function checkUpcomingRecurringPayments(
         title: `Upcoming Payment: ${capitalize(r.merchantName)}`,
         message: `${capitalize(r.merchantName)} (~$${r.averageAmount.toFixed(0)}) is expected ${daysUntil === 0 ? 'today' : daysUntil === 1 ? 'tomorrow' : `in ${daysUntil} days`}.`,
         priority: daysUntil <= 1 ? 'high' : 'normal',
-        action_url: '/dashboard/recurring',
+        action_url: `/dashboard/recurring?merchant=${encodeURIComponent(r.merchantName)}`,
         metadata: {
           merchant: r.merchantName,
           expected_amount: r.averageAmount,
@@ -492,7 +492,7 @@ export async function checkUnusualSpending(
         title: 'Large Withdrawal',
         message: `$${tx.amount.toFixed(0)} spent at ${tx.merchant_name || tx.name}.`,
         priority: 'normal',
-        action_url: '/dashboard/transactions',
+        action_url: `/dashboard/transactions?id=${tx.id}`,
         metadata: {
           transaction_id: tx.id,
           amount: tx.amount,
@@ -514,7 +514,7 @@ export async function checkUnusualSpending(
         title: 'Large Deposit',
         message: `$${Math.abs(tx.amount).toFixed(0)} received from ${tx.merchant_name || tx.name}.`,
         priority: 'low',
-        action_url: '/dashboard/transactions',
+        action_url: `/dashboard/transactions?id=${tx.id}`,
         metadata: {
           transaction_id: tx.id,
           amount: Math.abs(tx.amount),
@@ -535,7 +535,7 @@ export async function checkUnusualSpending(
       title: 'Unusual Transaction',
       message: `$${tx.amount.toFixed(0)} at ${tx.merchant_name || tx.name} is ${Math.round(tx.amount / avgTransaction)}x your average.`,
       priority: 'normal',
-      action_url: '/dashboard/transactions',
+      action_url: `/dashboard/transactions?id=${tx.id}`,
       metadata: {
         transaction_id: tx.id,
         amount: tx.amount,

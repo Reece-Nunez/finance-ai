@@ -13,10 +13,10 @@ const DELETE_RATE_LIMIT = {
   identifier: 'delete-account',
 }
 
-export async function DELETE(request: NextRequest) {
+export async function DELETE(request: NextRequest): Promise<NextResponse> {
   try {
     // Rate limit check
-    const rateLimitResponse = rateLimit(request, DELETE_RATE_LIMIT)
+    const rateLimitResponse = await rateLimit(request, DELETE_RATE_LIMIT)
     if (rateLimitResponse) {
       return rateLimitResponse
     }

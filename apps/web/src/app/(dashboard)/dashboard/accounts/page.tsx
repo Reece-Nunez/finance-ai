@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PlaidLinkButton } from '@/components/plaid/plaid-link-button'
@@ -111,6 +112,7 @@ function formatTimeAgo(dateStr: string) {
 }
 
 export default function AccountsPage() {
+  const searchParams = useSearchParams()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [plaidItems, setPlaidItems] = useState<PlaidItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -121,6 +123,8 @@ export default function AccountsPage() {
   const [editName, setEditName] = useState('')
   const [saving, setSaving] = useState(false)
   const [showHidden, setShowHidden] = useState(false)
+  const [highlightedAccountId, setHighlightedAccountId] = useState<string | null>(null)
+  const accountRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const supabase = createClient()
 
   const fetchData = useCallback(async () => {
@@ -137,6 +141,37 @@ export default function AccountsPage() {
   useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  // Handle deep link from notifications
+  useEffect(() => {
+    const accountId = searchParams.get('id')
+    if (accountId && accounts.length > 0) {
+      // Show hidden accounts if the target is hidden
+      const targetAccount = accounts.find(a => a.id === accountId)
+      if (targetAccount?.hidden) {
+        setShowHidden(true)
+      }
+
+      // Highlight and scroll to the account
+      setHighlightedAccountId(accountId)
+
+      // Scroll to the account after a brief delay to allow render
+      setTimeout(() => {
+        const ref = accountRefs.current[accountId]
+        if (ref) {
+          ref.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }, 100)
+
+      // Clear highlight after 3 seconds
+      setTimeout(() => {
+        setHighlightedAccountId(null)
+      }, 3000)
+
+      // Clear URL
+      window.history.replaceState({}, '', '/dashboard/accounts')
+    }
+  }, [searchParams, accounts])
 
   const handleSync = async (itemId: string) => {
     setSyncing(true)
@@ -347,7 +382,12 @@ export default function AccountsPage() {
                   {itemAccounts.map((account) => (
                     <div
                       key={account.id}
-                      className="flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/50"
+                      ref={(el) => { accountRefs.current[account.id] = el }}
+                      className={`flex items-center justify-between rounded-lg border p-4 transition-all hover:bg-muted/50 ${
+                        highlightedAccountId === account.id
+                          ? 'ring-2 ring-emerald-500 bg-emerald-50 dark:bg-emerald-950/20'
+                          : ''
+                      }`}
                     >
                       <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-600">

@@ -1424,11 +1424,14 @@ export default function RecurringPage() {
     fetchRecurring()
   }, [])
 
-  // Handle highlight param from dashboard navigation
+  // Handle highlight/merchant param from dashboard navigation or notifications
   useEffect(() => {
     const highlightParam = searchParams.get('highlight')
-    if (highlightParam) {
-      setHighlightedName(highlightParam)
+    const merchantParam = searchParams.get('merchant')
+    const targetName = highlightParam || merchantParam
+
+    if (targetName) {
+      setHighlightedName(targetName)
       // Clear the query param from URL without page reload
       window.history.replaceState({}, '', '/dashboard/recurring')
 

@@ -22,7 +22,7 @@ import { Badge } from '@/components/ui/badge'
 import { formatCategory } from '@/lib/format'
 import { SterlingIcon } from '@/components/ui/sterling-icon'
 import {
-  User,
+  User as UserIcon,
   Bell,
   // Sparkles removed - using SterlingIcon for AI features
   Download,
@@ -783,7 +783,7 @@ export default function SettingsPage() {
       <Card>
         <CardHeader className="flex flex-row items-center gap-3">
           <div className="rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 p-2.5">
-            <User className="h-5 w-5 text-white" />
+            <UserIcon className="h-5 w-5 text-white" />
           </div>
           <div className="flex-1">
             <CardTitle>Personal Information</CardTitle>
