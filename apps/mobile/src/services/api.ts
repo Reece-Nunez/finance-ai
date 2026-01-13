@@ -9,6 +9,15 @@ import type {
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://joinsterling.com'
 
+// Retry configuration
+const RETRY_CONFIG = {
+  maxAttempts: 3,
+  baseDelayMs: 1000,
+  maxDelayMs: 30000,
+  jitterFactor: 0.3,
+  retryableStatuses: [408, 429, 500, 502, 503, 504],
+}
+
 class ApiError extends Error {
   status: number
   data: unknown
@@ -21,6 +30,35 @@ class ApiError extends Error {
   }
 }
 
+function isRetryableError(error: unknown): boolean {
+  // Network errors are retryable
+  if (error instanceof TypeError) {
+    const message = error.message.toLowerCase()
+    if (
+      message.includes('fetch') ||
+      message.includes('network') ||
+      message.includes('failed to fetch')
+    ) {
+      return true
+    }
+  }
+
+  // Check ApiError status codes
+  if (error instanceof ApiError) {
+    return RETRY_CONFIG.retryableStatuses.includes(error.status)
+  }
+
+  return false
+}
+
+function calculateDelay(attempt: number): number {
+  const exponentialDelay =
+    RETRY_CONFIG.baseDelayMs * Math.pow(2, attempt - 1)
+  const cappedDelay = Math.min(exponentialDelay, RETRY_CONFIG.maxDelayMs)
+  const jitter = cappedDelay * RETRY_CONFIG.jitterFactor * Math.random()
+  return Math.floor(cappedDelay + jitter)
+}
+
 async function apiClient<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -31,22 +69,54 @@ async function apiClient<T>(
     throw new ApiError(401, 'Not authenticated')
   }
 
-  const response = await fetch(`${API_URL}/api${endpoint}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...options.headers,
-    },
-  })
+  let lastError: Error = new Error('Unknown error')
 
-  const data = await response.json()
+  for (let attempt = 1; attempt <= RETRY_CONFIG.maxAttempts; attempt++) {
+    try {
+      const response = await fetch(`${API_URL}/api${endpoint}`, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          ...options.headers,
+        },
+      })
 
-  if (!response.ok) {
-    throw new ApiError(response.status, data.error || 'Request failed', data)
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new ApiError(
+          response.status,
+          data.error || 'Request failed',
+          data
+        )
+      }
+
+      return data
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+
+      // Don't retry non-retryable errors
+      if (!isRetryableError(error)) {
+        throw lastError
+      }
+
+      // Don't wait after last attempt
+      if (attempt === RETRY_CONFIG.maxAttempts) {
+        break
+      }
+
+      const delayMs = calculateDelay(attempt)
+      console.log(
+        `[API] Retry attempt ${attempt}/${RETRY_CONFIG.maxAttempts} for ${endpoint} after ${delayMs}ms:`,
+        lastError.message
+      )
+
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
   }
 
-  return data
+  throw lastError
 }
 
 // API methods

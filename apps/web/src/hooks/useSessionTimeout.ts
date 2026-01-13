@@ -22,8 +22,10 @@ export function useSessionTimeout(options: UseSessionTimeoutOptions = {}) {
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null)
   const [showWarning, setShowWarning] = useState(false)
 
-  const lastActivityRef = useRef<number>(Date.now())
-  const sessionStartRef = useRef<number>(Date.now())
+  // Initialize refs with 0 to avoid calling impure Date.now() during render
+  // Actual timestamp is set in useEffect on mount
+  const lastActivityRef = useRef<number>(0)
+  const sessionStartRef = useRef<number>(0)
   const warningShownRef = useRef<boolean>(false)
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const isExtendedSessionRef = useRef<boolean>(false)

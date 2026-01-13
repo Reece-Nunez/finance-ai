@@ -48,6 +48,9 @@ export type AuditAction =
   | 'admin.user_modified'
   | 'admin.user_deleted'
   | 'admin.settings_changed'
+  | 'admin.backup_status_checked'
+  | 'admin.backup_triggered'
+  | 'admin.backup_failed'
   // Security events
   | 'security.suspicious_activity'
   | 'security.rate_limited'

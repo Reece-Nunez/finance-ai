@@ -3,6 +3,8 @@ import { Plus_Jakarta_Sans, JetBrains_Mono, Playfair_Display } from "next/font/g
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { CookieConsentBanner } from "@/components/cookie-consent-banner";
+import { SkipLink } from "@/components/ui/skip-link";
 
 const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-sans",
@@ -36,6 +38,7 @@ export default function RootLayout({
       <body
         className={`${plusJakarta.variable} ${jetbrainsMono.variable} ${playfair.variable} antialiased`}
       >
+        <SkipLink />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -44,6 +47,7 @@ export default function RootLayout({
         >
           {children}
           <Toaster position="top-right" richColors closeButton />
+          <CookieConsentBanner />
         </ThemeProvider>
       </body>
     </html>

@@ -9,6 +9,13 @@ import { BarChart3, TrendingUp, PieChart, Calendar } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 
+interface Transaction {
+  date: string
+  amount: number
+  category?: string
+  ai_category?: string
+}
+
 export default async function AnalyticsPage() {
   const supabase = await createClient()
 
@@ -135,7 +142,7 @@ export default async function AnalyticsPage() {
 
 // Helper functions to process transaction data
 
-function processSpendingByCategory(transactions: any[]) {
+function processSpendingByCategory(transactions: Transaction[]) {
   const categoryMap: Record<string, number> = {}
 
   transactions.forEach((tx) => {
@@ -152,7 +159,7 @@ function processSpendingByCategory(transactions: any[]) {
     .slice(0, 10) // Top 10 categories
 }
 
-function processMonthlyComparison(transactions: any[]) {
+function processMonthlyComparison(transactions: Transaction[]) {
   const monthlyMap: Record<string, { income: number; expenses: number }> = {}
 
   transactions.forEach((tx) => {
@@ -188,7 +195,7 @@ function processMonthlyComparison(transactions: any[]) {
     })
 }
 
-function processSpendingOverTime(transactions: any[]) {
+function processSpendingOverTime(transactions: Transaction[]) {
   const weeklyMap: Record<string, { income: number; expenses: number }> = {}
 
   transactions.forEach((tx) => {
@@ -219,7 +226,7 @@ function processSpendingOverTime(transactions: any[]) {
     }))
 }
 
-function processDailySpending(transactions: any[]) {
+function processDailySpending(transactions: Transaction[]) {
   const now = new Date()
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 

@@ -252,7 +252,7 @@ export default function AIReportPage() {
         <div className="text-center py-16">
           <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <h2 className="text-xl font-semibold">Report Not Found</h2>
-          <p className="text-muted-foreground mt-2">This AI categorization report doesn't exist or has been deleted.</p>
+          <p className="text-muted-foreground mt-2">This AI categorization report doesn&apos;t exist or has been deleted.</p>
           <Button onClick={() => router.back()} className="mt-6">
             Go Back
           </Button>
@@ -539,7 +539,7 @@ export default function AIReportPage() {
           <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <h2 className="text-xl font-semibold">No Changes Made</h2>
           <p className="text-muted-foreground mt-2">
-            AI didn't find any transactions to categorize in this run.
+            AI didn&apos;t find any transactions to categorize in this run.
           </p>
         </div>
       )}

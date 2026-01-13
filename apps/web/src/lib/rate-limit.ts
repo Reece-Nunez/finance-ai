@@ -1,19 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Ratelimit } from '@upstash/ratelimit'
 import { log } from './logger'
+import { getRedis, isRedisConfigured } from './redis'
 
-// In-memory store for rate limiting
-// In production, replace with Redis/Upstash for distributed rate limiting
+// ============================================================================
+// In-memory fallback for development (when Redis not configured)
+// ============================================================================
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>()
 
-// Clean up expired entries periodically
-setInterval(() => {
-  const now = Date.now()
-  for (const [key, value] of rateLimitStore.entries()) {
-    if (value.resetTime < now) {
-      rateLimitStore.delete(key)
+// Clean up expired entries periodically (only used when Redis not available)
+if (typeof setInterval !== 'undefined') {
+  setInterval(() => {
+    const now = Date.now()
+    for (const [key, value] of rateLimitStore.entries()) {
+      if (value.resetTime < now) {
+        rateLimitStore.delete(key)
+      }
     }
-  }
-}, 60000) // Clean up every minute
+  }, 60000) // Clean up every minute
+}
+
+// ============================================================================
+// Redis-based rate limiters (used in production)
+// ============================================================================
+let redisRateLimiters: Map<string, Ratelimit> | null = null
+
+function getRedisRateLimiters(): Map<string, Ratelimit> | null {
+  if (!isRedisConfigured()) return null
+
+  if (redisRateLimiters) return redisRateLimiters
+
+  const redis = getRedis()
+  if (!redis) return null
+
+  redisRateLimiters = new Map([
+    ['api', new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(100, '60 s'), prefix: 'rl:api' })],
+    ['auth', new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(5, '60 s'), prefix: 'rl:auth' })],
+    ['ai', new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(20, '60 s'), prefix: 'rl:ai' })],
+    ['plaid', new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '60 s'), prefix: 'rl:plaid' })],
+    ['stripe', new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(30, '60 s'), prefix: 'rl:stripe' })],
+    ['webhook', new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(100, '60 s'), prefix: 'rl:webhook' })],
+    ['strict', new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '60 s'), prefix: 'rl:strict' })],
+  ])
+
+  return redisRateLimiters
+}
 
 export interface RateLimitConfig {
   // Maximum number of requests
@@ -71,13 +102,12 @@ function getClientIdentifier(request: NextRequest): string {
 }
 
 /**
- * Check rate limit for a request
+ * Check rate limit for a request (in-memory fallback)
  */
-export function checkRateLimit(
-  request: NextRequest,
+function checkRateLimitInMemory(
+  clientId: string,
   config: RateLimitConfig
 ): RateLimitResult {
-  const clientId = getClientIdentifier(request)
   const key = `${config.identifier}:${clientId}`
   const now = Date.now()
   const windowMs = config.windowSeconds * 1000
@@ -124,6 +154,61 @@ export function checkRateLimit(
 }
 
 /**
+ * Check rate limit for a request using Redis (if available) or in-memory fallback
+ */
+export async function checkRateLimit(
+  request: NextRequest,
+  config: RateLimitConfig
+): Promise<RateLimitResult> {
+  const clientId = getClientIdentifier(request)
+
+  // Try Redis first
+  const redisLimiters = getRedisRateLimiters()
+  if (redisLimiters) {
+    const limiter = redisLimiters.get(config.identifier)
+    if (limiter) {
+      try {
+        const result = await limiter.limit(clientId)
+
+        if (!result.success) {
+          log.warn('Rate limit exceeded (Redis)', {
+            clientId,
+            identifier: config.identifier,
+            limit: result.limit,
+            remaining: result.remaining,
+          })
+        }
+
+        return {
+          success: result.success,
+          limit: result.limit,
+          remaining: result.remaining,
+          resetTime: result.reset,
+        }
+      } catch (error) {
+        // Redis error - fall back to in-memory
+        log.error('Redis rate limit error, falling back to in-memory', { error })
+      }
+    }
+  }
+
+  // Fallback to in-memory
+  return checkRateLimitInMemory(clientId, config)
+}
+
+/**
+ * Synchronous version for backwards compatibility (uses in-memory only)
+ * @deprecated Use checkRateLimit instead
+ */
+export function checkRateLimitSync(
+  request: NextRequest,
+  config: RateLimitConfig
+): RateLimitResult {
+  const clientId = getClientIdentifier(request)
+  return checkRateLimitInMemory(clientId, config)
+}
+
+/**
  * Create rate limit headers for response
  */
 export function createRateLimitHeaders(result: RateLimitResult): Headers {
@@ -138,11 +223,11 @@ export function createRateLimitHeaders(result: RateLimitResult): Headers {
  * Rate limit middleware for API routes
  * Returns null if allowed, or a Response if rate limited
  */
-export function rateLimit(
+export async function rateLimit(
   request: NextRequest,
   config: RateLimitConfig = RATE_LIMITS.api
-): NextResponse | null {
-  const result = checkRateLimit(request, config)
+): Promise<NextResponse | null> {
+  const result = await checkRateLimit(request, config)
   const headers = createRateLimitHeaders(result)
 
   if (!result.success) {
@@ -170,7 +255,7 @@ export function withRateLimit<T extends NextRequest>(
   config: RateLimitConfig = RATE_LIMITS.api
 ) {
   return async (request: T): Promise<NextResponse> => {
-    const rateLimitResponse = rateLimit(request, config)
+    const rateLimitResponse = await rateLimit(request, config)
     if (rateLimitResponse) {
       return rateLimitResponse
     }
@@ -178,7 +263,7 @@ export function withRateLimit<T extends NextRequest>(
     const response = await handler(request)
 
     // Add rate limit headers to successful responses too
-    const result = checkRateLimit(request, config)
+    const result = await checkRateLimit(request, config)
     const headers = createRateLimitHeaders(result)
     headers.forEach((value, key) => {
       response.headers.set(key, value)

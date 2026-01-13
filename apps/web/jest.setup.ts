@@ -1,4 +1,8 @@
 import '@testing-library/jest-dom'
+import { toHaveNoViolations } from 'jest-axe'
+
+// Extend Jest matchers with accessibility testing
+expect.extend(toHaveNoViolations)
 
 // Mock @sentry/nextjs
 jest.mock('@sentry/nextjs', () => ({

@@ -65,7 +65,7 @@ export function createApiHandler(
     try {
       // 1. Rate limiting
       if (options.rateLimit) {
-        const rateLimitResponse = rateLimit(request, options.rateLimit)
+        const rateLimitResponse = await rateLimit(request, options.rateLimit)
         if (rateLimitResponse) {
           await auditLog({
             action: 'security.rate_limited',

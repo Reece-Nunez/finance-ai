@@ -1,6 +1,27 @@
 import * as Sentry from '@sentry/nextjs'
 
-Sentry.init({
+// Check for analytics consent before initializing Sentry
+function hasAnalyticsConsent(): boolean {
+  if (typeof window === 'undefined') return false
+
+  try {
+    const stored = localStorage.getItem('sterling_cookie_consent')
+    if (!stored) return false
+
+    const consent = JSON.parse(stored)
+    return consent.analytics === true
+  } catch {
+    return false
+  }
+}
+
+// Only initialize Sentry if user has given analytics consent
+// or if we're in development (for testing)
+const shouldInitSentry =
+  process.env.NODE_ENV === 'development' || hasAnalyticsConsent()
+
+if (shouldInitSentry) {
+  Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
 
   // Environment
@@ -61,4 +82,7 @@ Sentry.init({
       blockAllMedia: true,
     }),
   ],
-})
+  })
+} else {
+  console.log('[Sentry] Not initialized - analytics consent not given')
+}

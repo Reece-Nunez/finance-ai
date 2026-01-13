@@ -255,52 +255,56 @@ export async function GET(request: Request) {
       is_income: boolean
     }>)
 
-    // Store spending patterns
-    for (const pattern of analysis.spendingPatterns) {
+    // Store spending patterns - BATCH UPSERT (N+1 fix)
+    if (analysis.spendingPatterns.length > 0) {
+      const spendingPatternRecords = analysis.spendingPatterns.map(pattern => ({
+        user_id: user.id,
+        pattern_type: pattern.patternType,
+        dimension_key: pattern.dimensionKey,
+        category: pattern.category,
+        average_amount: pattern.averageAmount,
+        median_amount: pattern.medianAmount,
+        std_deviation: pattern.stdDeviation,
+        min_amount: pattern.minAmount,
+        max_amount: pattern.maxAmount,
+        occurrence_count: pattern.occurrenceCount,
+        confidence_score: pattern.confidenceScore,
+        weight: pattern.weight,
+        data_points_used: pattern.dataPointsUsed,
+        months_of_data: pattern.monthsOfData,
+        last_calculated_at: new Date().toISOString(),
+      }))
+
       await supabase
         .from('spending_patterns')
-        .upsert({
-          user_id: user.id,
-          pattern_type: pattern.patternType,
-          dimension_key: pattern.dimensionKey,
-          category: pattern.category,
-          average_amount: pattern.averageAmount,
-          median_amount: pattern.medianAmount,
-          std_deviation: pattern.stdDeviation,
-          min_amount: pattern.minAmount,
-          max_amount: pattern.maxAmount,
-          occurrence_count: pattern.occurrenceCount,
-          confidence_score: pattern.confidenceScore,
-          weight: pattern.weight,
-          data_points_used: pattern.dataPointsUsed,
-          months_of_data: pattern.monthsOfData,
-          last_calculated_at: new Date().toISOString(),
-        }, {
+        .upsert(spendingPatternRecords, {
           onConflict: 'user_id,pattern_type,dimension_key,category',
         })
     }
 
-    // Store income patterns
-    for (const income of analysis.incomePatterns) {
+    // Store income patterns - BATCH UPSERT (N+1 fix)
+    if (analysis.incomePatterns.length > 0) {
+      const incomePatternRecords = analysis.incomePatterns.map(income => ({
+        user_id: user.id,
+        source_name: income.sourceName,
+        source_type: income.sourceType,
+        typical_day_of_month: income.typicalDayOfMonth,
+        typical_day_of_week: income.typicalDayOfWeek,
+        frequency: income.frequency,
+        average_amount: income.averageAmount,
+        min_amount: income.minAmount,
+        max_amount: income.maxAmount,
+        variability: income.variability,
+        confidence_score: income.confidenceScore,
+        occurrences_analyzed: income.occurrencesAnalyzed,
+        last_occurrence: income.lastOccurrence,
+        next_expected: income.nextExpected,
+        is_active: true,
+      }))
+
       await supabase
         .from('income_patterns')
-        .upsert({
-          user_id: user.id,
-          source_name: income.sourceName,
-          source_type: income.sourceType,
-          typical_day_of_month: income.typicalDayOfMonth,
-          typical_day_of_week: income.typicalDayOfWeek,
-          frequency: income.frequency,
-          average_amount: income.averageAmount,
-          min_amount: income.minAmount,
-          max_amount: income.maxAmount,
-          variability: income.variability,
-          confidence_score: income.confidenceScore,
-          occurrences_analyzed: income.occurrencesAnalyzed,
-          last_occurrence: income.lastOccurrence,
-          next_expected: income.nextExpected,
-          is_active: true,
-        }, {
+        .upsert(incomePatternRecords, {
           onConflict: 'user_id,source_name',
         })
     }
@@ -357,12 +361,14 @@ export async function GET(request: Request) {
       }
     }
 
-    // Estimate actuals and update predictions
+    // Estimate actuals and update predictions - Use Promise.all for parallel execution (N+1 fix)
     let runningBalance = currentBalance
     const sortedPreds = [...uncomaredPredictions].sort(
       (a, b) => new Date(b.prediction_date).getTime() - new Date(a.prediction_date).getTime()
     )
 
+    // Calculate all updates first, then execute in parallel
+    const updates: Array<{ id: string; data: Record<string, unknown> }> = []
     for (const pred of sortedPreds) {
       const daily = dailyActuals.get(pred.prediction_date)
       const actualIncome = daily?.income || 0
@@ -375,18 +381,28 @@ export async function GET(request: Request) {
         ? (variance / Math.abs(pred.predicted_balance)) * 100
         : 0
 
-      await supabase
-        .from('cash_flow_predictions')
-        .update({
+      updates.push({
+        id: pred.id,
+        data: {
           actual_balance: actualBalance,
           actual_income: actualIncome,
           actual_expenses: actualExpenses,
           actual_recorded_at: new Date().toISOString(),
           variance_amount: variance,
           variance_percentage: variancePercent,
-        })
-        .eq('id', pred.id)
+        },
+      })
     }
+
+    // Execute all updates in parallel
+    await Promise.all(
+      updates.map(({ id, data }) =>
+        supabase
+          .from('cash_flow_predictions')
+          .update(data)
+          .eq('id', id)
+      )
+    )
   }
 
   // Get prediction accuracy to adjust confidence
@@ -518,15 +534,11 @@ export async function GET(request: Request) {
       },
     }))
 
-    // Upsert predictions (update if already exists for this date)
-    for (const pred of predictionsToStore) {
-      await supabase
-        .from('cash_flow_predictions')
-        .upsert(pred, {
-          onConflict: 'user_id,prediction_date,created_at',
-          ignoreDuplicates: true,
-        })
-    }
+    // Upsert predictions - BATCH INSERT (N+1 fix)
+    // Use insert instead of upsert since we want to create new predictions, not update old ones
+    await supabase
+      .from('cash_flow_predictions')
+      .insert(predictionsToStore)
   }
 
   // Get upcoming recurring transactions (next 7 days) for quick view

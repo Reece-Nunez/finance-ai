@@ -207,42 +207,62 @@ export async function GET(request: NextRequest) {
     .sort((a, b) => b.amount - a.amount)
 
   // Get monthly data for the bar chart (last 6 months)
+  // OPTIMIZATION: Single query instead of 6 separate queries (N+1 fix)
+  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1)
+  const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+
+  const { data: allMonthlyTxs } = await supabase
+    .from('transactions')
+    .select('amount, date, category, is_income')
+    .eq('user_id', user.id)
+    .gte('date', sixMonthsAgo.toISOString().split('T')[0])
+    .lte('date', currentMonthEnd.toISOString().split('T')[0])
+    .neq('ignore_type', 'all')
+    .or('ignored.is.null,ignored.eq.false')
+
+  // Group transactions by month in JavaScript (much faster than 6 queries)
+  const monthlyMap = new Map<string, { income: number; bills: number; spending: number }>()
+
+  // Initialize all 6 months
+  for (let i = 5; i >= 0; i--) {
+    const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const key = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`
+    monthlyMap.set(key, { income: 0, bills: 0, spending: 0 })
+  }
+
+  // Aggregate transactions by month
+  ;(allMonthlyTxs || []).forEach((t: { amount: number; date: string; category: string | null; is_income: boolean }) => {
+    const txDate = new Date(t.date)
+    const key = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}`
+    const monthData = monthlyMap.get(key)
+
+    if (monthData) {
+      if (t.amount < 0 || t.is_income) {
+        monthData.income += Math.abs(t.amount)
+      }
+      if (t.amount > 0 && !t.is_income) {
+        monthData.spending += t.amount
+        const cat = (t.category || '').toLowerCase()
+        if (cat.includes('bill') || cat.includes('utilit')) {
+          monthData.bills += t.amount
+        }
+      }
+    }
+  })
+
+  // Convert to array format
   const monthlyData: MonthlyData[] = []
   for (let i = 5; i >= 0; i--) {
     const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0)
-
-    const { data: monthTxs } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('user_id', user.id)
-      .gte('date', monthDate.toISOString().split('T')[0])
-      .lte('date', monthEnd.toISOString().split('T')[0])
-      .neq('ignore_type', 'all')
-
-    const mtxs = monthTxs || []
-
-    const monthIncome = mtxs
-      .filter((t: Transaction) => t.amount < 0 || t.is_income)
-      .reduce((sum: number, t: Transaction) => sum + Math.abs(t.amount), 0)
-
-    const monthBills = mtxs
-      .filter((t: Transaction) => {
-        const cat = (t.category || '').toLowerCase()
-        return t.amount > 0 && (cat.includes('bill') || cat.includes('utilit'))
-      })
-      .reduce((sum: number, t: Transaction) => sum + t.amount, 0)
-
-    const monthSpending = mtxs
-      .filter((t: Transaction) => t.amount > 0 && !t.is_income)
-      .reduce((sum: number, t: Transaction) => sum + t.amount, 0)
+    const key = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`
+    const data = monthlyMap.get(key) || { income: 0, bills: 0, spending: 0 }
 
     monthlyData.push({
       month: monthDate.toLocaleDateString('en-US', { month: 'short' }),
       year: monthDate.getFullYear(),
-      income: monthIncome,
-      bills: monthBills,
-      spending: monthSpending,
+      income: data.income,
+      bills: data.bills,
+      spending: data.spending,
     })
   }
 

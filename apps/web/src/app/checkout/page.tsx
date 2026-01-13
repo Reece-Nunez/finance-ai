@@ -218,9 +218,10 @@ function CheckoutForm({ plan }: { plan: 'monthly' | 'yearly' }) {
       {/* Promo Code */}
       {!promoInfo && (
         <div className="space-y-2">
-          <label className="text-sm font-medium">Have a promo code?</label>
+          <label htmlFor="promo-code" className="text-sm font-medium">Have a promo code?</label>
           <div className="flex gap-2">
             <input
+              id="promo-code"
               type="text"
               value={promoCode}
               onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
@@ -244,11 +245,11 @@ function CheckoutForm({ plan }: { plan: 'monthly' | 'yearly' }) {
 
       {/* Card Input */}
       <div className="space-y-3">
-        <label className="text-sm font-medium flex items-center gap-2">
+        <p className="text-sm font-medium flex items-center gap-2" id="payment-details-label">
           <CreditCard className="h-4 w-4" />
           Payment Details
-        </label>
-        <div className="rounded-lg border bg-white dark:bg-slate-950 p-4">
+        </p>
+        <div className="rounded-lg border bg-white dark:bg-slate-950 p-4" aria-labelledby="payment-details-label">
           <CardElement
             options={{
               style: {

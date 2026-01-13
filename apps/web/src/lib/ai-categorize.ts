@@ -233,13 +233,13 @@ Please categorize these transactions and clean up the names using the account co
 
   try {
     // Remove markdown code blocks if present
-    let cleanedResponse = responseText
+    const cleanedResponse = responseText
       .replace(/```json\s*/gi, '')
       .replace(/```\s*/g, '')
       .trim()
 
     // Find JSON array in response
-    let jsonMatch = cleanedResponse.match(/\[[\s\S]*\]/)
+    const jsonMatch = cleanedResponse.match(/\[[\s\S]*\]/)
 
     // If no complete array found, try to repair truncated JSON
     if (!jsonMatch && cleanedResponse.startsWith('[')) {

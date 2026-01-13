@@ -323,7 +323,7 @@ export async function POST() {
     for (const budget of budgets) {
       // Calculate period dates
       const periodStart = new Date(budget.period_start || today)
-      let periodEnd = new Date(periodStart)
+      const periodEnd = new Date(periodStart)
 
       if (budget.period === 'weekly') {
         periodEnd.setDate(periodEnd.getDate() + 7)

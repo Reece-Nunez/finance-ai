@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import type { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -158,7 +159,7 @@ export default function SettingsPage() {
   const supabase = createClient()
   const { theme, setTheme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -239,6 +240,11 @@ export default function SettingsPage() {
   const [batchTotal, setBatchTotal] = useState(0)
   const [batchProcessed, setBatchProcessed] = useState(0)
   const [batchStarted, setBatchStarted] = useState(false)
+
+  // Delete account state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteConfirmation, setDeleteConfirmation] = useState('')
+  const [isDeleting, setIsDeleting] = useState(false)
   const [loadingBatchCount, setLoadingBatchCount] = useState(false)
   const [categorizationResult, setCategorizationResult] = useState<{
     categorized: number
@@ -719,6 +725,43 @@ export default function SettingsPage() {
     }
     await supabase.auth.signOut()
     window.location.href = '/login?message=logged_out'
+  }
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmation !== 'DELETE') {
+      return
+    }
+
+    setIsDeleting(true)
+    try {
+      const response = await fetch('/api/user/delete', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ confirmation: 'DELETE' }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to delete account')
+      }
+
+      // Clear local storage
+      try {
+        localStorage.clear()
+      } catch {
+        // Ignore errors
+      }
+
+      // Redirect to home with message
+      window.location.href = '/?message=account_deleted'
+    } catch (error) {
+      console.error('Error deleting account:', error)
+      setIsDeleting(false)
+      // Show error in the dialog
+      alert(error instanceof Error ? error.message : 'Failed to delete account. Please try again.')
+    }
   }
 
   if (loading) {
@@ -1473,7 +1516,7 @@ export default function SettingsPage() {
                     <div className="space-y-0.5">
                       <Label>Clean Up Merchant Names</Label>
                       <p className="text-xs text-muted-foreground">
-                        AI normalizes messy merchant names (e.g., "AMZN*123XY" → "Amazon")
+                        AI normalizes messy merchant names (e.g., &quot;AMZN*123XY&quot; → &quot;Amazon&quot;)
                       </p>
                     </div>
                     <Switch
@@ -2154,16 +2197,88 @@ export default function SettingsPage() {
             <p className="text-sm text-muted-foreground mb-3">
               Permanently delete your account and all associated data. This action cannot be undone.
             </p>
-            <Button variant="destructive" className="w-full" disabled>
+            <Button
+              variant="destructive"
+              className="w-full"
+              onClick={() => setDeleteDialogOpen(true)}
+            >
               <Trash2 className="mr-2 h-4 w-4" />
               Delete Account
             </Button>
-            <p className="text-xs text-muted-foreground mt-2">
-              Contact support to delete your account
-            </p>
           </div>
         </CardContent>
       </Card>
+
+      {/* Delete Account Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={(open) => !isDeleting && setDeleteDialogOpen(open)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Delete Account
+            </DialogTitle>
+            <DialogDescription>
+              This action is <strong>permanent and irreversible</strong>. All your data will be deleted including:
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-4">
+            <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+              <li>Your profile and personal information</li>
+              <li>All linked bank accounts and transactions</li>
+              <li>Budgets, spending patterns, and insights</li>
+              <li>AI chat history and reports</li>
+              <li>Any active subscriptions will be cancelled</li>
+            </ul>
+
+            <div className="space-y-2">
+              <Label htmlFor="delete-confirmation" className="text-sm font-medium">
+                Type <span className="font-mono bg-muted px-1 rounded">DELETE</span> to confirm
+              </Label>
+              <Input
+                id="delete-confirmation"
+                value={deleteConfirmation}
+                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                placeholder="DELETE"
+                disabled={isDeleting}
+                className="font-mono"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false)
+                setDeleteConfirmation('')
+              }}
+              disabled={isDeleting}
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteAccount}
+              disabled={deleteConfirmation !== 'DELETE' || isDeleting}
+              className="w-full sm:w-auto"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete My Account
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Batch Categorization Modal */}
       <Dialog open={batchModalOpen} onOpenChange={(open) => !batchStarted && setBatchModalOpen(open)}>

@@ -199,10 +199,18 @@ export function NotificationsDropdown() {
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative"
+          aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+        >
+          <Bell className="h-5 w-5" aria-hidden="true" />
           {unreadCount > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-medium text-white">
+            <span
+              className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-medium text-white"
+              aria-hidden="true"
+            >
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
@@ -218,9 +226,9 @@ export function NotificationsDropdown() {
               className="h-7 w-7 p-0"
               onClick={refreshNotifications}
               disabled={refreshing}
-              title="Check for new notifications"
+              aria-label="Refresh notifications"
             >
-              <RotateCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              <RotateCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} aria-hidden="true" />
             </Button>
             {unreadCount > 0 && (
               <Button
@@ -249,8 +257,9 @@ export function NotificationsDropdown() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <div className="flex items-center justify-center py-8" role="status" aria-live="polite">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
+            <span className="sr-only">Loading notifications</span>
           </div>
         ) : notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -263,9 +272,10 @@ export function NotificationsDropdown() {
         ) : (
           <div className="divide-y">
             {notifications.map((notification) => (
-              <div
+              <button
+                type="button"
                 key={notification.id}
-                className={`flex gap-3 p-3 transition-colors hover:bg-muted/50 cursor-pointer group relative ${
+                className={`flex gap-3 p-3 transition-colors hover:bg-muted/50 cursor-pointer group relative text-left w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset ${
                   !notification.read ? 'bg-emerald-50/50 dark:bg-emerald-950/20' : ''
                 } ${getPriorityColor(notification.priority)}`}
                 onClick={() => {
@@ -275,6 +285,7 @@ export function NotificationsDropdown() {
                     setOpen(false)
                   }
                 }}
+                aria-label={`${notification.title}: ${notification.message}`}
               >
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
                   {getNotificationIcon(notification.type)}
@@ -294,15 +305,18 @@ export function NotificationsDropdown() {
                   {!notification.read && (
                     <div className="flex h-2 w-2 rounded-full bg-emerald-500" />
                   )}
-                  <button
+                  <span
+                    role="button"
+                    tabIndex={0}
                     onClick={(e) => deleteNotification(notification.id, e)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') deleteNotification(notification.id, e) }}
                     className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded"
-                    title="Delete notification"
+                    aria-label={`Delete notification: ${notification.title}`}
                   >
-                    <X className="h-3.5 w-3.5 text-muted-foreground hover:text-red-600" />
-                  </button>
+                    <X className="h-3.5 w-3.5 text-muted-foreground hover:text-red-600" aria-hidden="true" />
+                  </span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}

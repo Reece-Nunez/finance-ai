@@ -126,12 +126,18 @@ const CATEGORY_ICONS: Record<string, typeof Utensils> = {
   dining: Utensils,
 }
 
-function getCategoryIcon(category: string) {
+function getCategoryIcon(category: string): React.ComponentType<{ className?: string }> {
   const lower = category.toLowerCase()
   for (const [key, icon] of Object.entries(CATEGORY_ICONS)) {
     if (lower.includes(key)) return icon
   }
   return MoreHorizontal
+}
+
+// Helper component that renders the category icon
+// Using React.createElement to avoid "component created during render" lint error
+function CategoryIcon({ category, className }: { category: string; className: string }) {
+  return React.createElement(getCategoryIcon(category), { className })
 }
 
 function formatCurrency(amount: number) {
@@ -255,7 +261,12 @@ function BudgetCategoryCard({
   const [isExpanded, setIsExpanded] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editAmount, setEditAmount] = useState(category.budgeted.toString())
-  const Icon = getCategoryIcon(category.category)
+
+  const iconClassName = category.status === 'over'
+    ? 'text-red-600'
+    : category.status === 'warning'
+      ? 'text-amber-600'
+      : 'text-emerald-600'
 
   const handleSave = () => {
     const amount = parseFloat(editAmount)
@@ -290,13 +301,7 @@ function BudgetCategoryCard({
                 ? 'bg-amber-100 dark:bg-amber-900/30'
                 : 'bg-emerald-100 dark:bg-emerald-900/30'
           }`}>
-            <Icon className={`h-6 w-6 ${
-              category.status === 'over'
-                ? 'text-red-600'
-                : category.status === 'warning'
-                  ? 'text-amber-600'
-                  : 'text-emerald-600'
-            }`} />
+            <CategoryIcon category={category.category} className={`h-6 w-6 ${iconClassName}`} />
           </div>
 
           {/* Category Info */}

@@ -604,8 +604,8 @@ export function AnomalyAlerts() {
               </div>
 
               {/* Quick Options */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">What was this for?</label>
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-medium">What was this for?</legend>
                 <div className="grid grid-cols-2 gap-2">
                   {EXPLANATION_OPTIONS.map((option) => (
                     <button
@@ -625,14 +625,15 @@ export function AnomalyAlerts() {
                     </button>
                   ))}
                 </div>
-              </div>
+              </fieldset>
 
               {/* Custom Explanation */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">
+                <label htmlFor="anomaly-explanation" className="text-sm font-medium">
                   {selectedOption ? 'Add more details (optional)' : 'Or describe in your own words'}
                 </label>
                 <textarea
+                  id="anomaly-explanation"
                   value={explanation}
                   onChange={(e) => setExplanation(e.target.value)}
                   placeholder="e.g., Paid contractor with insurance money from house repairs..."

@@ -223,6 +223,8 @@ function DonutChart({
           ref={containerRef}
           className="relative w-[320px] sm:w-[380px] md:w-[500px] lg:w-[580px] xl:w-[450px]"
           onMouseMove={handleMouseMove}
+          role="img"
+          aria-label="Spending breakdown pie chart"
         >
           <svg className="w-full h-auto" viewBox="0 0 300 300">
             {segments.map((segment, idx) => {
@@ -352,6 +354,8 @@ function MonthlyBarChart({
             ref={chartRef}
             className="flex flex-1 items-end justify-around gap-2 h-[180px] relative"
             onMouseMove={handleMouseMove}
+            role="img"
+            aria-label="Daily spending bar chart"
           >
             {/* Floating Tooltip */}
             {hoveredData && (
@@ -636,8 +640,9 @@ export default function SpendingPage() {
       {period === 'custom' && (
         <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/50 rounded-lg">
           <div className="flex items-center gap-2">
-            <label className="text-sm text-muted-foreground">From:</label>
+            <label htmlFor="spending-start-date" className="text-sm text-muted-foreground">From:</label>
             <input
+              id="spending-start-date"
               type="date"
               value={pendingStartDate}
               onChange={(e) => setPendingStartDate(e.target.value)}
@@ -645,8 +650,9 @@ export default function SpendingPage() {
             />
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-sm text-muted-foreground">To:</label>
+            <label htmlFor="spending-end-date" className="text-sm text-muted-foreground">To:</label>
             <input
+              id="spending-end-date"
               type="date"
               value={pendingEndDate}
               onChange={(e) => setPendingEndDate(e.target.value)}

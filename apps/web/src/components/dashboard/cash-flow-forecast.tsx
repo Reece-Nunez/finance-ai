@@ -371,9 +371,12 @@ export function CashFlowForecast() {
               ${forecast.projectedEndBalance.toLocaleString()}
             </p>
           </div>
-          <div
-            className="rounded-lg bg-muted/50 p-3 cursor-pointer hover:bg-muted/70 transition-colors"
+          <button
+            type="button"
+            className="rounded-lg bg-muted/50 p-3 cursor-pointer hover:bg-muted/70 transition-colors text-left w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onClick={() => setShowBreakdown(!showBreakdown)}
+            aria-expanded={showBreakdown}
+            aria-label={showBreakdown ? 'Hide cash flow breakdown' : 'Show why cash flow is changing'}
           >
             <p className="text-xs text-muted-foreground flex items-center justify-between">
               Change
@@ -385,7 +388,7 @@ export function CashFlowForecast() {
               {isPositiveChange ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
               ${Math.abs(balanceChange).toLocaleString()}
             </p>
-          </div>
+          </button>
           <div className="rounded-lg bg-muted/50 p-3">
             <p className="text-xs text-muted-foreground">Lowest Point</p>
             <p className={`text-lg font-semibold ${forecast.lowestBalance < 100 ? 'text-amber-600' : ''}`}>

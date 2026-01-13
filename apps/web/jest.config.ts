@@ -1,11 +1,12 @@
-import nextJest from 'next/jest'
+import nextJest from 'next/jest.js'
+import type { Config } from 'jest'
 
 const createJestConfig = nextJest({
   // Provide the path to your Next.js app to load next.config.js and .env files
   dir: './',
 })
 
-const config = {
+const config: Config = {
   displayName: 'web',
   testEnvironment: 'jsdom',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
@@ -36,6 +37,7 @@ const config = {
   },
   coverageReporters: ['text', 'lcov', 'html'],
   testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/.next/'],
+  modulePathIgnorePatterns: ['<rootDir>/.next/'],
   transformIgnorePatterns: [
     '/node_modules/',
     '^.+\\.module\\.(css|sass|scss)$',

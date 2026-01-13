@@ -30,11 +30,13 @@ export async function GET() {
   }
 
   // Get user's categories
-  let { data: categories, error } = await supabase
+  const result = await supabase
     .from('categories')
     .select('*')
     .order('is_default', { ascending: false })
     .order('name', { ascending: true })
+  let categories = result.data
+  const error = result.error
 
   // If no categories exist, seed defaults
   if (!categories || categories.length === 0) {

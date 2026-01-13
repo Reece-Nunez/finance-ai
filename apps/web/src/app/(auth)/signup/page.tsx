@@ -230,12 +230,16 @@ export default function SignupPage() {
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    We'll use this for account recovery and important alerts
+                    We&apos;ll use this for account recovery and important alerts
                   </p>
                 </div>
 
                 {error && (
-                  <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                  <div
+                    role="alert"
+                    id="step1-error"
+                    className="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400"
+                  >
                     {error}
                   </div>
                 )}
@@ -245,7 +249,7 @@ export default function SignupPage() {
                   className="h-11 w-full bg-gradient-to-r from-slate-500 to-slate-700 hover:from-slate-600 hover:to-slate-800 shadow-lg shadow-slate-500/25"
                 >
                   Continue
-                  <ArrowRight className="ml-2 h-4 w-4" />
+                  <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
                 </Button>
               </>
             ) : (
@@ -254,7 +258,7 @@ export default function SignupPage() {
                 <div className="space-y-2">
                   <Label htmlFor="email">Email Address</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
                     <Input
                       id="email"
                       type="email"
@@ -263,6 +267,8 @@ export default function SignupPage() {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       className="h-11 pl-10"
+                      aria-describedby={error ? 'step2-error' : undefined}
+                      aria-invalid={error ? 'true' : undefined}
                     />
                   </div>
                 </div>
@@ -270,7 +276,7 @@ export default function SignupPage() {
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
                     <Input
                       id="password"
                       type={showPassword ? 'text' : 'password'}
@@ -279,18 +285,21 @@ export default function SignupPage() {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       className="h-11 pl-10 pr-10"
+                      aria-describedby={`password-strength${error ? ' step2-error' : ''}`}
+                      aria-invalid={error ? 'true' : undefined}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                     </button>
                   </div>
                   {password.length > 0 && (
-                    <div className="space-y-1">
-                      <div className="flex gap-1">
+                    <div className="space-y-1" id="password-strength">
+                      <div className="flex gap-1" aria-hidden="true">
                         {[1, 2, 3, 4, 5].map((i) => (
                           <div
                             key={i}
@@ -309,7 +318,7 @@ export default function SignupPage() {
                       <p className={`text-xs ${
                         strength <= 2 ? 'text-red-500' : strength <= 3 ? 'text-yellow-600' : 'text-green-600'
                       }`}>
-                        {label}
+                        Password strength: {label}
                       </p>
                     </div>
                   )}
@@ -338,7 +347,11 @@ export default function SignupPage() {
                 </div>
 
                 {error && (
-                  <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                  <div
+                    role="alert"
+                    id="step2-error"
+                    className="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400"
+                  >
                     {error}
                   </div>
                 )}

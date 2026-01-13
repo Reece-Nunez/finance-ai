@@ -88,10 +88,12 @@ export function RecentTransactions({
           ) : (
             <div className="space-y-2">
               {transactions.map((tx) => (
-                <div
+                <button
                   key={tx.id}
+                  type="button"
                   onClick={() => handleTransactionClick(tx)}
-                  className="flex cursor-pointer items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/50"
+                  className="flex w-full cursor-pointer items-center justify-between rounded-lg border p-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  aria-label={`View details for ${tx.display_name || tx.merchant_name || tx.name}, ${tx.amount < 0 ? 'income' : 'expense'} of ${formatCurrency(Math.abs(tx.amount))}`}
                 >
                   <div className="flex items-center gap-3">
                     <MerchantLogo
@@ -129,7 +131,7 @@ export function RecentTransactions({
                       })}
                     </p>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}

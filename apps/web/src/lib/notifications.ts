@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js'
-import { detectRecurringTransactions, RecurringTransaction } from './recurring'
+import { detectRecurringTransactions } from './recurring'
 
 interface NotificationData {
   type: string
@@ -7,7 +7,7 @@ interface NotificationData {
   message: string
   priority: 'low' | 'normal' | 'high' | 'urgent'
   action_url?: string
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 }
 
 // Thresholds for alerts

@@ -155,69 +155,75 @@ export async function POST(request: Request) {
     // Run pattern analysis
     const analysis = analyzeSpendingPatterns(transactions as Transaction[])
 
-    // Store spending patterns
-    for (const pattern of analysis.spendingPatterns) {
+    // Store spending patterns - BATCH UPSERT (N+1 fix)
+    if (analysis.spendingPatterns.length > 0) {
+      const spendingPatternRecords = analysis.spendingPatterns.map(pattern => ({
+        user_id: user.id,
+        pattern_type: pattern.patternType,
+        dimension_key: pattern.dimensionKey,
+        category: pattern.category,
+        average_amount: pattern.averageAmount,
+        median_amount: pattern.medianAmount,
+        std_deviation: pattern.stdDeviation,
+        min_amount: pattern.minAmount,
+        max_amount: pattern.maxAmount,
+        occurrence_count: pattern.occurrenceCount,
+        confidence_score: pattern.confidenceScore,
+        weight: pattern.weight,
+        data_points_used: pattern.dataPointsUsed,
+        months_of_data: pattern.monthsOfData,
+        last_calculated_at: new Date().toISOString(),
+      }))
+
       await supabase
         .from('spending_patterns')
-        .upsert({
-          user_id: user.id,
-          pattern_type: pattern.patternType,
-          dimension_key: pattern.dimensionKey,
-          category: pattern.category,
-          average_amount: pattern.averageAmount,
-          median_amount: pattern.medianAmount,
-          std_deviation: pattern.stdDeviation,
-          min_amount: pattern.minAmount,
-          max_amount: pattern.maxAmount,
-          occurrence_count: pattern.occurrenceCount,
-          confidence_score: pattern.confidenceScore,
-          weight: pattern.weight,
-          data_points_used: pattern.dataPointsUsed,
-          months_of_data: pattern.monthsOfData,
-          last_calculated_at: new Date().toISOString(),
-        }, {
+        .upsert(spendingPatternRecords, {
           onConflict: 'user_id,pattern_type,dimension_key,category',
         })
     }
 
-    // Store income patterns
-    for (const income of analysis.incomePatterns) {
+    // Store income patterns - BATCH UPSERT (N+1 fix)
+    if (analysis.incomePatterns.length > 0) {
+      const incomePatternRecords = analysis.incomePatterns.map(income => ({
+        user_id: user.id,
+        source_name: income.sourceName,
+        source_type: income.sourceType,
+        typical_day_of_month: income.typicalDayOfMonth,
+        typical_day_of_week: income.typicalDayOfWeek,
+        frequency: income.frequency,
+        average_amount: income.averageAmount,
+        min_amount: income.minAmount,
+        max_amount: income.maxAmount,
+        variability: income.variability,
+        confidence_score: income.confidenceScore,
+        occurrences_analyzed: income.occurrencesAnalyzed,
+        last_occurrence: income.lastOccurrence,
+        next_expected: income.nextExpected,
+        is_active: true,
+      }))
+
       await supabase
         .from('income_patterns')
-        .upsert({
-          user_id: user.id,
-          source_name: income.sourceName,
-          source_type: income.sourceType,
-          typical_day_of_month: income.typicalDayOfMonth,
-          typical_day_of_week: income.typicalDayOfWeek,
-          frequency: income.frequency,
-          average_amount: income.averageAmount,
-          min_amount: income.minAmount,
-          max_amount: income.maxAmount,
-          variability: income.variability,
-          confidence_score: income.confidenceScore,
-          occurrences_analyzed: income.occurrencesAnalyzed,
-          last_occurrence: income.lastOccurrence,
-          next_expected: income.nextExpected,
-          is_active: true,
-        }, {
+        .upsert(incomePatternRecords, {
           onConflict: 'user_id,source_name',
         })
     }
 
-    // Store insights
-    for (const insight of analysis.insights) {
+    // Store insights - BATCH INSERT (N+1 fix)
+    if (analysis.insights.length > 0) {
+      const insightRecords = analysis.insights.map(insight => ({
+        user_id: user.id,
+        insight_type: insight.type,
+        title: insight.title,
+        description: insight.description,
+        related_category: insight.category || null,
+        impact_score: insight.impactScore,
+        actionable: insight.actionable,
+      }))
+
       await supabase
         .from('learning_insights')
-        .insert({
-          user_id: user.id,
-          insight_type: insight.type,
-          title: insight.title,
-          description: insight.description,
-          related_category: insight.category || null,
-          impact_score: insight.impactScore,
-          actionable: insight.actionable,
-        })
+        .insert(insightRecords)
     }
 
     return NextResponse.json({
@@ -239,29 +245,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'predictions array required' }, { status: 400 })
     }
 
-    const inserted = []
-    for (const pred of predictions) {
-      const { data, error } = await supabase
-        .from('cash_flow_predictions')
-        .insert({
-          user_id: user.id,
-          prediction_date: pred.date,
-          predicted_balance: pred.balance,
-          predicted_income: pred.income || 0,
-          predicted_expenses: pred.expenses || 0,
-          predicted_recurring: pred.recurring || 0,
-          predicted_discretionary: pred.discretionary || 0,
-          confidence_score: pred.confidence || 0.5,
-          prediction_factors: pred.factors || null,
-        })
-        .select()
+    // BATCH INSERT (N+1 fix)
+    const predictionRecords = predictions.map(pred => ({
+      user_id: user.id,
+      prediction_date: pred.date,
+      predicted_balance: pred.balance,
+      predicted_income: pred.income || 0,
+      predicted_expenses: pred.expenses || 0,
+      predicted_recurring: pred.recurring || 0,
+      predicted_discretionary: pred.discretionary || 0,
+      confidence_score: pred.confidence || 0.5,
+      prediction_factors: pred.factors || null,
+    }))
 
-      if (!error && data) {
-        inserted.push(data[0])
-      }
+    const { data: inserted, error } = await supabase
+      .from('cash_flow_predictions')
+      .insert(predictionRecords)
+      .select()
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, stored: inserted.length })
+    return NextResponse.json({ success: true, stored: inserted?.length || 0 })
   }
 
   // -------------------------------------------------------------------------
@@ -475,9 +481,11 @@ Format your response as JSON:
 
       const analysis = JSON.parse(sanitizedJson)
 
-      // Update predictions with analysis
-      for (const a of analysis.analyses) {
-        await supabase
+      // Update predictions with analysis - batch by collecting dates and using IN clause
+      // Note: Supabase doesn't support bulk updates with different values per row,
+      // so we use Promise.all for parallel execution instead of sequential (N+1 mitigation)
+      const updatePromises = analysis.analyses.map((a: { date: string; primaryReason: string; isPattern: boolean; recommendedAdjustment: string; unexpectedExpenses: Array<{ name: string; amount: number; shouldPredict: boolean }> }) =>
+        supabase
           .from('cash_flow_predictions')
           .update({
             variance_analyzed: true,
@@ -490,25 +498,44 @@ Format your response as JSON:
           })
           .eq('user_id', user.id)
           .eq('prediction_date', a.date)
+      )
 
-        // Store unexpected expenses for future learning
+      await Promise.all(updatePromises)
+
+      // Collect all unexpected expenses for batch insert (N+1 fix)
+      const unexpectedExpenseRecords: Array<{
+        user_id: string
+        amount: number
+        description: string
+        expense_date: string
+        expense_type: string
+        ai_analysis: string
+        should_predict_future: boolean
+      }> = []
+
+      for (const a of analysis.analyses) {
         if (a.unexpectedExpenses) {
           for (const expense of a.unexpectedExpenses) {
             if (expense.shouldPredict) {
-              await supabase
-                .from('unexpected_expenses')
-                .insert({
-                  user_id: user.id,
-                  amount: expense.amount,
-                  description: expense.name,
-                  expense_date: a.date,
-                  expense_type: a.isPattern ? 'irregular_recurring' : 'one_time',
-                  ai_analysis: a.primaryReason,
-                  should_predict_future: expense.shouldPredict,
-                })
+              unexpectedExpenseRecords.push({
+                user_id: user.id,
+                amount: expense.amount,
+                description: expense.name,
+                expense_date: a.date,
+                expense_type: a.isPattern ? 'irregular_recurring' : 'one_time',
+                ai_analysis: a.primaryReason,
+                should_predict_future: expense.shouldPredict,
+              })
             }
           }
         }
+      }
+
+      // Batch insert unexpected expenses
+      if (unexpectedExpenseRecords.length > 0) {
+        await supabase
+          .from('unexpected_expenses')
+          .insert(unexpectedExpenseRecords)
       }
 
       // Store overall insight

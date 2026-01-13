@@ -595,7 +595,7 @@ export default function ChatPage() {
                 <div>
                   <p className="font-medium">Budget Alert</p>
                   <p className="text-sm text-muted-foreground">
-                    You're over budget in {insights.stats.categoriesOverBudget.length} {insights.stats.categoriesOverBudget.length === 1 ? 'category' : 'categories'}:{' '}
+                    You&apos;re over budget in {insights.stats.categoriesOverBudget.length} {insights.stats.categoriesOverBudget.length === 1 ? 'category' : 'categories'}:{' '}
                     {insights.stats.categoriesOverBudget.slice(0, 3).map(c => formatCategory(c)).join(', ')}
                   </p>
                   <Button
@@ -850,24 +850,30 @@ export default function ChatPage() {
             ) : (
               <div className="space-y-1">
                 {sessions.map((session) => (
-                  <div
+                  <button
+                    type="button"
                     key={session.id}
                     onClick={() => loadSession(session.id)}
-                    className={`group flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                    className={`group flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                       currentSessionId === session.id
                         ? 'bg-slate-100 text-slate-900 dark:bg-slate-900/30 dark:text-slate-100'
                         : 'hover:bg-muted'
                     }`}
+                    aria-label={`Load chat session: ${session.title}`}
                   >
                     <MessageSquare className="h-4 w-4 shrink-0" />
                     <span className="flex-1 truncate text-xs">{session.title}</span>
-                    <button
+                    <span
+                      role="button"
+                      tabIndex={0}
                       onClick={(e) => deleteSession(session.id, e)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') deleteSession(session.id, e) }}
                       className="opacity-0 group-hover:opacity-100 hover:text-red-500"
+                      aria-label={`Delete chat session: ${session.title}`}
                     >
                       <Trash2 className="h-3 w-3" />
-                    </button>
-                  </div>
+                    </span>
+                  </button>
                 ))}
               </div>
             )}

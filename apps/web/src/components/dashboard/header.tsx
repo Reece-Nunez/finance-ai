@@ -75,13 +75,13 @@ export function Header({ user, userName }: HeaderProps) {
       </div>
       <div className="flex items-center gap-1 md:gap-2">
         <NotificationsDropdown />
-        <Button variant="ghost" size="icon" asChild className="h-9 w-9 md:h-10 md:w-10">
+        <Button variant="ghost" size="icon" asChild className="h-9 w-9 md:h-10 md:w-10" aria-label="Account settings">
           <Link href="/dashboard/settings">
-            <User className="h-5 w-5" />
+            <User className="h-5 w-5" aria-hidden="true" />
           </Link>
         </Button>
-        <Button variant="ghost" size="icon" onClick={handleSignOut} className="h-9 w-9 md:h-10 md:w-10">
-          <LogOut className="h-5 w-5" />
+        <Button variant="ghost" size="icon" onClick={handleSignOut} className="h-9 w-9 md:h-10 md:w-10" aria-label="Sign out">
+          <LogOut className="h-5 w-5" aria-hidden="true" />
         </Button>
       </div>
     </header>
