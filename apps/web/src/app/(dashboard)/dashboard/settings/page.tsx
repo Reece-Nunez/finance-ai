@@ -286,6 +286,11 @@ export default function SettingsPage() {
   // Track if notification prefs are being saved
   const [savingNotifications, setSavingNotifications] = useState(false)
 
+  // Sync preferences state
+  const [syncFrequency, setSyncFrequency] = useState<'manual' | 'daily' | 'frequent'>('daily')
+  const [lastAutoSync, setLastAutoSync] = useState<string | null>(null)
+  const [savingSyncPrefs, setSavingSyncPrefs] = useState(false)
+
   useEffect(() => {
     setMounted(true)
   }, [])
@@ -360,6 +365,23 @@ export default function SettingsPage() {
       }
     }
     fetchUsage()
+  }, [])
+
+  // Fetch sync preferences
+  useEffect(() => {
+    async function fetchSyncPrefs() {
+      try {
+        const response = await fetch('/api/user/sync-preferences')
+        if (response.ok) {
+          const data = await response.json()
+          setSyncFrequency(data.sync_frequency || 'daily')
+          setLastAutoSync(data.last_auto_sync)
+        }
+      } catch (error) {
+        console.error('Failed to fetch sync preferences:', error)
+      }
+    }
+    fetchSyncPrefs()
   }, [])
 
   const formatPhoneNumber = (value: string) => {
@@ -707,6 +729,49 @@ export default function SettingsPage() {
       console.error('Failed to export data:', error)
     }
     setExporting(false)
+  }
+
+  const handleSyncFrequencyChange = async (frequency: 'manual' | 'daily' | 'frequent') => {
+    // Check if trying to select Pro feature without Pro
+    if (frequency === 'frequent' && !isPro) {
+      return
+    }
+
+    setSavingSyncPrefs(true)
+    setSyncFrequency(frequency)
+    try {
+      const response = await fetch('/api/user/sync-preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sync_frequency: frequency }),
+      })
+      if (response.ok) {
+        const data = await response.json()
+        if (data.downgraded) {
+          setSyncFrequency(data.sync_frequency)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to update sync preferences:', error)
+    } finally {
+      setSavingSyncPrefs(false)
+    }
+  }
+
+  const formatSyncTime = (dateString: string | null) => {
+    if (!dateString) return 'Never'
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMins / 60)
+    const diffDays = Math.floor(diffHours / 24)
+
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffHours < 24) return `${diffHours}h ago`
+    if (diffDays < 7) return `${diffDays}d ago`
+    return date.toLocaleDateString()
   }
 
   const handleSignOut = async () => {
@@ -2168,6 +2233,132 @@ export default function SettingsPage() {
             <Button variant="outline" asChild className="flex-1">
               <a href="/auth/reset-password">Change Password</a>
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Account Sync Settings */}
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-3">
+          <div className="rounded-lg bg-gradient-to-br from-cyan-500 to-teal-600 p-2.5">
+            <RefreshCw className="h-5 w-5 text-white" />
+          </div>
+          <div className="flex-1">
+            <CardTitle>Account Sync</CardTitle>
+            <CardDescription>Control how often your accounts sync automatically</CardDescription>
+          </div>
+          {savingSyncPrefs && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Saving...
+            </div>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            {/* Daily Sync Option */}
+            <div
+              className={`rounded-lg border p-4 cursor-pointer transition-all ${
+                syncFrequency === 'daily'
+                  ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20'
+                  : 'hover:bg-muted/50'
+              }`}
+              onClick={() => handleSyncFrequencyChange('daily')}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSyncFrequencyChange('daily') }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${
+                    syncFrequency === 'daily' ? 'border-emerald-500' : 'border-muted-foreground'
+                  }`}>
+                    {syncFrequency === 'daily' && (
+                      <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-medium">Daily</p>
+                    <p className="text-sm text-muted-foreground">Sync once per day automatically</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Frequent Sync Option - Pro Only */}
+            <div
+              className={`rounded-lg border p-4 transition-all ${
+                !isPro
+                  ? 'opacity-60 cursor-not-allowed'
+                  : syncFrequency === 'frequent'
+                  ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 cursor-pointer'
+                  : 'hover:bg-muted/50 cursor-pointer'
+              }`}
+              onClick={() => isPro && handleSyncFrequencyChange('frequent')}
+              role="button"
+              tabIndex={isPro ? 0 : -1}
+              onKeyDown={(e) => { if (isPro && (e.key === 'Enter' || e.key === ' ')) handleSyncFrequencyChange('frequent') }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${
+                    syncFrequency === 'frequent' ? 'border-emerald-500' : 'border-muted-foreground'
+                  }`}>
+                    {syncFrequency === 'frequent' && (
+                      <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-medium flex items-center gap-2">
+                      Every 6 Hours
+                      {!isPro && (
+                        <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50 text-[10px]">
+                          <Crown className="h-3 w-3 mr-0.5" />
+                          Pro
+                        </Badge>
+                      )}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Stay up-to-date with more frequent syncs</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Manual Only Option */}
+            <div
+              className={`rounded-lg border p-4 cursor-pointer transition-all ${
+                syncFrequency === 'manual'
+                  ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20'
+                  : 'hover:bg-muted/50'
+              }`}
+              onClick={() => handleSyncFrequencyChange('manual')}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSyncFrequencyChange('manual') }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${
+                    syncFrequency === 'manual' ? 'border-emerald-500' : 'border-muted-foreground'
+                  }`}>
+                    {syncFrequency === 'manual' && (
+                      <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-medium">Manual Only</p>
+                    <p className="text-sm text-muted-foreground">Only sync when you click the sync button</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Last automatic sync:</span>
+            <span className="font-medium">{formatSyncTime(lastAutoSync)}</span>
           </div>
         </CardContent>
       </Card>

@@ -51,6 +51,10 @@ export type AuditAction =
   | 'admin.backup_status_checked'
   | 'admin.backup_triggered'
   | 'admin.backup_failed'
+  // Cron jobs
+  | 'cron.sync_accounts'
+  | 'cron.completed'
+  | 'cron.failed'
   // Security events
   | 'security.suspicious_activity'
   | 'security.rate_limited'
