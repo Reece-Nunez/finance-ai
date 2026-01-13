@@ -17,6 +17,8 @@ export default async function DashboardPage() {
     supabase
       .from('transactions')
       .select('*')
+      .neq('ignore_type', 'all')
+      .or('ignored.is.null,ignored.eq.false')
       .order('date', { ascending: false })
       .limit(200),
     supabase
@@ -47,11 +49,11 @@ export default async function DashboardPage() {
   const monthTransactions = allTransactions.filter(t => t.date >= startOfMonth)
 
   const earnings = monthTransactions
-    .filter((t) => t.amount < 0)
+    .filter((t) => t.amount < 0 || t.is_income)
     .reduce((sum, t) => sum + Math.abs(t.amount), 0)
 
   const spending = monthTransactions
-    .filter((t) => t.amount > 0)
+    .filter((t) => t.amount > 0 && !t.is_income)
     .reduce((sum, t) => sum + t.amount, 0)
 
   const hasAccounts = accounts.length > 0

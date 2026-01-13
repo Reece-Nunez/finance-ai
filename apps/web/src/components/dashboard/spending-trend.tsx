@@ -19,6 +19,8 @@ interface Transaction {
   id: string
   amount: number
   date: string
+  is_income?: boolean
+  ignore_type?: string
 }
 
 interface SpendingTrendProps {
@@ -63,7 +65,9 @@ export function SpendingTrend({ transactions }: SpendingTrendProps) {
     let lastMonthTotal = 0
 
     transactions.forEach((tx) => {
-      if (tx.amount <= 0) return // Skip income
+      // Skip income (negative amounts or is_income flag)
+      if (tx.amount <= 0) return
+      if (tx.is_income) return
 
       const txDate = new Date(tx.date)
       const txMonth = txDate.getMonth()
