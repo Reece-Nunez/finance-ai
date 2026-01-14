@@ -287,18 +287,19 @@ export async function GET(request: NextRequest) {
       average: data.total / data.count,
     }))
     .sort((a, b) => b.count - a.count)
-    .slice(0, 5)
+    .slice(0, 50) // Return top 50 for the detailed view
 
-  // Get largest purchases
+  // Get largest purchases (top 50 for detailed view)
   const largestPurchases = txs
-    .filter((t: Transaction) => t.amount > 0)
+    .filter((t: Transaction) => t.amount > 0 && !t.is_income)
     .sort((a: Transaction, b: Transaction) => b.amount - a.amount)
-    .slice(0, 5)
+    .slice(0, 50)
     .map((t: Transaction) => ({
       id: t.id,
       name: t.display_name || t.merchant_name || t.name,
       amount: t.amount,
       date: t.date,
+      category: t.category,
     }))
 
   return NextResponse.json({

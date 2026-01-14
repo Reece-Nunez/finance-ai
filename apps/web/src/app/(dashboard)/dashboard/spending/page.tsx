@@ -8,6 +8,21 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { formatCategory } from '@/lib/format'
 import {
   ChevronLeft,
@@ -16,6 +31,7 @@ import {
   TrendingDown,
   ArrowUp,
   ArrowDown,
+  ArrowUpDown,
   Pencil,
   DollarSign,
   CreditCard,
@@ -32,6 +48,11 @@ import {
   MoreHorizontal,
   PlusCircle,
   MinusCircle,
+  Search,
+  Store,
+  Calendar,
+  Hash,
+  ExternalLink,
 } from 'lucide-react'
 
 interface MonthlyData {
@@ -62,6 +83,7 @@ interface LargestPurchase {
   name: string
   amount: number
   date: string
+  category?: string | null
 }
 
 interface SpendingData {
@@ -533,6 +555,18 @@ export default function SpendingPage() {
   const [selectedMonth, setSelectedMonth] = useState(5) // Current month (last in array)
   const [includeBills, setIncludeBills] = useState(true)
 
+  // Sheet state for detailed views
+  const [frequentSpendOpen, setFrequentSpendOpen] = useState(false)
+  const [largestPurchasesOpen, setLargestPurchasesOpen] = useState(false)
+
+  // Frequent spend sorting and search
+  const [merchantSearch, setMerchantSearch] = useState('')
+  const [merchantSort, setMerchantSort] = useState<'count' | 'total' | 'average'>('count')
+
+  // Largest purchases sorting and filtering
+  const [purchaseSort, setPurchaseSort] = useState<'amount' | 'date'>('amount')
+  const [purchaseCategoryFilter, setPurchaseCategoryFilter] = useState<string>('all')
+
   // Custom date range state - separate "pending" dates from "applied" dates
   const [pendingStartDate, setPendingStartDate] = useState(() => {
     const date = new Date()
@@ -613,12 +647,74 @@ export default function SpendingPage() {
     )
   }
 
+  // Filtered and sorted merchants for the sheet
+  const filteredMerchants = data.frequentMerchants
+    .filter(m => m.name.toLowerCase().includes(merchantSearch.toLowerCase()))
+    .sort((a, b) => {
+      switch (merchantSort) {
+        case 'total':
+          return b.total - a.total
+        case 'average':
+          return b.average - a.average
+        case 'count':
+        default:
+          return b.count - a.count
+      }
+    })
+
+  // Get unique categories for filter dropdown
+  const purchaseCategories = Array.from(
+    new Set(data.largestPurchases.map(p => p.category || 'Uncategorized'))
+  ).sort()
+
+  // Filtered and sorted purchases for the sheet
+  const filteredPurchases = data.largestPurchases
+    .filter(p => purchaseCategoryFilter === 'all' || (p.category || 'Uncategorized') === purchaseCategoryFilter)
+    .sort((a, b) => {
+      if (purchaseSort === 'date') {
+        return new Date(b.date).getTime() - new Date(a.date).getTime()
+      }
+      return b.amount - a.amount
+    })
+
+  // Handle clicking a purchase to view in transactions
+  const handlePurchaseClick = (purchaseId: string) => {
+    router.push(`/dashboard/transactions?id=${purchaseId}`)
+    setLargestPurchasesOpen(false)
+  }
+
+  // Handle clicking a merchant to see their transactions
+  const handleMerchantClick = (merchantName: string) => {
+    router.push(`/dashboard/transactions?search=${encodeURIComponent(merchantName)}`)
+    setFrequentSpendOpen(false)
+  }
+
+  // Bill-related category patterns to filter out when "Include bills" is off
+  const BILL_PATTERNS = [
+    'bill',
+    'utilit',
+    'rent',
+    'mortgage',
+    'insurance',
+    'loan',
+    'subscription',
+  ]
+
   const filteredCategories = includeBills
     ? data.categories
     : data.categories.filter(c => {
         const lower = c.category.toLowerCase()
-        return !lower.includes('bill') && !lower.includes('utilit')
+        return !BILL_PATTERNS.some(pattern => lower.includes(pattern))
       })
+
+  // Calculate filtered total spend (recalculate percentages when bills are excluded)
+  const filteredTotalSpend = filteredCategories.reduce((sum, c) => sum + c.amount, 0)
+
+  // Recalculate percentages based on filtered total
+  const filteredCategoriesWithPercentages = filteredCategories.map(c => ({
+    ...c,
+    percentage: filteredTotalSpend > 0 ? Math.round((c.amount / filteredTotalSpend) * 100) : 0,
+  }))
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -697,8 +793,8 @@ export default function SpendingPage() {
             </CardHeader>
             <CardContent>
               <DonutChart
-                categories={filteredCategories}
-                totalSpend={data.summary.spending}
+                categories={filteredCategoriesWithPercentages}
+                totalSpend={filteredTotalSpend}
                 spendingChange={data.summary.spendingChange}
                 includeBills={includeBills}
                 onIncludeBillsChange={setIncludeBills}
@@ -711,7 +807,7 @@ export default function SpendingPage() {
           <Card>
             <CardContent className="pt-6">
               <CategoryList
-                categories={filteredCategories}
+                categories={filteredCategoriesWithPercentages}
                 onCategoryClick={handleCategoryClick}
               />
             </CardContent>
@@ -843,8 +939,12 @@ export default function SpendingPage() {
                       </div>
                     ))}
                   </div>
-                  <Button variant="outline" className="w-full mt-4">
-                    See more
+                  <Button
+                    variant="outline"
+                    className="w-full mt-4"
+                    onClick={() => setFrequentSpendOpen(true)}
+                  >
+                    See all {data.frequentMerchants.length} merchants
                   </Button>
                 </>
               ) : (
@@ -888,8 +988,12 @@ export default function SpendingPage() {
                       </div>
                     ))}
                   </div>
-                  <Button variant="outline" className="w-full mt-4">
-                    See more
+                  <Button
+                    variant="outline"
+                    className="w-full mt-4"
+                    onClick={() => setLargestPurchasesOpen(true)}
+                  >
+                    See all {data.largestPurchases.length} purchases
                   </Button>
                 </>
               ) : (
@@ -899,6 +1003,203 @@ export default function SpendingPage() {
           </Card>
         </div>
       </div>
+
+      {/* Frequent Spend Sheet */}
+      <Sheet open={frequentSpendOpen} onOpenChange={setFrequentSpendOpen}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Store className="h-5 w-5" />
+              Frequent Merchants
+            </SheetTitle>
+            <SheetDescription>
+              All merchants you&apos;ve visited during this period, sorted by frequency
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-6 space-y-4">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search merchants..."
+                value={merchantSearch}
+                onChange={(e) => setMerchantSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            {/* Sort */}
+            <div className="flex items-center gap-2">
+              <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Sort by:</span>
+              <Select value={merchantSort} onValueChange={(v) => setMerchantSort(v as 'count' | 'total' | 'average')}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="count">Frequency</SelectItem>
+                  <SelectItem value="total">Total Spent</SelectItem>
+                  <SelectItem value="average">Average</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Summary */}
+            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+              <span className="text-sm text-muted-foreground">
+                {filteredMerchants.length} merchant{filteredMerchants.length !== 1 ? 's' : ''}
+              </span>
+              <span className="text-sm font-medium">
+                Total: {formatCurrency(filteredMerchants.reduce((sum, m) => sum + m.total, 0))}
+              </span>
+            </div>
+
+            {/* Merchant List */}
+            <div className="space-y-2">
+              {filteredMerchants.map((merchant, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleMerchantClick(merchant.name)}
+                  className="w-full flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors text-left group"
+                >
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 shrink-0">
+                      <Store className="h-5 w-5 text-slate-600 dark:text-slate-300" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate">{merchant.name}</p>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Hash className="h-3 w-3" />
+                          {merchant.count} visit{merchant.count !== 1 ? 's' : ''}
+                        </span>
+                        <span>Avg: {formatCurrency(merchant.average)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-semibold">{formatCurrency(merchant.total)}</span>
+                    <ExternalLink className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </button>
+              ))}
+              {filteredMerchants.length === 0 && (
+                <p className="text-center text-sm text-muted-foreground py-8">
+                  No merchants found matching your search
+                </p>
+              )}
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Largest Purchases Sheet */}
+      <Sheet open={largestPurchasesOpen} onOpenChange={setLargestPurchasesOpen}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Largest Purchases
+            </SheetTitle>
+            <SheetDescription>
+              Your biggest expenses during this period
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-6 space-y-4">
+            {/* Filters */}
+            <div className="flex flex-wrap gap-3">
+              {/* Sort */}
+              <div className="flex items-center gap-2">
+                <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                <Select value={purchaseSort} onValueChange={(v) => setPurchaseSort(v as 'amount' | 'date')}>
+                  <SelectTrigger className="w-[120px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="amount">Amount</SelectItem>
+                    <SelectItem value="date">Date</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Category Filter */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Category:</span>
+                <Select value={purchaseCategoryFilter} onValueChange={setPurchaseCategoryFilter}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {purchaseCategories.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {formatCategory(cat)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Summary */}
+            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+              <span className="text-sm text-muted-foreground">
+                {filteredPurchases.length} purchase{filteredPurchases.length !== 1 ? 's' : ''}
+              </span>
+              <span className="text-sm font-medium">
+                Total: {formatCurrency(filteredPurchases.reduce((sum, p) => sum + p.amount, 0))}
+              </span>
+            </div>
+
+            {/* Purchase List */}
+            <div className="space-y-2">
+              {filteredPurchases.map((purchase, idx) => (
+                <button
+                  key={purchase.id}
+                  onClick={() => handlePurchaseClick(purchase.id)}
+                  className="w-full flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors text-left group"
+                >
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 shrink-0">
+                      <span className="text-sm font-bold text-amber-600 dark:text-amber-400">
+                        #{idx + 1}
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate">{purchase.name}</p>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {new Date(purchase.date).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </span>
+                        {purchase.category && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                            {formatCategory(purchase.category)}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-semibold text-lg">{formatCurrency(purchase.amount)}</span>
+                    <ExternalLink className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </button>
+              ))}
+              {filteredPurchases.length === 0 && (
+                <p className="text-center text-sm text-muted-foreground py-8">
+                  No purchases found for this category
+                </p>
+              )}
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
