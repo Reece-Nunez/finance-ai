@@ -58,6 +58,9 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   output: 'standalone',
 
+  // Fix for Amplify bundling issue with import-in-the-middle
+  serverExternalPackages: ['import-in-the-middle'],
+
   // Performance: Optimize package imports to reduce bundle size
   experimental: {
     optimizePackageImports: [
