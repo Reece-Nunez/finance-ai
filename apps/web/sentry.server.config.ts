@@ -18,9 +18,6 @@ Sentry.init({
   // Disable ESM loader hooks to fix Amplify bundling issues
   registerEsmLoaderHooks: false,
 
-  // Disable all auto-instrumentation to prevent OpenTelemetry usage
-  autoSessionTracking: false,
-
   // Empty integrations to prevent any auto-instrumentation
   integrations: [],
 
