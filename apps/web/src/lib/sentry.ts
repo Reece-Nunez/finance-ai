@@ -1,42 +1,52 @@
-import * as Sentry from '@sentry/nextjs'
+// Sentry temporarily disabled for Amplify deployment compatibility
+// TODO: Re-enable once AWS fixes OpenTelemetry bundling issues
 
-// Helper to capture exceptions with context
+// No-op helper functions that maintain the same API
 export function captureException(
-  error: Error,
-  context?: Record<string, unknown>
+  _error: Error,
+  _context?: Record<string, unknown>
 ) {
-  Sentry.withScope((scope) => {
-    if (context) {
-      scope.setExtras(context)
-    }
-    Sentry.captureException(error)
-  })
-}
-
-// Helper to capture messages
-export function captureMessage(
-  message: string,
-  level: Sentry.SeverityLevel = 'info'
-) {
-  Sentry.captureMessage(message, level)
-}
-
-// Helper to set user context
-export function setUser(user: { id: string; email?: string } | null) {
-  if (user) {
-    Sentry.setUser({
-      id: user.id,
-      email: user.email,
-    })
-  } else {
-    Sentry.setUser(null)
+  // No-op: Sentry disabled
+  if (process.env.NODE_ENV === 'development') {
+    console.error('[Sentry disabled]', _error)
   }
 }
 
-// Helper to add breadcrumb
-export function addBreadcrumb(breadcrumb: Sentry.Breadcrumb) {
-  Sentry.addBreadcrumb(breadcrumb)
+export function captureMessage(
+  _message: string,
+  _level: 'fatal' | 'error' | 'warning' | 'log' | 'info' | 'debug' = 'info'
+) {
+  // No-op: Sentry disabled
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[Sentry disabled]', _message)
+  }
 }
 
-// Export Sentry for direct access when needed
-export { Sentry }
+export function setUser(_user: { id: string; email?: string } | null) {
+  // No-op: Sentry disabled
+}
+
+export function addBreadcrumb(_breadcrumb: {
+  category?: string
+  message?: string
+  level?: string
+  data?: Record<string, unknown>
+}) {
+  // No-op: Sentry disabled
+}
+
+// Export a mock Sentry object for direct access compatibility
+export const Sentry = {
+  captureException,
+  captureMessage,
+  setUser,
+  addBreadcrumb,
+  withScope: (callback: (scope: unknown) => void) => {
+    callback({
+      setExtras: () => {},
+      setExtra: () => {},
+      setTag: () => {},
+      setTags: () => {},
+    })
+  },
+}

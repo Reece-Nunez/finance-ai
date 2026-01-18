@@ -58,21 +58,6 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   output: 'standalone',
 
-  // Fix for Amplify bundling issue with import-in-the-middle (used by Sentry/OpenTelemetry)
-  serverExternalPackages: [
-    'import-in-the-middle',
-    'require-in-the-middle',
-    '@opentelemetry/instrumentation',
-    '@opentelemetry/api',
-    '@opentelemetry/core',
-    '@opentelemetry/sdk-trace-base',
-    '@opentelemetry/semantic-conventions',
-    '@opentelemetry/resources',
-    '@opentelemetry/context-async-hooks',
-    '@sentry/node',
-    '@sentry/opentelemetry',
-  ],
-
   // Performance: Optimize package imports to reduce bundle size
   experimental: {
     optimizePackageImports: [
