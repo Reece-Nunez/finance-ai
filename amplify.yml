@@ -5,6 +5,9 @@ applications:
       phases:
         preBuild:
           commands:
+            - echo "=== Cleaning previous build artifacts ==="
+            - rm -rf .next
+            - rm -rf amplify-compute-bundle-output
             - npm ci --prefix ../..
         build:
           commands:
