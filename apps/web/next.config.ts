@@ -56,7 +56,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
-  output: 'standalone',
+  // Note: 'standalone' output removed due to Amplify bundler EEXIST bug
+  // Amplify's compute bundler has race conditions when copying node_modules
 
   // Performance: Optimize package imports to reduce bundle size
   experimental: {
