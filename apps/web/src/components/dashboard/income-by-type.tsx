@@ -52,7 +52,7 @@ function formatCurrency(amount: number) {
 export function IncomeByType({ byType, totalActual }: IncomeByTypeProps) {
   const chartData = useMemo(() => {
     return Object.entries(byType)
-      .filter(([_, data]) => data.actualThisMonth > 0)
+      .filter(([, data]) => data.actualThisMonth > 0)
       .map(([type, data]) => ({
         name: TYPE_LABELS[type] || type,
         value: data.actualThisMonth,
@@ -117,7 +117,7 @@ export function IncomeByType({ byType, totalActual }: IncomeByTypeProps) {
               <Legend
                 verticalAlign="bottom"
                 height={36}
-                formatter={(value, entry) => (
+                formatter={(value) => (
                   <span className="text-xs text-muted-foreground">{value}</span>
                 )}
               />

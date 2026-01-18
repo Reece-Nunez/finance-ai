@@ -356,11 +356,11 @@ export function RecurringReviewModal({
 
             {/* Denial reason selector */}
             <div className="py-3 border-t">
-              <label className="text-sm text-muted-foreground block mb-2">
+              <label htmlFor="denial-reason" className="text-sm text-muted-foreground block mb-2">
                 If denying, select reason:
               </label>
               <Select value={denialReason} onValueChange={setDenialReason}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger id="denial-reason" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
