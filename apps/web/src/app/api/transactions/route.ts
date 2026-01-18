@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
   const filter = searchParams.get('filter') || 'all'
   const period = searchParams.get('period')
   const search = searchParams.get('search')
+  const includeIgnored = searchParams.get('include_ignored') === 'true'
 
   let query = supabase
     .from('transactions')
@@ -38,6 +39,11 @@ export async function GET(request: NextRequest) {
     .eq('user_id', user.id)
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
+
+  // Exclude ignored transactions by default
+  if (!includeIgnored) {
+    query = query.or('ignored.is.null,ignored.eq.false')
+  }
 
   // Apply filter
   if (filter === 'income') {

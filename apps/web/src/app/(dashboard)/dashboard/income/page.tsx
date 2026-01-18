@@ -40,6 +40,7 @@ import {
   Building2,
   PiggyBank,
   TrendingUp,
+  TrendingDown,
   Home,
   Plus,
   MoreVertical,
@@ -53,7 +54,13 @@ import {
   Calendar,
   RefreshCw,
   Banknote,
+  ArrowUp,
+  ArrowDown,
+  Clock,
 } from 'lucide-react'
+import { IncomeTrend } from '@/components/dashboard/income-trend'
+import { IncomeByType } from '@/components/dashboard/income-by-type'
+import { YtdIncome } from '@/components/dashboard/ytd-income'
 import { toast } from 'sonner'
 import { MerchantLogo } from '@/components/ui/merchant-logo'
 
@@ -705,18 +712,54 @@ function DetectIncomeModal({
   )
 }
 
+interface UpcomingPayment {
+  sourceId: string
+  name: string
+  amount: number
+  expectedDate: string
+  daysUntil: number
+  incomeType: string
+}
+
+interface Transaction {
+  id: string
+  name: string
+  display_name?: string
+  merchant_name?: string
+  amount: number
+  date: string
+  is_income?: boolean
+  income_type?: string
+  category?: string
+}
+
+interface Stats {
+  actualThisMonth: number
+  actualLastMonth: number
+  actualMonthChange: number
+  transactionCount: number
+  projectedMonthly: number
+  projectedYearly: number
+  ytdTotal: number
+  ytdByMonth: Array<{ month: string; year: number; amount: number }>
+  ytdAvgMonthly: number
+  byType: Record<string, { count: number; actualThisMonth: number; projectedMonthly: number }>
+  monthlyTotal: number
+  yearlyProjection: number
+  sourceCount: number
+}
+
 // Main Page
 export default function IncomePage() {
   const [sources, setSources] = useState<IncomeSource[]>([])
-  const [stats, setStats] = useState<{
-    monthlyTotal: number
-    yearlyProjection: number
-    sourceCount: number
-    byType: Record<string, { count: number; monthly: number; yearly: number }>
-  } | null>(null)
+  const [stats, setStats] = useState<Stats | null>(null)
+  const [recentIncome, setRecentIncome] = useState<Transaction[]>([])
+  const [thisMonthTransactions, setThisMonthTransactions] = useState<Transaction[]>([])
+  const [upcomingPayments, setUpcomingPayments] = useState<UpcomingPayment[]>([])
   const [loading, setLoading] = useState(true)
 
   // Modal states
+  const [incomeSheetOpen, setIncomeSheetOpen] = useState(false)
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [editSource, setEditSource] = useState<IncomeSource | null>(null)
   const [historySource, setHistorySource] = useState<IncomeSource | null>(null)
@@ -735,6 +778,9 @@ export default function IncomePage() {
         const data = await response.json()
         setSources(data.sources || [])
         setStats(data.stats || null)
+        setRecentIncome(data.recentIncome || [])
+        setThisMonthTransactions(data.thisMonthIncome || [])
+        setUpcomingPayments(data.upcomingPayments || [])
       }
     } catch (error) {
       console.error('Error fetching income:', error)
@@ -835,43 +881,129 @@ export default function IncomePage() {
 
       {/* Stats Cards */}
       {stats && (
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card className="bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/30">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {/* This Month (Actual) - Clickable */}
+          <Card
+            className="bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/30 cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => setIncomeSheetOpen(true)}
+          >
             <CardContent className="flex items-center gap-4 p-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/20">
                 <DollarSign className="h-6 w-6 text-emerald-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Monthly Income</p>
-                <p className="text-2xl font-bold text-emerald-600">{formatCurrency(stats.monthlyTotal)}</p>
+                <p className="text-sm text-muted-foreground">This Month</p>
+                <p className="text-2xl font-bold text-emerald-600">{formatCurrency(stats.actualThisMonth)}</p>
+                <p className="text-xs text-muted-foreground">from {stats.transactionCount} transactions - click to view</p>
               </div>
             </CardContent>
           </Card>
 
+          {/* vs Last Month */}
+          <Card className={`bg-gradient-to-br ${stats.actualMonthChange >= 0 ? 'from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30' : 'from-red-50 to-orange-50 dark:from-red-950/30 dark:to-orange-950/30'}`}>
+            <CardContent className="flex items-center gap-4 p-4">
+              <div className={`flex h-12 w-12 items-center justify-center rounded-full ${stats.actualMonthChange >= 0 ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
+                {stats.actualMonthChange >= 0 ? (
+                  <ArrowUp className="h-6 w-6 text-green-600" />
+                ) : (
+                  <ArrowDown className="h-6 w-6 text-red-600" />
+                )}
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">vs Last Month</p>
+                <p className={`text-2xl font-bold ${stats.actualMonthChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {stats.actualMonthChange >= 0 ? '+' : ''}{stats.actualMonthChange}%
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {formatCurrency(Math.abs(stats.actualThisMonth - stats.actualLastMonth))} {stats.actualMonthChange >= 0 ? 'more' : 'less'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Projected Monthly */}
           <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
             <CardContent className="flex items-center gap-4 p-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/20">
                 <TrendingUp className="h-6 w-6 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Yearly Projection</p>
-                <p className="text-2xl font-bold">{formatCurrency(stats.yearlyProjection)}</p>
+                <p className="text-sm text-muted-foreground">Projected Monthly</p>
+                <p className="text-2xl font-bold">{formatCurrency(stats.projectedMonthly)}</p>
+                <p className="text-xs text-muted-foreground">based on {stats.sourceCount} sources</p>
               </div>
             </CardContent>
           </Card>
 
+          {/* Year-to-Date */}
           <Card className="bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-950/30 dark:to-violet-950/30">
             <CardContent className="flex items-center gap-4 p-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-500/20">
-                <Briefcase className="h-6 w-6 text-purple-600" />
+                <Banknote className="h-6 w-6 text-purple-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Income Sources</p>
-                <p className="text-2xl font-bold">{stats.sourceCount}</p>
+                <p className="text-sm text-muted-foreground">Year-to-Date</p>
+                <p className="text-2xl font-bold">{formatCurrency(stats.ytdTotal)}</p>
+                <p className="text-xs text-muted-foreground">avg {formatCurrency(stats.ytdAvgMonthly)}/mo</p>
               </div>
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Charts Row */}
+      {stats && recentIncome.length > 0 && (
+        <div className="grid gap-4 md:grid-cols-2">
+          <IncomeTrend transactions={recentIncome} />
+          <IncomeByType byType={stats.byType} totalActual={stats.actualThisMonth} />
+        </div>
+      )}
+
+      {/* YTD Chart */}
+      {stats && stats.ytdByMonth.length > 0 && (
+        <YtdIncome data={stats.ytdByMonth} avgMonthly={stats.ytdAvgMonthly} />
+      )}
+
+      {/* Upcoming Payments */}
+      {upcomingPayments.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Upcoming Income
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {upcomingPayments.slice(0, 5).map((payment) => {
+                const config = INCOME_TYPES[payment.incomeType as keyof typeof INCOME_TYPES] || INCOME_TYPES.other
+                const Icon = config.icon
+                return (
+                  <div key={payment.sourceId} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-3">
+                      <div className={`rounded-lg p-2 ${config.bgClass}`}>
+                        <Icon className={`h-4 w-4 ${config.textClass}`} />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">{payment.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {payment.daysUntil === 0
+                            ? 'Expected today'
+                            : payment.daysUntil === 1
+                              ? 'Expected tomorrow'
+                              : payment.daysUntil < 0
+                                ? `${Math.abs(payment.daysUntil)} days overdue`
+                                : `in ${payment.daysUntil} days`}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="font-semibold text-green-600">+{formatCurrency(payment.amount)}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Income Sources */}
@@ -940,6 +1072,129 @@ export default function IncomePage() {
           ))}
         </Tabs>
       )}
+
+      {/* Income Transactions Sheet */}
+      <Sheet open={incomeSheetOpen} onOpenChange={setIncomeSheetOpen}>
+        <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-emerald-600" />
+              This Month&apos;s Income
+            </SheetTitle>
+            <p className="text-sm text-muted-foreground">
+              {thisMonthTransactions.length} transactions totaling {formatCurrency(stats?.actualThisMonth || 0)}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Click &quot;Not Income&quot; to exclude transactions that aren&apos;t actually income
+            </p>
+          </SheetHeader>
+
+          <div className="mt-6 space-y-2">
+            {thisMonthTransactions.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No income transactions found this month
+              </div>
+            ) : (
+              thisMonthTransactions.map(tx => {
+                const detectedType = tx.income_type && tx.income_type !== 'none'
+                  ? tx.income_type
+                  : 'other'
+                const config = INCOME_TYPES[detectedType as keyof typeof INCOME_TYPES] || INCOME_TYPES.other
+                const Icon = config.icon
+
+                return (
+                  <div key={tx.id} className="flex items-center gap-3 rounded-lg border p-3">
+                    <div className={`rounded-lg p-2 ${config.bgClass} shrink-0`}>
+                      <Icon className={`h-4 w-4 ${config.textClass}`} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm truncate">
+                        {tx.display_name || tx.merchant_name || tx.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{formatDate(tx.date)}</p>
+                      <p className="text-xs text-muted-foreground truncate" title={tx.name}>
+                        {tx.name}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="font-semibold text-green-600">+{formatCurrency(Math.abs(Number(tx.amount)))}</p>
+                      <Badge variant="secondary" className="text-xs">{config.label}</Badge>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                      onClick={async () => {
+                        try {
+                          // 1. Mark this transaction as not income
+                          const response = await fetch('/api/transactions', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              id: tx.id,
+                              is_income: false,
+                            }),
+                          })
+
+                          if (!response.ok) {
+                            toast.error('Failed to update transaction')
+                            return
+                          }
+
+                          // 2. Create a rule to mark similar transactions as not income
+                          // Extract a pattern from merchant name or transaction name
+                          const merchantName = tx.merchant_name || tx.display_name || ''
+                          const txName = tx.name || ''
+
+                          // Use merchant name if available, otherwise use first few words of name
+                          let pattern = merchantName
+                          if (!pattern) {
+                            // Extract key words from transaction name (skip common prefixes)
+                            const words = txName.toLowerCase()
+                              .replace(/[^a-z0-9\s]/g, '')
+                              .split(/\s+/)
+                              .filter(w => w.length > 2 && !['the', 'and', 'for', 'ach', 'pos', 'deb', 'crd'].includes(w))
+                              .slice(0, 3)
+                            pattern = words.join(' ')
+                          }
+
+                          if (pattern && pattern.length >= 3) {
+                            // Create rule to mark similar transactions as not income
+                            await fetch('/api/transaction-rules', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                match_field: merchantName ? 'merchant_name' : 'name',
+                                match_pattern: pattern.toLowerCase(),
+                                set_as_income: false,
+                                unset_income: true,
+                                apply_to_existing: true,
+                                description: `Auto-created: "${tx.display_name || tx.merchant_name || tx.name}" marked as not income`,
+                              }),
+                            })
+                            toast.success(`Marked as not income. Future "${pattern}" transactions will also be excluded.`)
+                          } else {
+                            toast.success('Transaction marked as not income')
+                          }
+
+                          // Remove from local list
+                          setThisMonthTransactions(prev => prev.filter(t => t.id !== tx.id))
+                          // Refresh data to update totals
+                          fetchIncome()
+                        } catch {
+                          toast.error('Failed to update transaction')
+                        }
+                      }}
+                    >
+                      Not Income
+                    </Button>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Modals */}
       <AddIncomeModal

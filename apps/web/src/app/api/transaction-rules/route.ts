@@ -88,6 +88,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Match pattern is required' }, { status: 400 })
   }
 
+  // If category is INCOME and set_as_income wasn't explicitly set, default to true
+  const finalSetAsIncome = set_as_income !== undefined
+    ? set_as_income
+    : (set_category?.toUpperCase() === 'INCOME' ? true : false)
+
   // Create the rule
   const { data: rule, error } = await supabase
     .from('transaction_rules')
@@ -97,7 +102,7 @@ export async function POST(request: NextRequest) {
       match_pattern,
       display_name,
       set_category,
-      set_as_income: set_as_income || false,
+      set_as_income: finalSetAsIncome,
       set_ignore_type: set_ignore_type || null,
       description,
     })
@@ -113,8 +118,8 @@ export async function POST(request: NextRequest) {
     const updates: Record<string, unknown> = {}
     if (display_name) updates.display_name = display_name
     if (set_category) updates.category = set_category
-    // Handle is_income: set to true if enabled, false if explicitly disabled
-    if (set_as_income === true) {
+    // Handle is_income: set to true if enabled OR if category is INCOME
+    if (finalSetAsIncome || set_category?.toUpperCase() === 'INCOME') {
       updates.is_income = true
     } else if (set_as_income === false && body.unset_income) {
       // Only unset if explicitly requested (to avoid breaking existing behavior)

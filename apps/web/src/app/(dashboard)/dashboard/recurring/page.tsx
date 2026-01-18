@@ -60,6 +60,7 @@ import {
 import { toast } from 'sonner'
 import { SterlingIcon } from '@/components/ui/sterling-icon'
 import { MerchantLogo } from '@/components/ui/merchant-logo'
+import { RecurringReviewModal } from '@/components/dashboard/recurring-review-modal'
 
 interface Transaction {
   id: string
@@ -1402,6 +1403,10 @@ export default function RecurringPage() {
   // Add Recurring Modal state
   const [addRecurringOpen, setAddRecurringOpen] = useState(false)
 
+  // Review suggestions state
+  const [reviewModalOpen, setReviewModalOpen] = useState(false)
+  const [pendingSuggestions, setPendingSuggestions] = useState(0)
+
   useEffect(() => {
     const fetchRecurring = async () => {
       try {
@@ -1413,6 +1418,7 @@ export default function RecurringPage() {
           setYearlySpend(data.yearlySpend || 0)
           setAiPowered(data.aiPowered || false)
           setLastAnalysis(data.lastAnalysis || null)
+          setPendingSuggestions(data.pendingSuggestions || 0)
         }
       } catch (error) {
         console.error('Error fetching recurring:', error)
@@ -1486,15 +1492,20 @@ export default function RecurringPage() {
         setYearlySpend(data.yearlySpend || 0)
         setAiPowered(data.aiPowered || true)
         setLastAnalysis(data.lastAnalysis || new Date().toISOString())
+        setPendingSuggestions(data.pendingSuggestions || 0)
         setAnalysisResult({
-          count: recurringData.length,
+          count: data.newSuggestions || 0,
           message: data.message,
         })
 
-        // Close modal after showing success
+        // Close modal after showing success, then open review if there are suggestions
         setTimeout(() => {
           setAnalysisModalOpen(false)
           setAnalysisStarted(false)
+          // Auto-open review modal if there are new suggestions
+          if (data.pendingSuggestions > 0) {
+            setReviewModalOpen(true)
+          }
         }, 2000)
       } else if (response.status === 403) {
         setAnalysisResult({
@@ -1631,6 +1642,20 @@ export default function RecurringPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {pendingSuggestions > 0 && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setReviewModalOpen(true)}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              Review Suggestions
+              <Badge variant="secondary" className="ml-2 bg-white text-amber-700">
+                {pendingSuggestions}
+              </Badge>
+            </Button>
+          )}
           <Button
             variant="default"
             size="sm"
@@ -1738,6 +1763,13 @@ export default function RecurringPage() {
         open={addRecurringOpen}
         onOpenChange={setAddRecurringOpen}
         onSuccess={handleAddSuccess}
+      />
+
+      {/* Review Suggestions Modal */}
+      <RecurringReviewModal
+        open={reviewModalOpen}
+        onOpenChange={setReviewModalOpen}
+        onComplete={handleAddSuccess}
       />
 
       {/* AI Analysis Modal */}

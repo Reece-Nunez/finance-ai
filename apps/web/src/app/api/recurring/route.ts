@@ -410,6 +410,13 @@ export async function GET(request: NextRequest) {
       return sum + (r.averageAmount * multiplier)
     }, 0)
 
+  // Get pending suggestions count
+  const { count: pendingSuggestions } = await supabase
+    .from('recurring_suggestions')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .eq('status', 'pending')
+
   return NextResponse.json({
     recurring,
     yearlySpend,
@@ -417,6 +424,7 @@ export async function GET(request: NextRequest) {
     aiPowered,
     lastAnalysis,
     hasCachedResults: cachedPatterns && cachedPatterns.length > 0,
+    pendingSuggestions: pendingSuggestions || 0,
   })
 }
 
@@ -575,12 +583,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to parse AI analysis', recurring: [] })
     }
 
-    // Upsert AI patterns (merge with existing, don't delete basic detection patterns)
+    // Save AI detections to suggestions table for user review (NOT directly to patterns)
     const now = new Date().toISOString()
+
+    // Get existing patterns to avoid re-suggesting what's already confirmed
+    const { data: existingPatterns } = await supabase
+      .from('recurring_patterns')
+      .select('merchant_pattern')
+      .eq('user_id', user.id)
+    const existingMerchants = new Set((existingPatterns || []).map(p => p.merchant_pattern))
+
+    let newSuggestions = 0
 
     for (const item of aiRecurring) {
       const merchantKey = normalizeMerchant(item.name)
       const group = merchantGroups.get(merchantKey)
+
+      // Skip if already dismissed or already a confirmed pattern
+      if (dismissedPatterns.includes(merchantKey)) continue
+      if (existingMerchants.has(merchantKey)) continue
 
       // Calculate next date
       let daysToAdd = 30
@@ -593,7 +614,8 @@ export async function POST(request: NextRequest) {
       const nextDate = new Date(lastDate)
       nextDate.setDate(nextDate.getDate() + daysToAdd)
 
-      await supabase.from('recurring_patterns').upsert({
+      // Save to suggestions table for user review
+      const { error: suggestionError } = await supabase.from('recurring_suggestions').upsert({
         user_id: user.id,
         name: item.name,
         display_name: item.displayName || item.name,
@@ -608,9 +630,13 @@ export async function POST(request: NextRequest) {
         confidence: item.confidence,
         occurrences: group?.count || 0,
         bill_type: item.billType || null,
-        ai_detected: true,
-        last_ai_analysis: now,
+        detection_reason: `AI detected ${group?.count || 0} transactions with ${item.confidence} confidence`,
+        status: 'pending',
       }, { onConflict: 'user_id,merchant_pattern' })
+
+      if (!suggestionError) {
+        newSuggestions++
+      }
     }
 
     // Fetch ALL patterns from database (includes both AI and basic detection)
@@ -664,7 +690,13 @@ export async function POST(request: NextRequest) {
         return sum + ((r.averageAmount || r.amount) * multiplier)
       }, 0)
 
-    const aiCount = aiRecurring.length
+    // Get pending suggestions count for the response
+    const { count: pendingSuggestions } = await supabase
+      .from('recurring_suggestions')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('status', 'pending')
+
     const totalCount = recurring.length
 
     return NextResponse.json({
@@ -673,7 +705,11 @@ export async function POST(request: NextRequest) {
       count: totalCount,
       aiPowered: true,
       lastAnalysis: now,
-      message: `AI enhanced ${aiCount} patterns. Total: ${totalCount} recurring transactions.`
+      pendingSuggestions: pendingSuggestions || 0,
+      newSuggestions,
+      message: newSuggestions > 0
+        ? `AI detected ${newSuggestions} new recurring transactions. Review them in the suggestions panel.`
+        : `No new recurring transactions detected. You have ${totalCount} confirmed patterns.`
     })
 
   } catch (aiError: unknown) {

@@ -114,6 +114,11 @@ async function executeTool(
         ? `"${match_pattern}": ${actions.join(', ')}`
         : `Match "${match_pattern}"`
 
+      // If category is INCOME and set_as_income wasn't explicitly set, default to true
+      const finalSetAsIncome = set_as_income !== undefined
+        ? set_as_income
+        : (set_category?.toUpperCase() === 'INCOME' ? true : false)
+
       // Create the rule
       const { data: rule, error } = await supabase
         .from('transaction_rules')
@@ -123,7 +128,7 @@ async function executeTool(
           match_pattern,
           display_name: display_name || null,
           set_category: set_category || null,
-          set_as_income: set_as_income || false,
+          set_as_income: finalSetAsIncome,
           set_ignore_type: set_ignore_type || null,
           description,
         })
@@ -138,7 +143,10 @@ async function executeTool(
       const updates: Record<string, unknown> = {}
       if (display_name) updates.display_name = display_name
       if (set_category) updates.category = set_category
-      if (set_as_income) updates.is_income = true
+      // Set is_income based on finalSetAsIncome or if category is INCOME
+      if (finalSetAsIncome || set_category?.toUpperCase() === 'INCOME') {
+        updates.is_income = true
+      }
       if (set_ignore_type && set_ignore_type !== 'none') updates.ignore_type = set_ignore_type
 
       if (Object.keys(updates).length > 0) {
