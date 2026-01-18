@@ -33,4 +33,4 @@ applications:
       cache:
         paths:
           - ../../node_modules/**/*
-          - .next/cache/**/*
+          # Removed .next/cache to prevent stale file conflicts during bundling
