@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 // Content Security Policy
 const cspHeader = `
   default-src 'self';
-  script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com https://challenges.cloudflare.com;
+  script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com https://challenges.cloudflare.com https://cdn.plaid.com;
   style-src 'self' 'unsafe-inline';
   img-src 'self' blob: data: https://logo.clearbit.com https://www.google.com https://*.stripe.com https://*.plaid.com https://plaid.com https://*.vercel.app;
   font-src 'self';
