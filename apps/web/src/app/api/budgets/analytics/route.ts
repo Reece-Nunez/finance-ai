@@ -70,11 +70,17 @@ export async function GET(request: NextRequest) {
       .gt('amount', 0)
       .or('ignore_type.is.null,ignore_type.neq.all')
 
+    // Normalize category for consistent matching (handle Plaid uppercase vs user input)
+    const normalizeCategory = (category: string | null): string => {
+      if (!category) return 'UNCATEGORIZED'
+      return category.toUpperCase().trim()
+    }
+
     // Calculate spending by category for current month
     type TransactionType = NonNullable<typeof currentTransactions>[number]
     const currentSpendingByCategory: Record<string, { spent: number; transactions: TransactionType[] }> = {}
     currentTransactions?.forEach((tx) => {
-      const category = tx.category || 'Uncategorized'
+      const category = normalizeCategory(tx.category)
       if (!currentSpendingByCategory[category]) {
         currentSpendingByCategory[category] = { spent: 0, transactions: [] }
       }
@@ -85,14 +91,16 @@ export async function GET(request: NextRequest) {
     // Calculate spending by category for last month
     const lastMonthSpendingByCategory: Record<string, number> = {}
     lastMonthTransactions?.forEach((tx) => {
-      const category = tx.category || 'Uncategorized'
+      const category = normalizeCategory(tx.category)
       lastMonthSpendingByCategory[category] = (lastMonthSpendingByCategory[category] || 0) + tx.amount
     })
 
     // Build budget categories with analytics
-    const budgetMap: Record<string, { id: string; amount: number }> = {}
+    // Store both normalized key and original display name
+    const budgetMap: Record<string, { id: string; amount: number; displayName: string }> = {}
     budgets?.forEach((b) => {
-      budgetMap[b.category] = { id: b.id, amount: b.amount }
+      const normalizedKey = normalizeCategory(b.category)
+      budgetMap[normalizedKey] = { id: b.id, amount: b.amount, displayName: b.category }
     })
 
     // Get all unique categories (from budgets and spending)
@@ -116,14 +124,22 @@ export async function GET(request: NextRequest) {
       transactions: TransactionType[]
     }
 
-    const budgetCategories: BudgetCategory[] = Array.from(allCategories).map((category) => {
-      const budget = budgetMap[category]
-      const categoryData = currentSpendingByCategory[category] || { spent: 0, transactions: [] }
+    // Helper to format category for display (Title Case)
+    const formatCategoryDisplay = (normalizedCategory: string): string => {
+      return normalizedCategory
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ')
+    }
+
+    const budgetCategories: BudgetCategory[] = Array.from(allCategories).map((normalizedCategory) => {
+      const budget = budgetMap[normalizedCategory]
+      const categoryData = currentSpendingByCategory[normalizedCategory] || { spent: 0, transactions: [] }
       const spent = categoryData.spent
       const budgeted = budget?.amount || 0
       const remaining = budgeted - spent
       const percentUsed = budgeted > 0 ? (spent / budgeted) * 100 : 0
-      const lastMonthSpent = lastMonthSpendingByCategory[category] || 0
+      const lastMonthSpent = lastMonthSpendingByCategory[normalizedCategory] || 0
       const changeFromLastMonth = lastMonthSpent > 0
         ? ((spent - lastMonthSpent) / lastMonthSpent) * 100
         : spent > 0 ? 100 : 0
@@ -137,8 +153,11 @@ export async function GET(request: NextRequest) {
         else if (percentUsed > 80) status = 'warning'
       }
 
+      // Use budget's original display name if available, otherwise format the normalized category
+      const displayCategory = budget?.displayName || formatCategoryDisplay(normalizedCategory)
+
       return {
-        category,
+        category: displayCategory,
         budgetId: budget?.id || null,
         budgeted,
         spent,
