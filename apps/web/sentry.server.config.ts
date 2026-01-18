@@ -6,8 +6,8 @@ Sentry.init({
   // Environment
   environment: process.env.NODE_ENV,
 
-  // Performance Monitoring
-  tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+  // Disable tracing entirely to avoid OpenTelemetry/Amplify bundling issues
+  tracesSampleRate: 0,
 
   // Debug (disable in production)
   debug: process.env.NODE_ENV === 'development',
@@ -16,8 +16,13 @@ Sentry.init({
   release: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA || 'development',
 
   // Disable ESM loader hooks to fix Amplify bundling issues
-  // This prevents import-in-the-middle from being used
   registerEsmLoaderHooks: false,
+
+  // Disable all auto-instrumentation to prevent OpenTelemetry usage
+  autoSessionTracking: false,
+
+  // Empty integrations to prevent any auto-instrumentation
+  integrations: [],
 
   // Before sending events
   beforeSend(event, hint) {

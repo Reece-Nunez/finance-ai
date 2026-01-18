@@ -64,7 +64,13 @@ const nextConfig: NextConfig = {
     'require-in-the-middle',
     '@opentelemetry/instrumentation',
     '@opentelemetry/api',
+    '@opentelemetry/core',
+    '@opentelemetry/sdk-trace-base',
+    '@opentelemetry/semantic-conventions',
+    '@opentelemetry/resources',
+    '@opentelemetry/context-async-hooks',
     '@sentry/node',
+    '@sentry/opentelemetry',
   ],
 
   // Performance: Optimize package imports to reduce bundle size
