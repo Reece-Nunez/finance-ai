@@ -28,6 +28,10 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Get the app URL for webhook
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://localhost:3000'
+    const webhookUrl = `${appUrl}/api/plaid/webhook`
+
     const response = await plaidClient.linkTokenCreate({
       user: {
         client_user_id: user.id,
@@ -36,6 +40,7 @@ export async function POST() {
       products: [Products.Transactions],
       country_codes: [CountryCode.Us],
       language: 'en',
+      webhook: webhookUrl,
     })
 
     return NextResponse.json({ link_token: response.data.link_token })

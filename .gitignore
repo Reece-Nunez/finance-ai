@@ -59,3 +59,5 @@ web-build/
 *.hprof
 android/app/build/
 ios/Pods/
+
+.vercel
