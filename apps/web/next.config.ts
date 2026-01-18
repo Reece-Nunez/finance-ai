@@ -61,9 +61,8 @@ const nextConfig: NextConfig = {
   // Fix for Amplify bundling issue with import-in-the-middle
   serverExternalPackages: ['import-in-the-middle', 'require-in-the-middle'],
 
-  // Disable instrumentation hook (uses import-in-the-middle which causes Amplify bundling errors)
+  // Performance: Optimize package imports to reduce bundle size
   experimental: {
-    instrumentationHook: false,
     optimizePackageImports: [
       'lucide-react',
       'recharts',
