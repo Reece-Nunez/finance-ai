@@ -5,7 +5,7 @@ const cspHeader = `
   default-src 'self';
   script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com https://challenges.cloudflare.com;
   style-src 'self' 'unsafe-inline';
-  img-src 'self' blob: data: https://logo.clearbit.com https://www.google.com https://*.stripe.com;
+  img-src 'self' blob: data: https://logo.clearbit.com https://www.google.com https://*.stripe.com https://*.plaid.com https://plaid.com https://*.vercel.app;
   font-src 'self';
   connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://api.anthropic.com https://cdn.plaid.com https://production.plaid.com https://sandbox.plaid.com;
   frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://challenges.cloudflare.com https://cdn.plaid.com;
