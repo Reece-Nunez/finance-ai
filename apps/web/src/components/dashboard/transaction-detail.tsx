@@ -392,6 +392,32 @@ export function TransactionDetail({
     if (!transaction || !onUpdate) return
     setIsUpdating(true)
     try {
+      // If ignoring from all, also create a rule to ignore future transactions
+      if (ignoreType === 'all') {
+        const name = transaction.name || ''
+        // Extract a pattern from the transaction name (remove transaction IDs, etc.)
+        const cleanedName = name.replace(/\b\d{4,}\b/g, '').replace(/\s+/g, ' ').trim()
+        const words = cleanedName.split(' ')
+        const pattern = words.slice(0, 2).join(' ').trim()
+
+        if (pattern) {
+          // Create a rule to ignore future matching transactions
+          await fetch('/api/transaction-rules', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              match_field: 'name',
+              match_pattern: pattern,
+              set_ignore_type: 'all',
+              description: `Auto-ignore transactions matching "${pattern}"`,
+              apply_to_existing: true,
+            }),
+          })
+          toast.success('Ignored', {
+            description: `Created rule to ignore all "${pattern}" transactions`,
+          })
+        }
+      }
       await onUpdate(transaction.id, { ignore_type: ignoreType } as Partial<Transaction>)
     } finally {
       setIsUpdating(false)

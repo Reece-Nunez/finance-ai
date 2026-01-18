@@ -21,7 +21,13 @@ import {
   Loader2,
   ChevronRight,
   ArrowLeftRight,
+  EyeOff,
+  CheckSquare,
+  Square,
+  XCircle,
 } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
+import { toast } from 'sonner'
 import { formatCategory, formatCurrency } from '@/lib/format'
 import { TransactionDetail } from '@/components/dashboard/transaction-detail'
 import { MerchantLogo } from '@/components/ui/merchant-logo'
@@ -41,6 +47,7 @@ interface Transaction {
   pending: boolean
   is_income: boolean
   plaid_account_id: string
+  ignore_type?: 'none' | 'budget' | 'all'
 }
 
 interface Account {
@@ -63,6 +70,11 @@ export default function TransactionsPage() {
   const [hasMore, setHasMore] = useState(true)
   const [totalCount, setTotalCount] = useState<number | null>(null)
   const [transferModalOpen, setTransferModalOpen] = useState(false)
+
+  // Multi-select state
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkProcessing, setBulkProcessing] = useState(false)
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('')
@@ -136,6 +148,7 @@ export default function TransactionsPage() {
         supabase
           .from('transactions')
           .select('*')
+          .or('ignore_type.is.null,ignore_type.neq.all')
           .order('date', { ascending: false })
           .range(0, PAGE_SIZE - 1),
         supabase
@@ -168,6 +181,7 @@ export default function TransactionsPage() {
     const { data, error } = await supabase
       .from('transactions')
       .select('*')
+      .or('ignore_type.is.null,ignore_type.neq.all')
       .order('date', { ascending: false })
       .range(offset, offset + PAGE_SIZE - 1)
 
@@ -305,10 +319,67 @@ export default function TransactionsPage() {
       body: JSON.stringify({ id, ...updates }),
     })
     if (response.ok) {
-      setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t))
-      if (selectedTransaction?.id === id) {
-        setSelectedTransaction(prev => prev ? { ...prev, ...updates } : prev)
+      // If ignoring from all, remove from list and close detail sheet
+      if (updates.ignore_type === 'all') {
+        setTransactions(prev => prev.filter(t => t.id !== id))
+        setSelectedTransaction(null)
+      } else {
+        setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t))
+        if (selectedTransaction?.id === id) {
+          setSelectedTransaction(prev => prev ? { ...prev, ...updates } : prev)
+        }
       }
+    }
+  }
+
+  // Multi-select functions
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) {
+        newSet.delete(id)
+      } else {
+        newSet.add(id)
+      }
+      return newSet
+    })
+  }
+
+  const selectAll = () => {
+    const allIds = filteredTransactions.slice(0, visibleCount).map(t => t.id)
+    setSelectedIds(new Set(allIds))
+  }
+
+  const clearSelection = () => {
+    setSelectedIds(new Set())
+    setSelectionMode(false)
+  }
+
+  const handleBulkIgnore = async () => {
+    if (selectedIds.size === 0) return
+    setBulkProcessing(true)
+
+    try {
+      // Update all selected transactions to ignore_type = 'all'
+      const promises = Array.from(selectedIds).map(id =>
+        fetch('/api/transactions', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, ignore_type: 'all' }),
+        })
+      )
+
+      await Promise.all(promises)
+
+      // Remove all selected transactions from list
+      setTransactions(prev => prev.filter(t => !selectedIds.has(t.id)))
+      toast.success(`Ignored ${selectedIds.size} transactions`)
+      clearSelection()
+    } catch (error) {
+      console.error('Bulk ignore error:', error)
+      toast.error('Failed to ignore some transactions')
+    } finally {
+      setBulkProcessing(false)
     }
   }
 
@@ -360,16 +431,62 @@ export default function TransactionsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4 md:mb-6">
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Transactions</h1>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setTransferModalOpen(true)}
-          className="gap-2"
-        >
-          <ArrowLeftRight className="h-4 w-4" />
-          <span className="hidden sm:inline">Review Transfers</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={selectionMode ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              if (selectionMode) {
+                clearSelection()
+              } else {
+                setSelectionMode(true)
+              }
+            }}
+            className="gap-2"
+          >
+            {selectionMode ? <XCircle className="h-4 w-4" /> : <CheckSquare className="h-4 w-4" />}
+            <span className="hidden sm:inline">{selectionMode ? 'Cancel' : 'Select'}</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setTransferModalOpen(true)}
+            className="gap-2"
+          >
+            <ArrowLeftRight className="h-4 w-4" />
+            <span className="hidden sm:inline">Review Transfers</span>
+          </Button>
+        </div>
       </div>
+
+      {/* Bulk Action Bar */}
+      {selectionMode && selectedIds.size > 0 && (
+        <div className="mb-4 p-3 rounded-xl bg-muted/50 border flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium">{selectedIds.size} selected</span>
+            <Button variant="ghost" size="sm" onClick={selectAll}>
+              Select All
+            </Button>
+            <Button variant="ghost" size="sm" onClick={clearSelection}>
+              Clear
+            </Button>
+          </div>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={handleBulkIgnore}
+            disabled={bulkProcessing}
+            className="gap-2"
+          >
+            {bulkProcessing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <EyeOff className="h-4 w-4" />
+            )}
+            Ignore All
+          </Button>
+        </div>
+      )}
 
       {/* AI-Powered Natural Language Search */}
       <NLTransactionSearch onTransactionClick={handleSearchTransactionClick} />
@@ -486,13 +603,32 @@ export default function TransactionsPage() {
                 {txs.map((tx) => {
                   const category = tx.category || tx.ai_category
                   const isIncome = tx.amount < 0 || tx.is_income
+                  const isSelected = selectedIds.has(tx.id)
 
                   return (
                     <button
                       key={tx.id}
-                      onClick={() => setSelectedTransaction(tx)}
-                      className="w-full flex items-center gap-4 p-3 -mx-3 rounded-2xl transition-colors hover:bg-muted/50 group"
+                      onClick={() => {
+                        if (selectionMode) {
+                          toggleSelection(tx.id)
+                        } else {
+                          setSelectedTransaction(tx)
+                        }
+                      }}
+                      className={`w-full flex items-center gap-4 p-3 -mx-3 rounded-2xl transition-colors hover:bg-muted/50 group ${
+                        isSelected ? 'bg-primary/10 hover:bg-primary/15' : ''
+                      }`}
                     >
+                      {/* Checkbox in selection mode */}
+                      {selectionMode && (
+                        <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleSelection(tx.id)}
+                          />
+                        </div>
+                      )}
+
                       {/* Merchant Logo */}
                       <MerchantLogo
                         merchantName={tx.merchant_name || tx.name}
@@ -526,8 +662,10 @@ export default function TransactionsPage() {
                         </p>
                       </div>
 
-                      {/* Chevron */}
-                      <ChevronRight className="h-5 w-5 text-muted-foreground/50 group-hover:text-muted-foreground shrink-0" />
+                      {/* Chevron - hide in selection mode */}
+                      {!selectionMode && (
+                        <ChevronRight className="h-5 w-5 text-muted-foreground/50 group-hover:text-muted-foreground shrink-0" />
+                      )}
                     </button>
                   )
                 })}
