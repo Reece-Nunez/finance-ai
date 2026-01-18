@@ -192,7 +192,7 @@ async function checkBudgetWarnings(
     .eq('user_id', userId)
     .gte('date', startOfMonth)
     .gt('amount', 0) // Only expenses
-    .or('ignored.is.null,ignored.eq.false')
+    .or('ignore_type.is.null,ignore_type.neq.all')
 
   if (!transactions) return notifications
 
@@ -346,9 +346,9 @@ async function checkPotentialTransfers(
   // Get transactions that aren't already ignored
   const { data: transactions } = await supabase
     .from('transactions')
-    .select('id, name, merchant_name, display_name, amount, date, category, ignored')
+    .select('id, name, merchant_name, display_name, amount, date, category, ignore_type')
     .eq('user_id', userId)
-    .or('ignored.is.null,ignored.eq.false')
+    .or('ignore_type.is.null,ignore_type.neq.all')
 
   if (!transactions || transactions.length === 0) return notifications
 

@@ -71,6 +71,17 @@ async function syncItemTransactions(itemId: string) {
 
   const activeRules = rules || []
 
+  // Get budget envelope accounts (transactions from these should be auto-ignored)
+  const { data: budgetEnvelopeAccounts } = await supabase
+    .from('accounts')
+    .select('plaid_account_id')
+    .eq('user_id', userId)
+    .eq('is_budget_envelope', true)
+
+  const budgetEnvelopeAccountIds = new Set(
+    (budgetEnvelopeAccounts || []).map(a => a.plaid_account_id)
+  )
+
   while (hasMore) {
     pageCount++
     if (pageCount > 10) {
@@ -88,6 +99,9 @@ async function syncItemTransactions(itemId: string) {
     // Insert new transactions
     if (added.length > 0) {
       const transactions = added.map((tx) => {
+        // Check if this account is a budget envelope (auto-ignore all transactions)
+        const isBudgetEnvelopeAccount = budgetEnvelopeAccountIds.has(tx.account_id)
+
         // Apply rules
         let ruleUpdates: { display_name?: string; category?: string; is_income?: boolean; ignore_type?: string } = {}
         for (const rule of activeRules) {
@@ -110,6 +124,9 @@ async function syncItemTransactions(itemId: string) {
           }
         }
 
+        // Budget envelope accounts take precedence - always ignore their transactions
+        const finalIgnoreType = isBudgetEnvelopeAccount ? 'all' : (ruleUpdates.ignore_type || 'none')
+
         return {
           user_id: userId,
           plaid_item_id: itemId,
@@ -125,7 +142,7 @@ async function syncItemTransactions(itemId: string) {
           iso_currency_code: tx.iso_currency_code,
           display_name: ruleUpdates.display_name || null,
           is_income: ruleUpdates.is_income || false,
-          ignore_type: ruleUpdates.ignore_type || 'none',
+          ignore_type: finalIgnoreType,
         }
       })
 

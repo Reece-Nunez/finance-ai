@@ -40,9 +40,9 @@ export async function GET(request: NextRequest) {
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
 
-  // Exclude ignored transactions by default
+  // Exclude ignored transactions by default (ignore_type = 'all' means fully hidden)
   if (!includeIgnored) {
-    query = query.or('ignored.is.null,ignored.eq.false')
+    query = query.or('ignore_type.is.null,ignore_type.neq.all')
   }
 
   // Apply filter

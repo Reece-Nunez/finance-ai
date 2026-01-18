@@ -216,10 +216,12 @@ export default function TransactionsPage() {
         .select('*')
         .or(`name.ilike.${searchLower},display_name.ilike.${searchLower},merchant_name.ilike.${searchLower}`)
         .order('date', { ascending: false })
-        .limit(200)
+        .limit(300)
 
       if (!error && data) {
-        setSearchResults(data)
+        // Filter out ignored transactions client-side (Supabase doesn't support AND with OR easily)
+        const filtered = data.filter(tx => !tx.ignore_type || tx.ignore_type !== 'all')
+        setSearchResults(filtered.slice(0, 200))
       }
     } catch (error) {
       console.error('Search error:', error)
@@ -360,8 +362,38 @@ export default function TransactionsPage() {
     setBulkProcessing(true)
 
     try {
+      // Get all selected transactions to extract patterns
+      const selectedTxs = transactions.filter(t => selectedIds.has(t.id))
+
+      // Group by pattern (first 2 words of cleaned name) to create rules
+      const patterns = new Set<string>()
+      for (const tx of selectedTxs) {
+        const name = tx.name || ''
+        const cleanedName = name.replace(/\b\d{4,}\b/g, '').replace(/\s+/g, ' ').trim()
+        const words = cleanedName.split(' ')
+        const pattern = words.slice(0, 2).join(' ').trim()
+        if (pattern) {
+          patterns.add(pattern)
+        }
+      }
+
+      // Create rules for each unique pattern
+      const rulePromises = Array.from(patterns).map(pattern =>
+        fetch('/api/transaction-rules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            match_field: 'name',
+            match_pattern: pattern,
+            set_ignore_type: 'all',
+            description: `Auto-ignore transactions matching "${pattern}"`,
+            apply_to_existing: true,
+          }),
+        })
+      )
+
       // Update all selected transactions to ignore_type = 'all'
-      const promises = Array.from(selectedIds).map(id =>
+      const txPromises = Array.from(selectedIds).map(id =>
         fetch('/api/transactions', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -369,11 +401,13 @@ export default function TransactionsPage() {
         })
       )
 
-      await Promise.all(promises)
+      await Promise.all([...rulePromises, ...txPromises])
 
       // Remove all selected transactions from list
       setTransactions(prev => prev.filter(t => !selectedIds.has(t.id)))
-      toast.success(`Ignored ${selectedIds.size} transactions`)
+      toast.success(`Ignored ${selectedIds.size} transactions`, {
+        description: patterns.size > 0 ? `Created ${patterns.size} rule${patterns.size !== 1 ? 's' : ''} to ignore future matches` : undefined
+      })
       clearSelection()
     } catch (error) {
       console.error('Bulk ignore error:', error)

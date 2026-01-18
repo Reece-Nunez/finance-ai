@@ -103,6 +103,17 @@ export async function POST(request: Request) {
 
     const activeRules: TransactionRule[] = rules || []
 
+    // Get budget envelope accounts (transactions from these should be auto-ignored)
+    const { data: budgetEnvelopeAccounts } = await supabase
+      .from('accounts')
+      .select('plaid_account_id')
+      .eq('user_id', user.id)
+      .eq('is_budget_envelope', true)
+
+    const budgetEnvelopeAccountIds = new Set(
+      (budgetEnvelopeAccounts || []).map(a => a.plaid_account_id)
+    )
+
     let totalAdded = 0
     let totalModified = 0
     let totalRemoved = 0
@@ -131,11 +142,17 @@ export async function POST(request: Request) {
         // Insert new transactions
         if (added.length > 0) {
           const transactions = added.map((tx) => {
+            // Check if this account is a budget envelope (auto-ignore all transactions)
+            const isBudgetEnvelopeAccount = budgetEnvelopeAccountIds.has(tx.account_id)
+
             // Apply rules to get custom display name, category, and income flag
             const ruleUpdates = applyRules(
               { name: tx.name, merchant_name: tx.merchant_name || null },
               activeRules
             )
+
+            // Budget envelope accounts take precedence - always ignore their transactions
+            const finalIgnoreType = isBudgetEnvelopeAccount ? 'all' : (ruleUpdates.ignore_type || 'none')
 
             return {
               user_id: user.id,
@@ -152,7 +169,7 @@ export async function POST(request: Request) {
               iso_currency_code: tx.iso_currency_code,
               display_name: ruleUpdates.display_name || null,
               is_income: ruleUpdates.is_income || false,
-              ignore_type: ruleUpdates.ignore_type || 'none',
+              ignore_type: finalIgnoreType,
             }
           })
 

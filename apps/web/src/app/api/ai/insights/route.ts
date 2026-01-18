@@ -80,8 +80,7 @@ export async function GET(request: NextRequest) {
       .eq('user_id', user.id)
       .gte('date', startOfMonth)
       .lte('date', endOfMonth)
-      .neq('ignore_type', 'all')
-      .or('ignored.is.null,ignored.eq.false')
+      .or('ignore_type.is.null,ignore_type.neq.all')
 
     // Fetch last month transactions (excluding ignored)
     const { data: lastMonthTransactions } = await supabase
@@ -90,8 +89,7 @@ export async function GET(request: NextRequest) {
       .eq('user_id', user.id)
       .gte('date', startOfLastMonth)
       .lte('date', endOfLastMonth)
-      .neq('ignore_type', 'all')
-      .or('ignored.is.null,ignored.eq.false')
+      .or('ignore_type.is.null,ignore_type.neq.all')
 
     // Fetch budgets
     const { data: budgets } = await supabase

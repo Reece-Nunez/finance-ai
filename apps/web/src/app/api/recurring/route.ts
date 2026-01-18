@@ -258,13 +258,33 @@ function patternToRecurring(
   }
 }
 
+// Check if a key matches any dismissed pattern (lenient matching)
+function isDismissed(key: string, dismissedPatterns: string[]): boolean {
+  const keyLower = key.toLowerCase()
+  for (const pattern of dismissedPatterns) {
+    const patternLower = pattern.toLowerCase()
+    // Check if the key contains the dismissed pattern or vice versa
+    if (keyLower.includes(patternLower) || patternLower.includes(keyLower)) {
+      return true
+    }
+    // Also check if first two words match (common for merchant variants)
+    const keyWords = keyLower.split(' ')
+    const patternWords = patternLower.split(' ')
+    if (keyWords.length >= 2 && patternWords.length >= 2 &&
+        keyWords[0] === patternWords[0] && keyWords[1] === patternWords[1]) {
+      return true
+    }
+  }
+  return false
+}
+
 // Basic pattern detection (fallback when no AI cache)
 function analyzeRecurringPatterns(transactions: Transaction[], dismissedPatterns: string[]): RecurringTransaction[] {
   const groups = new Map<string, Transaction[]>()
 
   for (const tx of transactions) {
     const key = normalizeMerchant(tx.display_name || tx.merchant_name || tx.name)
-    if (!key || dismissedPatterns.includes(key)) continue
+    if (!key || isDismissed(key, dismissedPatterns)) continue
     if (!groups.has(key)) groups.set(key, [])
     groups.get(key)!.push(tx)
   }
@@ -272,7 +292,8 @@ function analyzeRecurringPatterns(transactions: Transaction[], dismissedPatterns
   const recurring: RecurringTransaction[] = []
 
   for (const [key, txs] of groups) {
-    if (txs.length < 2) continue
+    // Require at least 3 occurrences to avoid false positives from one-off purchases
+    if (txs.length < 3) continue
 
     const sorted = [...txs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
@@ -301,11 +322,14 @@ function analyzeRecurringPatterns(transactions: Transaction[], dismissedPatterns
     if (!frequency) continue
 
     let confidence: 'high' | 'medium' | 'low' = 'low'
-    if (amountConsistent && intervalConsistent && txs.length >= 3) confidence = 'high'
-    else if ((amountConsistent || intervalConsistent) && txs.length >= 3) confidence = 'medium'
-    else if (txs.length >= 4) confidence = 'medium'
+    if (amountConsistent && intervalConsistent && txs.length >= 4) confidence = 'high'
+    else if ((amountConsistent || intervalConsistent) && txs.length >= 4) confidence = 'medium'
+    else if (amountConsistent && intervalConsistent && txs.length >= 3) confidence = 'medium'
+    else if (txs.length >= 5) confidence = 'medium'
 
-    if (confidence === 'low' && txs.length < 4) continue
+    // Only show medium or high confidence patterns to avoid false positives
+    // Low confidence patterns require explicit user confirmation via AI analysis
+    if (confidence === 'low') continue
 
     const lastTx = sorted[sorted.length - 1]
     const [year, month, day] = lastTx.date.split('-').map(Number)
@@ -393,7 +417,7 @@ export async function GET(request: NextRequest) {
     .select('*')
     .eq('user_id', user.id)
 
-  // Get transactions for display
+  // Get transactions for display (exclude ignored transactions)
   const twelveMonthsAgo = new Date()
   twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
 
@@ -402,8 +426,7 @@ export async function GET(request: NextRequest) {
     .select('*')
     .eq('user_id', user.id)
     .gte('date', twelveMonthsAgo.toISOString().split('T')[0])
-    .neq('ignore_type', 'all')
-    .or('ignored.is.null,ignored.eq.false')
+    .or('ignore_type.is.null,ignore_type.neq.all')
     .order('date', { ascending: false })
 
   let recurring: RecurringTransaction[]
@@ -411,18 +434,25 @@ export async function GET(request: NextRequest) {
   let lastAnalysis: string | null = null
 
   if (cachedPatterns && cachedPatterns.length > 0) {
-    // Use cached AI results, filtering out dismissed ones
+    // Use cached AI results, filtering out dismissed ones (using lenient matching)
     // Apply transaction rules for display names and categories
+    console.log('[recurring] Using cached patterns:', cachedPatterns.length, 'total,', dismissedPatterns.length, 'dismissed')
     recurring = cachedPatterns
-      .filter(p => !dismissedPatterns.includes(p.merchant_pattern || ''))
+      .filter(p => !isDismissed(p.merchant_pattern || '', dismissedPatterns))
       .map(p => patternToRecurring(p, transactions || [], transactionRules))
 
     aiPowered = cachedPatterns.some(p => p.ai_detected)
     lastAnalysis = cachedPatterns[0]?.last_ai_analysis || null
   } else {
     // Fall back to basic detection
+    console.log('[recurring] No cached patterns, using basic detection. Dismissed patterns:', dismissedPatterns)
     recurring = analyzeRecurringPatterns(transactions || [], dismissedPatterns)
+    console.log('[recurring] Basic detection found:', recurring.length, 'patterns')
   }
+
+  // Final filter: ensure minimum 3 occurrences for all patterns (safety check)
+  recurring = recurring.filter(r => r.occurrences >= 3)
+  console.log('[recurring] After occurrence filter:', recurring.length, 'patterns')
 
   // Calculate yearly spend
   const yearlySpend = recurring
@@ -547,7 +577,7 @@ export async function POST(request: NextRequest) {
     .select('id, name, merchant_name, display_name, amount, date, category, is_income, plaid_account_id')
     .eq('user_id', user.id)
     .gte('date', sixMonthsAgo.toISOString().split('T')[0])
-    .or('ignored.is.null,ignored.eq.false')
+    .or('ignore_type.is.null,ignore_type.neq.all')
     .order('date', { ascending: false })
     .limit(500)
 
@@ -728,7 +758,7 @@ export async function POST(request: NextRequest) {
       .select('*')
       .eq('user_id', user.id)
       .gte('date', twelveMonthsAgo.toISOString().split('T')[0])
-      .or('ignored.is.null,ignored.eq.false')
+      .or('ignore_type.is.null,ignore_type.neq.all')
       .order('date', { ascending: false })
 
     // Convert to response format (apply transaction rules for display names)
@@ -1060,11 +1090,15 @@ export async function DELETE(request: NextRequest) {
     user = cookieUser
   }
 
-  const { merchantPattern, originalName, reason } = await request.json()
+  const { merchantPattern: rawMerchantPattern, originalName, reason } = await request.json()
 
-  if (!merchantPattern) {
+  if (!rawMerchantPattern) {
     return NextResponse.json({ error: 'merchantPattern is required' }, { status: 400 })
   }
+
+  // Normalize the merchant pattern to ensure consistent matching with basic detection
+  const merchantPattern = normalizeMerchant(rawMerchantPattern)
+  console.log('[recurring] Dismissing pattern:', { raw: rawMerchantPattern, normalized: merchantPattern })
 
   // Check if this was an income pattern before deleting
   const { data: existingPattern } = await supabase

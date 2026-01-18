@@ -99,8 +99,7 @@ export async function GET(request: NextRequest) {
     .eq('user_id', user.id)
     .gte('date', startDate.toISOString().split('T')[0])
     .lte('date', endDate.toISOString().split('T')[0])
-    .neq('ignore_type', 'all')
-    .or('ignored.is.null,ignored.eq.false')
+    .or('ignore_type.is.null,ignore_type.neq.all')
     .order('date', { ascending: false })
 
   if (category) {
@@ -126,8 +125,7 @@ export async function GET(request: NextRequest) {
     .eq('user_id', user.id)
     .gte('date', prevStartDate.toISOString().split('T')[0])
     .lte('date', prevEndDate.toISOString().split('T')[0])
-    .neq('ignore_type', 'all')
-    .or('ignored.is.null,ignored.eq.false')
+    .or('ignore_type.is.null,ignore_type.neq.all')
 
   if (category) {
     prevQuery = prevQuery.ilike('category', category)
@@ -217,8 +215,7 @@ export async function GET(request: NextRequest) {
     .eq('user_id', user.id)
     .gte('date', sixMonthsAgo.toISOString().split('T')[0])
     .lte('date', currentMonthEnd.toISOString().split('T')[0])
-    .neq('ignore_type', 'all')
-    .or('ignored.is.null,ignored.eq.false')
+    .or('ignore_type.is.null,ignore_type.neq.all')
 
   // Group transactions by month in JavaScript (much faster than 6 queries)
   const monthlyMap = new Map<string, { income: number; bills: number; spending: number }>()

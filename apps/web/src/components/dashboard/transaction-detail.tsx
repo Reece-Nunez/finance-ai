@@ -366,7 +366,7 @@ export function TransactionDetail({
           set_category: ruleSetAsIgnored ? null : (ruleCategory || null),
           set_as_income: ruleSetAsIncome,
           unset_income: shouldUnsetIncome, // Explicitly unset is_income and remove from recurring
-          set_as_ignored: ruleSetAsIgnored,
+          set_ignore_type: ruleSetAsIgnored ? 'all' : null, // Hide from all views when ignoring
           description,
           apply_to_existing: true,
         }),
@@ -402,7 +402,7 @@ export function TransactionDetail({
 
         if (pattern) {
           // Create a rule to ignore future matching transactions
-          await fetch('/api/transaction-rules', {
+          const ruleResponse = await fetch('/api/transaction-rules', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -413,12 +413,24 @@ export function TransactionDetail({
               apply_to_existing: true,
             }),
           })
-          toast.success('Ignored', {
-            description: `Created rule to ignore all "${pattern}" transactions`,
-          })
+
+          if (ruleResponse.ok) {
+            toast.success('Ignored', {
+              description: `Created rule to ignore all "${pattern}" transactions`,
+            })
+          } else {
+            const error = await ruleResponse.json()
+            console.error('Failed to create ignore rule:', error)
+            toast.error('Rule creation failed', {
+              description: 'Transaction will be ignored but rule was not created',
+            })
+          }
         }
       }
       await onUpdate(transaction.id, { ignore_type: ignoreType } as Partial<Transaction>)
+    } catch (error) {
+      console.error('Error in handleIgnoreChange:', error)
+      toast.error('Failed to update transaction')
     } finally {
       setIsUpdating(false)
     }

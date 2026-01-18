@@ -64,7 +64,9 @@ interface Account {
   current_balance: number | null
   available_balance: number | null
   plaid_item_id: string
+  plaid_account_id: string
   hidden: boolean
+  is_budget_envelope: boolean
 }
 
 interface PlaidItem {
@@ -237,6 +239,42 @@ export default function AccountsPage() {
     setAccounts(prev => prev.map(a => a.id === account.id ? { ...a, hidden: newHidden } : a))
   }
 
+  const handleToggleBudgetEnvelope = async (account: Account) => {
+    const newValue = !account.is_budget_envelope
+
+    // Update the account
+    await supabase
+      .from('accounts')
+      .update({ is_budget_envelope: newValue })
+      .eq('id', account.id)
+
+    // If marking as budget envelope, update all transactions from this account to be ignored
+    if (newValue) {
+      const { error } = await supabase
+        .from('transactions')
+        .update({ ignore_type: 'all' })
+        .eq('plaid_account_id', account.plaid_account_id)
+
+      if (!error) {
+        toast.success('Account marked as budget envelope', {
+          description: 'All transactions from this account are now hidden from reports'
+        })
+      }
+    } else {
+      // If unmarking, reset ignore_type to null for transactions from this account
+      await supabase
+        .from('transactions')
+        .update({ ignore_type: null })
+        .eq('plaid_account_id', account.plaid_account_id)
+
+      toast.success('Account unmarked as budget envelope', {
+        description: 'Transactions from this account will now appear in reports'
+      })
+    }
+
+    setAccounts(prev => prev.map(a => a.id === account.id ? { ...a, is_budget_envelope: newValue } : a))
+  }
+
   const handleSaveAccount = async () => {
     if (!editAccount) return
     setSaving(true)
@@ -387,29 +425,80 @@ export default function AccountsPage() {
                         highlightedAccountId === account.id
                           ? 'ring-2 ring-emerald-500 bg-emerald-50 dark:bg-emerald-950/20'
                           : ''
-                      }`}
+                      } ${account.is_budget_envelope ? 'border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/20' : ''}`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-600">
+                        <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                          account.is_budget_envelope
+                            ? 'bg-gradient-to-br from-amber-100 to-amber-200 text-amber-600'
+                            : 'bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-600'
+                        }`}>
                           {getAccountIcon(account.type)}
                         </div>
                         <div>
-                          <p className="font-medium">{account.name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{account.display_name || account.name}</p>
+                            {account.is_budget_envelope && (
+                              <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-100 text-[10px] px-1.5 py-0">
+                                <Wallet className="h-3 w-3 mr-0.5" />
+                                Budget Envelope
+                              </Badge>
+                            )}
+                            {account.hidden && (
+                              <Badge variant="outline" className="text-gray-500 border-gray-300 text-[10px] px-1.5 py-0">
+                                <EyeOff className="h-3 w-3 mr-0.5" />
+                                Hidden
+                              </Badge>
+                            )}
+                          </div>
                           <p className="text-sm text-muted-foreground">
                             {account.subtype} {account.mask && `•••• ${account.mask}`}
                           </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className={`font-semibold ${account.type === 'credit' ? 'text-red-600' : ''}`}>
-                          {account.type === 'credit' && account.current_balance ? '-' : ''}
-                          {formatCurrency(account.current_balance)}
-                        </p>
-                        {account.available_balance !== null && account.type !== 'credit' && (
-                          <p className="text-sm text-muted-foreground">
-                            {formatCurrency(account.available_balance)} available
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <p className={`font-semibold ${account.type === 'credit' ? 'text-red-600' : ''}`}>
+                            {account.type === 'credit' && account.current_balance ? '-' : ''}
+                            {formatCurrency(account.current_balance)}
                           </p>
-                        )}
+                          {account.available_balance !== null && account.type !== 'credit' && (
+                            <p className="text-sm text-muted-foreground">
+                              {formatCurrency(account.available_balance)} available
+                            </p>
+                          )}
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openEditDialog(account)}>
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Rename Account
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleToggleHidden(account)}>
+                              {account.hidden ? (
+                                <>
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  Show Account
+                                </>
+                              ) : (
+                                <>
+                                  <EyeOff className="mr-2 h-4 w-4" />
+                                  Hide Account
+                                </>
+                              )}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleToggleBudgetEnvelope(account)}>
+                              <Wallet className="mr-2 h-4 w-4" />
+                              {account.is_budget_envelope ? 'Unmark as Budget Envelope' : 'Mark as Budget Envelope'}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   ))}

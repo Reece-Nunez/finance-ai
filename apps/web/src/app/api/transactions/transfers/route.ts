@@ -89,7 +89,7 @@ export async function GET(request: Request) {
     .order('date', { ascending: false })
 
   if (!includeIgnored) {
-    query = query.or('ignored.is.null,ignored.eq.false')
+    query = query.or('ignore_type.is.null,ignore_type.neq.all')
   }
 
   const { data: transactions, error } = await query

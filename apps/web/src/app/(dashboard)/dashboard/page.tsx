@@ -17,13 +17,13 @@ export default async function DashboardPage() {
     supabase
       .from('transactions')
       .select('*')
-      .neq('ignore_type', 'all')
-      .or('ignored.is.null,ignored.eq.false')
+      .or('ignore_type.is.null,ignore_type.neq.all')
       .order('date', { ascending: false })
       .limit(200),
     supabase
       .from('transactions')
       .select('*')
+      .or('ignore_type.is.null,ignore_type.neq.all')
       .order('date', { ascending: false })
       .limit(10),
     supabase.from('plaid_items').select('updated_at').order('updated_at', { ascending: false }).limit(1),

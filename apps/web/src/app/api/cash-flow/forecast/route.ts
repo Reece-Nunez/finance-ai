@@ -207,8 +207,7 @@ export async function GET(request: Request) {
     .select('*')
     .eq('user_id', user.id)
     .gte('date', twelveMonthsAgo.toISOString().split('T')[0])
-    .neq('ignore_type', 'all')
-    .or('ignored.is.null,ignored.eq.false')
+    .or('ignore_type.is.null,ignore_type.neq.all')
     .order('date', { ascending: false })
 
   if (txError) {
@@ -346,7 +345,7 @@ export async function GET(request: Request) {
       .select('date, amount, is_income')
       .eq('user_id', user.id)
       .in('date', predDates)
-      .or('ignored.is.null,ignored.eq.false')
+      .or('ignore_type.is.null,ignore_type.neq.all')
 
     const dailyActuals: Map<string, { income: number; expenses: number }> = new Map()
     for (const tx of predTransactions || []) {

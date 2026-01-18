@@ -57,8 +57,7 @@ export async function GET(request: NextRequest) {
       .gte('date', startOfMonth)
       .lte('date', endOfMonth)
       .gt('amount', 0) // Expenses are positive
-      .neq('ignore_type', 'all')
-      .or('ignored.is.null,ignored.eq.false')
+      .or('ignore_type.is.null,ignore_type.neq.all')
       .order('date', { ascending: false })
 
     // Fetch last month transactions for comparison (excluding ignored)
@@ -69,8 +68,7 @@ export async function GET(request: NextRequest) {
       .gte('date', startOfLastMonth)
       .lte('date', endOfLastMonth)
       .gt('amount', 0)
-      .neq('ignore_type', 'all')
-      .or('ignored.is.null,ignored.eq.false')
+      .or('ignore_type.is.null,ignore_type.neq.all')
 
     // Calculate spending by category for current month
     type TransactionType = NonNullable<typeof currentTransactions>[number]

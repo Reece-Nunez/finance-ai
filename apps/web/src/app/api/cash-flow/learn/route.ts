@@ -136,8 +136,7 @@ export async function POST(request: Request) {
       .from('transactions')
       .select('id, amount, date, category, merchant_name, name, is_income')
       .eq('user_id', user.id)
-      .neq('ignore_type', 'all')
-      .or('ignored.is.null,ignored.eq.false')
+      .or('ignore_type.is.null,ignore_type.neq.all')
       .order('date', { ascending: false })
 
     if (txError) {
@@ -315,7 +314,7 @@ export async function POST(request: Request) {
       .eq('user_id', user.id)
       .gte('date', minDate)
       .lte('date', maxDate)
-      .or('ignored.is.null,ignored.eq.false')
+      .or('ignore_type.is.null,ignore_type.neq.all')
 
     // Calculate daily actuals
     const dailyActuals: Map<string, { income: number; expenses: number }> = new Map()
@@ -413,7 +412,7 @@ export async function POST(request: Request) {
       .select('*')
       .eq('user_id', user.id)
       .in('date', dates)
-      .or('ignored.is.null,ignored.eq.false')
+      .or('ignore_type.is.null,ignore_type.neq.all')
 
     // Use AI to analyze why predictions were off
     const prompt = `Analyze these cash flow prediction errors and explain WHY the predictions were wrong.

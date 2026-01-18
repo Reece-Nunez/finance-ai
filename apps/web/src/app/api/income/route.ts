@@ -178,11 +178,13 @@ export async function GET(request: NextRequest) {
 
   // Get ALL transactions (including last month for comparison), then filter for income in JavaScript
   // This is more reliable than the .or() query which can have issues
+  // Exclude transactions marked as ignore_type='all' (hidden from all reports)
   const { data: yearlyTransactions } = await supabase
     .from('transactions')
     .select('*')
     .eq('user_id', user.id)
     .gte('date', fetchStart)
+    .or('ignore_type.is.null,ignore_type.neq.all')
     .order('date', { ascending: false })
 
   // Legitimate income sources that should NOT be excluded even if they contain "transfer"
@@ -470,11 +472,13 @@ export async function POST(request: NextRequest) {
   }
 
   // Get all income transactions (negative amounts in Plaid)
+  // Exclude transactions marked as ignore_type='all' (hidden from all reports)
   const { data: incomeTransactions, error: txError } = await supabase
     .from('transactions')
     .select('*')
     .eq('user_id', user.id)
     .lt('amount', 0)
+    .or('ignore_type.is.null,ignore_type.neq.all')
     .order('date', { ascending: false })
 
   if (txError) {
@@ -656,11 +660,13 @@ export async function PUT(request: NextRequest) {
   const today = new Date().toISOString().split('T')[0]
 
   // Find the most recent matching transaction to get actual last received date
+  // Exclude ignored transactions
   const { data: recentTxs } = await supabase
     .from('transactions')
     .select('date, amount')
     .eq('user_id', user.id)
     .lt('amount', 0) // Income is negative in Plaid
+    .or('ignore_type.is.null,ignore_type.neq.all')
     .order('date', { ascending: false })
     .limit(100)
 
