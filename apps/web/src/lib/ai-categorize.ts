@@ -1,5 +1,21 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { anthropic } from '@/lib/ai'
+import { cacheGet, cacheSet, CACHE_KEYS, CACHE_TTL } from '@/lib/cache'
+
+interface CachedMerchantCategory {
+  category: string
+  displayName?: string
+  confidence: number
+  cachedAt: string
+}
+
+// Normalize merchant name for consistent cache keys
+function normalizeMerchantKey(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+    .slice(0, 50) // Limit key length
+}
 
 const CATEGORIZATION_PROMPT = `You are a financial transaction categorizer and name cleaner. Given a list of transactions and the user's accounts, categorize each transaction and clean up messy transaction names.
 
@@ -170,35 +186,79 @@ export async function categorizeTransactions(
     (accounts || []).map(acc => [acc.plaid_account_id, acc])
   )
 
-  // Format transactions for AI with source account info
-  const txList = transactions.map((tx) => {
-    const sourceAccount = accountLookup.get(tx.plaid_account_id)
-    return {
-      id: tx.id,
-      name: tx.merchant_name || tx.name,
-      amount: tx.amount,
-      current_category: tx.category,
-      source_account: sourceAccount ? {
-        name: sourceAccount.name,
-        official_name: sourceAccount.official_name,
-        type: sourceAccount.type,
-        subtype: sourceAccount.subtype,
-        mask: sourceAccount.mask,
-      } : null,
+  // =========================================================================
+  // CHECK CACHE FOR KNOWN MERCHANTS (Optimization #2)
+  // =========================================================================
+  const cachedCategories: Array<{
+    transaction_id: string
+    category: string
+    confidence: number
+    clean_name?: string
+  }> = []
+  const uncachedTransactions: typeof transactions = []
+
+  // Check cache for each transaction's merchant
+  for (const tx of transactions) {
+    const merchantName = tx.merchant_name || tx.name
+    const merchantKey = normalizeMerchantKey(merchantName)
+    const cacheKey = CACHE_KEYS.merchantCategory(userId, merchantKey)
+
+    const cached = await cacheGet<CachedMerchantCategory>(cacheKey)
+
+    if (cached && cached.confidence >= 80) {
+      // Use cached categorization
+      cachedCategories.push({
+        transaction_id: tx.id,
+        category: cached.category,
+        confidence: cached.confidence,
+        clean_name: cached.displayName,
+      })
+    } else {
+      // Need AI categorization
+      uncachedTransactions.push(tx)
     }
-  })
+  }
 
-  // Format accounts list for AI context
-  const accountsList = (accounts || []).map(acc => ({
-    name: acc.name,
-    official_name: acc.official_name,
-    type: acc.type,
-    subtype: acc.subtype,
-    mask: acc.mask,
-  }))
+  console.log(`Categorization: ${cachedCategories.length} from cache, ${uncachedTransactions.length} need AI`)
 
-  // Build AI message with account context
-  const aiMessage = `## User's Accounts:
+  // If all transactions were cached, skip AI call entirely
+  let aiCategories: Array<{
+    transaction_id: string
+    category: string
+    confidence: number
+    clean_name?: string
+  }> = []
+
+  if (uncachedTransactions.length > 0) {
+    // Format transactions for AI with source account info
+    const txList = uncachedTransactions.map((tx) => {
+      const sourceAccount = accountLookup.get(tx.plaid_account_id)
+      return {
+        id: tx.id,
+        name: tx.merchant_name || tx.name,
+        amount: tx.amount,
+        current_category: tx.category,
+        source_account: sourceAccount ? {
+          name: sourceAccount.name,
+          official_name: sourceAccount.official_name,
+          type: sourceAccount.type,
+          subtype: sourceAccount.subtype,
+          mask: sourceAccount.mask,
+        } : null,
+      }
+    })
+
+    // Format accounts list for AI context
+    const accountsList = (accounts || []).map(acc => ({
+      name: acc.name,
+      official_name: acc.official_name,
+      type: acc.type,
+      subtype: acc.subtype,
+      mask: acc.mask,
+    }))
+
+    // Build AI message with account context
+    const aiMessage = `## User's Accounts:
 ${JSON.stringify(accountsList, null, 2)}
 
 ## Transactions to Categorize:
@@ -206,76 +266,96 @@ ${JSON.stringify(txList, null, 2)}
 
 Please categorize these transactions and clean up the names using the account context provided. Each transaction includes its source_account which tells you which account it came from.`
 
-  const response = await anthropic.messages.create({
-    model: 'claude-3-5-haiku-20241022', // Using Haiku for cost efficiency (~90% cheaper than Sonnet)
-    max_tokens: 4096,
-    messages: [
-      {
-        role: 'user',
-        content: aiMessage,
-      },
-    ],
-    system: CATEGORIZATION_PROMPT,
-  })
+    const response = await anthropic.messages.create({
+      model: 'claude-3-5-haiku-20241022', // Using Haiku for cost efficiency (~90% cheaper than Sonnet)
+      max_tokens: 4096,
+      messages: [
+        {
+          role: 'user',
+          content: aiMessage,
+        },
+      ],
+      system: CATEGORIZATION_PROMPT,
+    })
 
-  const responseText =
-    response.content[0].type === 'text' ? response.content[0].text : ''
+    const responseText =
+      response.content[0].type === 'text' ? response.content[0].text : ''
 
-  console.log('AI response length:', responseText.length)
+    console.log('AI response length:', responseText.length)
 
-  // Parse the JSON response
-  let categories: Array<{
-    transaction_id: string
-    category: string
-    confidence: number
-    clean_name?: string
-  }> = []
+    // Parse the JSON response
+    try {
+      // Remove markdown code blocks if present
+      const cleanedResponse = responseText
+        .replace(/```json\s*/gi, '')
+        .replace(/```\s*/g, '')
+        .trim()
 
-  try {
-    // Remove markdown code blocks if present
-    const cleanedResponse = responseText
-      .replace(/```json\s*/gi, '')
-      .replace(/```\s*/g, '')
-      .trim()
+      // Find JSON array in response
+      const jsonMatch = cleanedResponse.match(/\[[\s\S]*\]/)
 
-    // Find JSON array in response
-    const jsonMatch = cleanedResponse.match(/\[[\s\S]*\]/)
+      // If no complete array found, try to repair truncated JSON
+      if (!jsonMatch && cleanedResponse.startsWith('[')) {
+        console.log('Attempting to repair truncated JSON response...')
+        // Find the last complete object (ends with })
+        const lastCompleteObject = cleanedResponse.lastIndexOf('}')
+        if (lastCompleteObject > 0) {
+          // Truncate at last complete object and close the array
+          let repairedJson = cleanedResponse.slice(0, lastCompleteObject + 1)
+          // Remove trailing comma if present
+          repairedJson = repairedJson.replace(/,\s*$/, '')
+          repairedJson += ']'
+          try {
+            aiCategories = JSON.parse(repairedJson)
+            console.log(`Repaired and parsed ${aiCategories.length} categories from truncated AI response`)
+          } catch {
+            console.error('Failed to repair truncated JSON')
+          }
+        }
+      } else if (jsonMatch) {
+        aiCategories = JSON.parse(jsonMatch[0])
+        console.log(`Parsed ${aiCategories.length} categories from AI response`)
+      }
 
-    // If no complete array found, try to repair truncated JSON
-    if (!jsonMatch && cleanedResponse.startsWith('[')) {
-      console.log('Attempting to repair truncated JSON response...')
-      // Find the last complete object (ends with })
-      const lastCompleteObject = cleanedResponse.lastIndexOf('}')
-      if (lastCompleteObject > 0) {
-        // Truncate at last complete object and close the array
-        let repairedJson = cleanedResponse.slice(0, lastCompleteObject + 1)
-        // Remove trailing comma if present
-        repairedJson = repairedJson.replace(/,\s*$/, '')
-        repairedJson += ']'
-        try {
-          categories = JSON.parse(repairedJson)
-          console.log(`Repaired and parsed ${categories.length} categories from truncated AI response`)
-        } catch {
-          console.error('Failed to repair truncated JSON')
+      if (aiCategories.length === 0 && !jsonMatch) {
+        console.error('No JSON array found in AI response:', cleanedResponse.slice(0, 500))
+      }
+    } catch (parseError) {
+      console.error('Error parsing AI response:', parseError)
+      console.error('Response text:', responseText.slice(0, 500))
+    }
+
+    // Cache new merchant categorizations for future use
+    const uncachedTxLookup = new Map(
+      uncachedTransactions.map(tx => [tx.id, tx.merchant_name || tx.name])
+    )
+
+    for (const cat of aiCategories) {
+      if (cat.confidence >= 80) {
+        const merchantName = uncachedTxLookup.get(cat.transaction_id)
+        if (merchantName) {
+          const merchantKey = normalizeMerchantKey(merchantName)
+          const cacheKey = CACHE_KEYS.merchantCategory(userId, merchantKey)
+          const cacheData: CachedMerchantCategory = {
+            category: cat.category,
+            displayName: cat.clean_name,
+            confidence: cat.confidence,
+            cachedAt: new Date().toISOString(),
+          }
+          // Cache asynchronously (don't wait)
+          cacheSet(cacheKey, cacheData, CACHE_TTL.merchantCategory).catch(err => {
+            console.error('Failed to cache merchant category:', err)
+          })
         }
       }
-    } else if (jsonMatch) {
-      categories = JSON.parse(jsonMatch[0])
-      console.log(`Parsed ${categories.length} categories from AI response`)
     }
+  } // End of if (uncachedTransactions.length > 0)
 
-    if (categories.length === 0 && !jsonMatch) {
-      console.error('No JSON array found in AI response:', cleanedResponse.slice(0, 500))
-      return { categorized: 0, needs_review: 0, found: transactions.length, message: 'AI response did not contain valid JSON' }
-    }
-  } catch (parseError) {
-    console.error('Error parsing AI response:', parseError)
-    console.error('Response text:', responseText.slice(0, 500))
-    return { categorized: 0, needs_review: 0, found: transactions.length, message: 'Failed to parse AI response' }
-  }
+  // Combine cached and AI categories
+  const categories = [...cachedCategories, ...aiCategories]
 
   if (categories.length === 0) {
-    return { categorized: 0, needs_review: 0, found: transactions.length, message: 'AI returned empty category list' }
+    return { categorized: 0, needs_review: 0, found: transactions.length, message: 'No categories determined' }
   }
 
   // Get confidence threshold from preferences (default 80)

@@ -3,7 +3,14 @@ import { createClient } from '@/lib/supabase/server'
 import { anthropic, FINANCIAL_ADVISOR_SYSTEM_PROMPT, formatFinancialContext } from '@/lib/ai'
 import { getUserSubscription, canAccessFeature } from '@/lib/subscription'
 import { checkAndIncrementUsage, rateLimitResponse } from '@/lib/ai-usage'
+import { cacheGet, cacheSet, CACHE_KEYS, CACHE_TTL } from '@/lib/cache'
 import { SupabaseClient } from '@supabase/supabase-js'
+
+interface CachedChatContext {
+  financialContext: string
+  budgetContext: string
+  cachedAt: string
+}
 
 // Tools that Sterling can use to take actions
 const STERLING_TOOLS = [
@@ -348,64 +355,90 @@ export async function POST(request: Request) {
       content: lastUserMessage.content,
     })
 
-    // Fetch user's financial data and learning history
-    const [accountsRes, transactionsRes, pastActionsRes, budgetsRes] = await Promise.all([
-      supabase.from('accounts').select('name, type, current_balance'),
-      aiPrefs.include_spending_context !== false
-        ? supabase
-            .from('transactions')
-            .select('name, merchant_name, amount, date, category')
-            .order('date', { ascending: false })
-            .limit(100)
-        : Promise.resolve({ data: [] }),
-      supabase
-        .from('ai_actions')
-        .select('action_type, status, details, created_at')
-        .in('status', ['approved', 'dismissed', 'executed'])
-        .order('created_at', { ascending: false })
-        .limit(50),
-      supabase
-        .from('budgets')
-        .select('category, amount, spent')
-        .order('created_at', { ascending: false }),
-    ])
+    // =========================================================================
+    // CHECK CACHE FOR FINANCIAL CONTEXT (Optimization #3)
+    // =========================================================================
+    const contextCacheKey = CACHE_KEYS.chatContext(user.id)
+    let financialContext = ''
+    let budgetContext = ''
 
-    const accounts = accountsRes.data || []
-    const transactions = transactionsRes.data || []
-    const pastActions = pastActionsRes.data || []
-    const budgets = budgetsRes.data || []
+    const cachedContext = await cacheGet<CachedChatContext>(contextCacheKey)
 
-    // Calculate monthly totals
-    const now = new Date()
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-      .toISOString()
-      .split('T')[0]
+    if (cachedContext) {
+      // Use cached context
+      financialContext = cachedContext.financialContext
+      budgetContext = cachedContext.budgetContext
+      console.log(`Chat context loaded from cache (cached at ${cachedContext.cachedAt})`)
+    } else {
+      // Fetch user's financial data and learning history
+      const [accountsRes, transactionsRes, pastActionsRes, budgetsRes] = await Promise.all([
+        supabase.from('accounts').select('name, type, current_balance'),
+        aiPrefs.include_spending_context !== false
+          ? supabase
+              .from('transactions')
+              .select('name, merchant_name, amount, date, category')
+              .order('date', { ascending: false })
+              .limit(100)
+          : Promise.resolve({ data: [] }),
+        supabase
+          .from('ai_actions')
+          .select('action_type, status, details, created_at')
+          .in('status', ['approved', 'dismissed', 'executed'])
+          .order('created_at', { ascending: false })
+          .limit(50),
+        supabase
+          .from('budgets')
+          .select('category, amount, spent')
+          .order('created_at', { ascending: false }),
+      ])
 
-    const monthlyTransactions = transactions.filter((t) => t.date >= startOfMonth)
-    const monthlyIncome = monthlyTransactions
-      .filter((t) => t.amount < 0)
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0)
-    const monthlyExpenses = monthlyTransactions
-      .filter((t) => t.amount > 0)
-      .reduce((sum, t) => sum + t.amount, 0)
+      const accounts = accountsRes.data || []
+      const transactions = transactionsRes.data || []
+      const pastActions = pastActionsRes.data || []
+      const budgets = budgetsRes.data || []
 
-    // Format financial context with learning history
-    const financialContext = formatFinancialContext({
-      accounts,
-      transactions,
-      monthlyIncome,
-      monthlyExpenses,
-      pastActions,
-    })
+      // Calculate monthly totals
+      const now = new Date()
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+        .toISOString()
+        .split('T')[0]
 
-    // Add budget context
-    const budgetContext = budgets.length > 0
-      ? `\n**Current Budgets:**\n${budgets.map(b => {
-          const percentUsed = b.amount > 0 ? ((b.spent || 0) / b.amount * 100).toFixed(0) : 0
-          const status = Number(percentUsed) >= 100 ? '🔴 OVER' : Number(percentUsed) >= 80 ? '🟡 WARNING' : '🟢 OK'
-          return `- ${b.category}: $${(b.spent || 0).toFixed(2)} / $${b.amount.toFixed(2)} (${percentUsed}%) ${status}`
-        }).join('\n')}`
-      : ''
+      const monthlyTransactions = transactions.filter((t) => t.date >= startOfMonth)
+      const monthlyIncome = monthlyTransactions
+        .filter((t) => t.amount < 0)
+        .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+      const monthlyExpenses = monthlyTransactions
+        .filter((t) => t.amount > 0)
+        .reduce((sum, t) => sum + t.amount, 0)
+
+      // Format financial context with learning history
+      financialContext = formatFinancialContext({
+        accounts,
+        transactions,
+        monthlyIncome,
+        monthlyExpenses,
+        pastActions,
+      })
+
+      // Add budget context
+      budgetContext = budgets.length > 0
+        ? `\n**Current Budgets:**\n${budgets.map(b => {
+            const percentUsed = b.amount > 0 ? ((b.spent || 0) / b.amount * 100).toFixed(0) : 0
+            const status = Number(percentUsed) >= 100 ? '🔴 OVER' : Number(percentUsed) >= 80 ? '🟡 WARNING' : '🟢 OK'
+            return `- ${b.category}: $${(b.spent || 0).toFixed(2)} / $${b.amount.toFixed(2)} (${percentUsed}%) ${status}`
+          }).join('\n')}`
+        : ''
+
+      // Cache the context for 15 minutes
+      const cacheData: CachedChatContext = {
+        financialContext,
+        budgetContext,
+        cachedAt: new Date().toISOString(),
+      }
+      cacheSet(contextCacheKey, cacheData, CACHE_TTL.chatContext).catch(err => {
+        console.error('Failed to cache chat context:', err)
+      })
+    }
 
     // Build personality modifier based on user preferences
     let personalityModifier = ''

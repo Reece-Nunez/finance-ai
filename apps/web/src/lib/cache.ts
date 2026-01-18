@@ -8,6 +8,12 @@ export const CACHE_KEYS = {
   budgetAnalytics: (userId: string) => `budgets:analytics:${userId}`,
   subscription: (userId: string) => `subscription:${userId}`,
   recurringPatterns: (userId: string) => `recurring:${userId}`,
+  // AI optimization caches
+  aiSuggestions: (userId: string) => `ai:suggestions:${userId}`,
+  aiSuggestionsContext: (userId: string) => `ai:suggestions:context:${userId}`,
+  merchantCategory: (userId: string, merchantKey: string) => `merchant:cat:${userId}:${merchantKey}`,
+  chatContext: (userId: string) => `chat:context:${userId}`,
+  recurringDetection: (userId: string) => `recurring:detection:${userId}`,
 } as const
 
 // Default TTLs in seconds
@@ -18,6 +24,12 @@ export const CACHE_TTL = {
   budgetAnalytics: 600, // 10 minutes
   subscription: 3600, // 1 hour
   recurringPatterns: 1800, // 30 minutes
+  // AI optimization TTLs
+  aiSuggestions: 86400, // 24 hours (1 day) - users can manually refresh
+  aiSuggestionsContext: 86400, // 24 hours
+  merchantCategory: 604800, // 7 days - merchant categories rarely change
+  chatContext: 900, // 15 minutes - balance between freshness and cost
+  recurringDetection: 86400, // 24 hours - only refresh on new transactions or manual
 } as const
 
 /**

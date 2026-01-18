@@ -4,6 +4,32 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUserSubscription, canAccessFeature } from '@/lib/subscription'
 import { anthropic } from '@/lib/ai'
 import { checkAndIncrementUsage, rateLimitResponse } from '@/lib/ai-usage'
+import { cacheGet, cacheSet, cacheDelete, CACHE_KEYS, CACHE_TTL } from '@/lib/cache'
+
+interface CachedRecurringAnalysis {
+  recurring: Array<{
+    id: string
+    name: string
+    display_name: string
+    amount: number
+    frequency: string
+    is_income: boolean
+    next_expected_date: string | null
+    category: string | null
+    confidence: string | null
+    bill_type: string | null
+    averageAmount?: number
+    lastSeenDate?: string
+    occurrences?: number
+    transactionIds?: string[]
+  }>
+  yearlySpend: number
+  count: number
+  aiPowered: boolean
+  lastAnalysis: string | null
+  cachedAt: string
+  expiresAt: string
+}
 
 const AI_RECURRING_PROMPT = `You are a financial analyst detecting recurring BILLS and SUBSCRIPTIONS.
 
@@ -452,6 +478,15 @@ export async function POST(request: NextRequest) {
     user = cookieUser
   }
 
+  // Parse request body for force parameter
+  let forceRefresh = false
+  try {
+    const body = await request.json()
+    forceRefresh = body.force === true
+  } catch {
+    // No body or invalid JSON - default to not forcing
+  }
+
   // Check subscription (pass supabase client for mobile auth)
   const subscription = await getUserSubscription(user.id, supabase)
   const isPro = canAccessFeature(subscription, 'ai_suggestions')
@@ -463,7 +498,30 @@ export async function POST(request: NextRequest) {
     }, { status: 403 })
   }
 
-  // Check rate limits
+  // =========================================================================
+  // CHECK CACHE FOR RECURRING ANALYSIS (Optimization #4)
+  // =========================================================================
+  const cacheKey = CACHE_KEYS.recurringDetection(user.id)
+
+  if (!forceRefresh) {
+    const cached = await cacheGet<CachedRecurringAnalysis>(cacheKey)
+    if (cached) {
+      // Get current pending suggestions count (might have changed)
+      const { count: pendingSuggestions } = await supabase
+        .from('recurring_suggestions')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('status', 'pending')
+
+      return NextResponse.json({
+        ...cached,
+        pendingSuggestions: pendingSuggestions || 0,
+        fromCache: true,
+      })
+    }
+  }
+
+  // Check rate limits (only if we're actually going to call AI)
   const usageCheck = await checkAndIncrementUsage(supabase, user.id, 'recurring_detection', isPro)
   if (!usageCheck.allowed) {
     return NextResponse.json(
@@ -699,6 +757,40 @@ export async function POST(request: NextRequest) {
 
     const totalCount = recurring.length
 
+    // Cache the results for 24 hours
+    const cachedAt = new Date()
+    const expiresAt = new Date(cachedAt.getTime() + CACHE_TTL.recurringDetection * 1000)
+
+    const cacheData: CachedRecurringAnalysis = {
+      recurring: recurring.map(r => ({
+        id: r.id,
+        name: r.name,
+        display_name: r.displayName || r.name,
+        amount: r.amount,
+        frequency: r.frequency,
+        is_income: r.isIncome,
+        next_expected_date: r.nextDate || null,
+        category: r.category || null,
+        confidence: r.confidence || null,
+        bill_type: null, // Not available in RecurringTransaction
+        averageAmount: r.averageAmount,
+        lastSeenDate: r.lastDate,
+        occurrences: r.occurrences,
+        transactionIds: r.transactions?.map(t => t.id) || [],
+      })),
+      yearlySpend,
+      count: totalCount,
+      aiPowered: true,
+      lastAnalysis: now,
+      cachedAt: cachedAt.toISOString(),
+      expiresAt: expiresAt.toISOString(),
+    }
+
+    // Cache asynchronously (don't wait)
+    cacheSet(cacheKey, cacheData, CACHE_TTL.recurringDetection).catch(err => {
+      console.error('Failed to cache recurring analysis:', err)
+    })
+
     return NextResponse.json({
       recurring,
       yearlySpend,
@@ -707,6 +799,9 @@ export async function POST(request: NextRequest) {
       lastAnalysis: now,
       pendingSuggestions: pendingSuggestions || 0,
       newSuggestions,
+      fromCache: false,
+      cachedAt: cachedAt.toISOString(),
+      expiresAt: expiresAt.toISOString(),
       message: newSuggestions > 0
         ? `AI detected ${newSuggestions} new recurring transactions. Review them in the suggestions panel.`
         : `No new recurring transactions detected. You have ${totalCount} confirmed patterns.`

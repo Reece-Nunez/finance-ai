@@ -1,8 +1,34 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { anthropic } from '@/lib/ai'
 import { getUserSubscription, canAccessFeature } from '@/lib/subscription'
 import { checkAndIncrementUsage, rateLimitResponse } from '@/lib/ai-usage'
+import { cacheGet, cacheSet, cacheDelete, CACHE_KEYS, CACHE_TTL } from '@/lib/cache'
+
+interface CachedSuggestions {
+  suggestions: Array<{
+    id: string
+    action_type: string
+    status: string
+    details: {
+      priority: string
+      title: string
+      description: string
+      action?: { from_account: string; to_account: string; amount: number }
+    }
+  }>
+  context: {
+    avgDailySpending: number
+    lowBalanceThreshold: number
+    upcomingBillsCount: number
+    budgetsTracked: number
+    patternsLearned: number
+    anomaliesDetected: number
+    criticalAnomalies: number
+  }
+  cachedAt: string
+  expiresAt: string
+}
 
 const SUGGESTION_SYSTEM_PROMPT = `You are an intelligent financial advisor with deep insight into this specific user's spending patterns, upcoming cash flow, and financial goals. You provide highly personalized, actionable suggestions based on comprehensive data analysis.
 
@@ -66,27 +92,55 @@ export async function GET() {
       )
     }
 
-    // Get only pending suggestions
+    // Try to get cached suggestions first
+    const cacheKey = CACHE_KEYS.aiSuggestions(user.id)
+    const cached = await cacheGet<CachedSuggestions>(cacheKey)
+
+    if (cached) {
+      // Return cached data with cache info
+      return NextResponse.json({
+        suggestions: cached.suggestions,
+        context: cached.context,
+        fromCache: true,
+        cachedAt: cached.cachedAt,
+        expiresAt: cached.expiresAt,
+      })
+    }
+
+    // No cache - get pending suggestions from DB
     const { data: suggestions } = await supabase
       .from('ai_actions')
       .select('*')
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
 
-    return NextResponse.json({ suggestions: suggestions || [] })
+    return NextResponse.json({
+      suggestions: suggestions || [],
+      fromCache: false,
+      needsAnalysis: (suggestions || []).length === 0,
+    })
   } catch (error) {
     console.error('Error fetching suggestions:', error)
     return NextResponse.json({ error: 'Failed to fetch suggestions' }, { status: 500 })
   }
 }
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Parse request body for force parameter
+    let forceRefresh = false
+    try {
+      const body = await request.json()
+      forceRefresh = body.force === true
+    } catch {
+      // No body or invalid JSON - default to not forcing
     }
 
     // Check subscription for AI suggestions access
@@ -97,6 +151,21 @@ export async function POST() {
         { error: 'upgrade_required', message: 'AI Suggestions requires a Pro subscription' },
         { status: 403 }
       )
+    }
+
+    // Check cache first (unless force refresh)
+    const cacheKey = CACHE_KEYS.aiSuggestions(user.id)
+    if (!forceRefresh) {
+      const cached = await cacheGet<CachedSuggestions>(cacheKey)
+      if (cached) {
+        return NextResponse.json({
+          suggestions: cached.suggestions,
+          context: cached.context,
+          fromCache: true,
+          cachedAt: cached.cachedAt,
+          expiresAt: cached.expiresAt,
+        })
+      }
     }
 
     // Check rate limits (using insights limit since suggestions are similar)
@@ -582,17 +651,38 @@ Based on ALL of this data, provide highly personalized suggestions. Be specific 
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
 
+    const contextData = {
+      avgDailySpending: Math.round(avgDailySpending * 100) / 100,
+      lowBalanceThreshold: Math.round(lowBalanceThreshold * 100) / 100,
+      upcomingBillsCount: upcomingBills.length,
+      budgetsTracked: budgetStatus.length,
+      patternsLearned: spendingPatterns.length,
+      anomaliesDetected: pendingAnomalies.length,
+      criticalAnomalies: pendingAnomalies.filter(a => a.severity === 'critical' || a.severity === 'high').length,
+    }
+
+    // Cache the results for 24 hours
+    const now = new Date()
+    const expiresAt = new Date(now.getTime() + CACHE_TTL.aiSuggestions * 1000)
+
+    const cacheData: CachedSuggestions = {
+      suggestions: newSuggestions || [],
+      context: contextData,
+      cachedAt: now.toISOString(),
+      expiresAt: expiresAt.toISOString(),
+    }
+
+    // Cache asynchronously (don't wait)
+    cacheSet(cacheKey, cacheData, CACHE_TTL.aiSuggestions).catch(err => {
+      console.error('Failed to cache suggestions:', err)
+    })
+
     return NextResponse.json({
       suggestions: newSuggestions || [],
-      context: {
-        avgDailySpending: Math.round(avgDailySpending * 100) / 100,
-        lowBalanceThreshold: Math.round(lowBalanceThreshold * 100) / 100,
-        upcomingBillsCount: upcomingBills.length,
-        budgetsTracked: budgetStatus.length,
-        patternsLearned: spendingPatterns.length,
-        anomaliesDetected: pendingAnomalies.length,
-        criticalAnomalies: pendingAnomalies.filter(a => a.severity === 'critical' || a.severity === 'high').length,
-      }
+      context: contextData,
+      fromCache: false,
+      cachedAt: now.toISOString(),
+      expiresAt: expiresAt.toISOString(),
     })
   } catch (error) {
     console.error('Error generating suggestions:', error)
@@ -626,6 +716,12 @@ export async function PATCH(request: Request) {
       .eq('user_id', user.id)
 
     if (error) throw error
+
+    // Invalidate suggestions cache when a suggestion is acted upon
+    const cacheKey = CACHE_KEYS.aiSuggestions(user.id)
+    cacheDelete(cacheKey).catch(err => {
+      console.error('Failed to invalidate suggestions cache:', err)
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {
