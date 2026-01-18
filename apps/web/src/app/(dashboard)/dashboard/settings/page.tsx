@@ -165,7 +165,7 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [openingPortal, setOpeningPortal] = useState(false)
-  const { isPro, isTrialing, currentPeriodEnd, refresh: refreshSubscription } = useSubscription()
+  const { isPro, isTrialing, currentPeriodEnd, trialEndsAt, refresh: refreshSubscription } = useSubscription()
 
   const handleManageSubscription = async () => {
     setOpeningPortal(true)
@@ -1014,10 +1014,10 @@ export default function SettingsPage() {
                     {isTrialing ? 'Trial Period' : 'Active'}
                   </span>
                 </div>
-                {currentPeriodEnd && (
+                {(isTrialing ? trialEndsAt : currentPeriodEnd) && (
                   <p className="text-sm text-muted-foreground">
                     {isTrialing ? 'Trial ends' : 'Next billing date'}:{' '}
-                    {new Date(currentPeriodEnd).toLocaleDateString()}
+                    {new Date(isTrialing ? trialEndsAt! : currentPeriodEnd!).toLocaleDateString()}
                   </p>
                 )}
               </div>
