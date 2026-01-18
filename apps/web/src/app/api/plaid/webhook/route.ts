@@ -1,15 +1,31 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { plaidClient } from '@/lib/plaid'
-import {
-  WebhookType,
-  TransactionsWebhookCode,
-  ItemWebhookCode,
-} from 'plaid'
+
+// Plaid webhook types and codes (using string literals as plaid package doesn't export these)
+const WEBHOOK_TYPE = {
+  TRANSACTIONS: 'TRANSACTIONS',
+  ITEM: 'ITEM',
+} as const
+
+const TRANSACTIONS_CODE = {
+  SYNC_UPDATES_AVAILABLE: 'SYNC_UPDATES_AVAILABLE',
+  RECURRING_TRANSACTIONS_UPDATE: 'RECURRING_TRANSACTIONS_UPDATE',
+  INITIAL_UPDATE: 'INITIAL_UPDATE',
+  HISTORICAL_UPDATE: 'HISTORICAL_UPDATE',
+  DEFAULT_UPDATE: 'DEFAULT_UPDATE',
+} as const
+
+const ITEM_CODE = {
+  ERROR: 'ERROR',
+  PENDING_EXPIRATION: 'PENDING_EXPIRATION',
+  USER_PERMISSION_REVOKED: 'USER_PERMISSION_REVOKED',
+  WEBHOOK_UPDATE_ACKNOWLEDGED: 'WEBHOOK_UPDATE_ACKNOWLEDGED',
+} as const
 
 // Plaid webhook payload types
 interface PlaidWebhookPayload {
-  webhook_type: WebhookType
+  webhook_type: string
   webhook_code: string
   item_id: string
   error?: {
@@ -189,22 +205,22 @@ export async function POST(request: Request) {
 
     // Handle different webhook types
     switch (webhook_type) {
-      case WebhookType.Transactions:
+      case WEBHOOK_TYPE.TRANSACTIONS:
         switch (webhook_code) {
-          case TransactionsWebhookCode.SyncUpdatesAvailable:
+          case TRANSACTIONS_CODE.SYNC_UPDATES_AVAILABLE:
             // New transactions available - sync them
             console.log('[plaid-webhook] Sync updates available for item:', item_id)
             const syncResult = await syncItemTransactions(item_id)
             console.log('[plaid-webhook] Sync result:', syncResult)
             break
 
-          case TransactionsWebhookCode.RecurringTransactionsUpdate:
+          case TRANSACTIONS_CODE.RECURRING_TRANSACTIONS_UPDATE:
             console.log('[plaid-webhook] Recurring transactions updated for item:', item_id)
             // Could trigger recurring detection here
             break
 
-          case TransactionsWebhookCode.InitialUpdate:
-          case TransactionsWebhookCode.HistoricalUpdate:
+          case TRANSACTIONS_CODE.INITIAL_UPDATE:
+          case TRANSACTIONS_CODE.HISTORICAL_UPDATE:
             console.log('[plaid-webhook] Historical update for item:', item_id)
             await syncItemTransactions(item_id)
             break
@@ -214,9 +230,9 @@ export async function POST(request: Request) {
         }
         break
 
-      case WebhookType.Item:
+      case WEBHOOK_TYPE.ITEM:
         switch (webhook_code) {
-          case ItemWebhookCode.Error:
+          case ITEM_CODE.ERROR:
             // Item has an error - notify user
             console.error('[plaid-webhook] Item error:', item_id, error)
 
@@ -246,7 +262,7 @@ export async function POST(request: Request) {
             }
             break
 
-          case ItemWebhookCode.PendingExpiration:
+          case ITEM_CODE.PENDING_EXPIRATION:
             // Access consent expiring - notify user
             console.log('[plaid-webhook] Pending expiration for item:', item_id)
 
@@ -268,7 +284,7 @@ export async function POST(request: Request) {
             }
             break
 
-          case ItemWebhookCode.UserPermissionRevoked:
+          case ITEM_CODE.USER_PERMISSION_REVOKED:
             // User revoked access
             console.log('[plaid-webhook] User permission revoked for item:', item_id)
             await supabase
