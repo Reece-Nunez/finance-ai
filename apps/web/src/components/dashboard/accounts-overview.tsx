@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -112,6 +112,33 @@ export function AccountsOverview({
   onSync,
   syncing,
 }: AccountsOverviewProps) {
+  // Use state for relative time to avoid hydration mismatch
+  const [syncedText, setSyncedText] = useState<string>('')
+
+  useEffect(() => {
+    const formatLastSynced = () => {
+      if (!lastSynced) return 'Never'
+      const date = new Date(lastSynced)
+      const now = new Date()
+      const diffMs = now.getTime() - date.getTime()
+      const diffMins = Math.floor(diffMs / 60000)
+      const diffHours = Math.floor(diffMs / 3600000)
+      const diffDays = Math.floor(diffMs / 86400000)
+
+      if (diffMins < 1) return 'Just now'
+      if (diffMins < 60) return `${diffMins}m ago`
+      if (diffHours < 24) return `${diffHours}h ago`
+      return `${diffDays}d ago`
+    }
+
+    setSyncedText(formatLastSynced())
+    // Update every minute
+    const interval = setInterval(() => {
+      setSyncedText(formatLastSynced())
+    }, 60000)
+    return () => clearInterval(interval)
+  }, [lastSynced])
+
   // Categorize accounts
   const checkingAccounts = accounts.filter(
     (a) => a.type === 'depository' && a.subtype === 'checking'
@@ -162,31 +189,12 @@ export function AccountsOverview({
   // Net cash = checking + savings - credit card balances (loans excluded as they're long-term debt)
   const netCash = checkingTotal + savingsTotal - creditTotal
 
-  // Total debt = credit cards + loans
-  const totalDebt = creditTotal + loanTotal
-
-  // Format last synced time
-  const formatLastSynced = () => {
-    if (!lastSynced) return 'Never'
-    const date = new Date(lastSynced)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffMins = Math.floor(diffMs / 60000)
-    const diffHours = Math.floor(diffMs / 3600000)
-    const diffDays = Math.floor(diffMs / 86400000)
-
-    if (diffMins < 1) return 'Just now'
-    if (diffMins < 60) return `${diffMins}m ago`
-    if (diffHours < 24) return `${diffHours}h ago`
-    return `${diffDays}d ago`
-  }
-
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-lg">Accounts</CardTitle>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <span>Synced {formatLastSynced()}</span>
+          {syncedText && <span>Synced {syncedText}</span>}
           <Button
             variant="ghost"
             size="sm"
