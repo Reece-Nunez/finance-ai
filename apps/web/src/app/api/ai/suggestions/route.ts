@@ -82,8 +82,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check subscription for AI suggestions access
-    const subscription = await getUserSubscription(user.id)
+    // Check subscription for AI suggestions access (pass supabase client for mobile auth)
+    const subscription = await getUserSubscription(user.id, supabase)
     if (!canAccessFeature(subscription, 'ai_suggestions')) {
       return NextResponse.json(
         { error: 'upgrade_required', message: 'AI Suggestions requires a Pro subscription' },
@@ -141,8 +141,8 @@ export async function POST(request: NextRequest) {
       // No body or invalid JSON - default to not forcing
     }
 
-    // Check subscription for AI suggestions access
-    const subscription = await getUserSubscription(user.id)
+    // Check subscription for AI suggestions access (pass supabase client for mobile auth)
+    const subscription = await getUserSubscription(user.id, supabase)
     const isPro = canAccessFeature(subscription, 'ai_suggestions')
     if (!isPro) {
       return NextResponse.json(
