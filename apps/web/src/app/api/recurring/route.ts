@@ -240,6 +240,48 @@ function patternToRecurring(
     ? matchingTxs.reduce((sum, tx) => sum + Math.abs(tx.amount), 0) / matchingTxs.length
     : Number(pattern.average_amount)
 
+  // Calculate the actual next date - advance if stored date is in the past
+  let nextDate = pattern.next_expected_date || new Date().toISOString().split('T')[0]
+  let lastDate = pattern.last_seen_date || new Date().toISOString().split('T')[0]
+
+  // If we have matching transactions, use the most recent one as the last date
+  if (matchingTxs.length > 0) {
+    const sortedTxs = [...matchingTxs].sort((a, b) =>
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    )
+    lastDate = sortedTxs[0].date
+  }
+
+  // Advance nextDate if it's in the past
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  let nextDateObj = new Date(nextDate)
+
+  // If the stored next date is in the past, recalculate from the last transaction date
+  if (nextDateObj < today) {
+    nextDateObj = new Date(lastDate)
+
+    // Keep advancing until we're in the future
+    while (nextDateObj < today) {
+      if (pattern.frequency === 'weekly') {
+        nextDateObj.setDate(nextDateObj.getDate() + 7)
+      } else if (pattern.frequency === 'bi-weekly') {
+        nextDateObj.setDate(nextDateObj.getDate() + 14)
+      } else if (pattern.frequency === 'monthly') {
+        nextDateObj.setMonth(nextDateObj.getMonth() + 1)
+      } else if (pattern.frequency === 'quarterly') {
+        nextDateObj.setMonth(nextDateObj.getMonth() + 3)
+      } else if (pattern.frequency === 'yearly') {
+        nextDateObj.setFullYear(nextDateObj.getFullYear() + 1)
+      } else {
+        // Default to monthly
+        nextDateObj.setMonth(nextDateObj.getMonth() + 1)
+      }
+    }
+
+    nextDate = nextDateObj.toISOString().split('T')[0]
+  }
+
   return {
     id: pattern.id,
     name: pattern.name,
@@ -247,8 +289,8 @@ function patternToRecurring(
     amount: Number(pattern.amount),
     averageAmount: actualAverage,
     frequency: pattern.frequency as RecurringTransaction['frequency'],
-    nextDate: pattern.next_expected_date || new Date().toISOString().split('T')[0],
-    lastDate: pattern.last_seen_date || new Date().toISOString().split('T')[0],
+    nextDate,
+    lastDate,
     category,
     accountId: matchingTxs[0]?.plaid_account_id || '',
     isIncome: isActuallyIncome,
@@ -335,7 +377,19 @@ function analyzeRecurringPatterns(transactions: Transaction[], dismissedPatterns
     const [year, month, day] = lastTx.date.split('-').map(Number)
     const lastDate = new Date(year, month - 1, day)
     const nextDate = new Date(lastDate)
-    nextDate.setDate(nextDate.getDate() + Math.round(avgInterval))
+
+    // Use calendar-based increments for predictable dates
+    if (frequency === 'weekly') {
+      nextDate.setDate(nextDate.getDate() + 7)
+    } else if (frequency === 'bi-weekly') {
+      nextDate.setDate(nextDate.getDate() + 14)
+    } else if (frequency === 'monthly') {
+      nextDate.setMonth(nextDate.getMonth() + 1)
+    } else if (frequency === 'quarterly') {
+      nextDate.setMonth(nextDate.getMonth() + 3)
+    } else if (frequency === 'yearly') {
+      nextDate.setFullYear(nextDate.getFullYear() + 1)
+    }
 
     const firstTx = sorted[0]
     const displayName = firstTx.display_name || firstTx.merchant_name || firstTx.name
@@ -448,6 +502,78 @@ export async function GET(request: NextRequest) {
     console.log('[recurring] No cached patterns, using basic detection. Dismissed patterns:', dismissedPatterns)
     recurring = analyzeRecurringPatterns(transactions || [], dismissedPatterns)
     console.log('[recurring] Basic detection found:', recurring.length, 'patterns')
+  }
+
+  // Also fetch from income_patterns table and merge as income items
+  const { data: incomePatterns } = await supabase
+    .from('income_patterns')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+
+  if (incomePatterns && incomePatterns.length > 0) {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    for (const income of incomePatterns) {
+      // Only include high-confidence patterns that look like actual income (not shopping)
+      if (income.confidence_score < 0.7) continue
+      if (income.source_type === 'other' && income.average_amount < 500) continue // Skip low-value "other" patterns
+
+      // Check if this income is already in recurring (by name similarity)
+      const alreadyExists = recurring.some(r =>
+        r.isIncome &&
+        (r.name.toLowerCase().includes(income.source_name.toLowerCase()) ||
+         income.source_name.toLowerCase().includes(r.name.toLowerCase()))
+      )
+      if (alreadyExists) continue
+
+      // Advance next_expected to future if it's in the past
+      let nextDate = income.next_expected || new Date().toISOString().split('T')[0]
+      let nextDateObj = new Date(nextDate)
+
+      if (nextDateObj < today) {
+        // Advance to next occurrence based on frequency
+        const lastDate = new Date(income.last_occurrence || nextDate)
+        nextDateObj = new Date(lastDate)
+
+        while (nextDateObj < today) {
+          if (income.frequency === 'weekly') {
+            nextDateObj.setDate(nextDateObj.getDate() + 7)
+          } else if (income.frequency === 'bi-weekly') {
+            nextDateObj.setDate(nextDateObj.getDate() + 14)
+          } else if (income.frequency === 'monthly') {
+            nextDateObj.setMonth(nextDateObj.getMonth() + 1)
+          } else if (income.frequency === 'quarterly') {
+            nextDateObj.setMonth(nextDateObj.getMonth() + 3)
+          } else if (income.frequency === 'yearly') {
+            nextDateObj.setFullYear(nextDateObj.getFullYear() + 1)
+          } else {
+            nextDateObj.setMonth(nextDateObj.getMonth() + 1)
+          }
+        }
+        nextDate = nextDateObj.toISOString().split('T')[0]
+      }
+
+      recurring.push({
+        id: `income-${income.id}`,
+        name: income.source_name,
+        displayName: income.source_name,
+        amount: Number(income.average_amount),
+        averageAmount: Number(income.average_amount),
+        frequency: income.frequency as RecurringTransaction['frequency'],
+        nextDate,
+        lastDate: income.last_occurrence || nextDate,
+        category: 'Income',
+        accountId: '',
+        isIncome: true,
+        confidence: income.confidence_score >= 0.8 ? 'high' : 'medium',
+        occurrences: income.occurrences_analyzed || 3,
+        transactions: [],
+      })
+    }
+
+    console.log('[recurring] Added', incomePatterns.length, 'income patterns from income_patterns table')
   }
 
   // Final filter: ensure minimum 3 occurrences for all patterns (safety check)
@@ -691,16 +817,24 @@ export async function POST(request: NextRequest) {
       if (dismissedPatterns.includes(merchantKey)) continue
       if (existingMerchants.has(merchantKey)) continue
 
-      // Calculate next date
-      let daysToAdd = 30
-      if (item.frequency === 'weekly') daysToAdd = 7
-      else if (item.frequency === 'bi-weekly') daysToAdd = 14
-      else if (item.frequency === 'quarterly') daysToAdd = 90
-      else if (item.frequency === 'yearly') daysToAdd = 365
-
+      // Calculate next date using proper calendar increments
       const lastDate = group?.dates[0] ? new Date(group.dates[0]) : new Date()
       const nextDate = new Date(lastDate)
-      nextDate.setDate(nextDate.getDate() + daysToAdd)
+
+      if (item.frequency === 'weekly') {
+        nextDate.setDate(nextDate.getDate() + 7)
+      } else if (item.frequency === 'bi-weekly') {
+        nextDate.setDate(nextDate.getDate() + 14)
+      } else if (item.frequency === 'monthly') {
+        nextDate.setMonth(nextDate.getMonth() + 1)
+      } else if (item.frequency === 'quarterly') {
+        nextDate.setMonth(nextDate.getMonth() + 3)
+      } else if (item.frequency === 'yearly') {
+        nextDate.setFullYear(nextDate.getFullYear() + 1)
+      } else {
+        // Default to monthly
+        nextDate.setMonth(nextDate.getMonth() + 1)
+      }
 
       // Save to suggestions table for user review
       const { error: suggestionError } = await supabase.from('recurring_suggestions').upsert({
@@ -1025,15 +1159,21 @@ export async function PATCH(request: NextRequest) {
 
     if (pattern?.last_seen_date) {
       const lastDate = new Date(pattern.last_seen_date)
-      let daysToAdd = 30
-      if (frequency === 'weekly') daysToAdd = 7
-      else if (frequency === 'bi-weekly') daysToAdd = 14
-      else if (frequency === 'monthly') daysToAdd = 30
-      else if (frequency === 'quarterly') daysToAdd = 90
-      else if (frequency === 'yearly') daysToAdd = 365
-
       const nextExpected = new Date(lastDate)
-      nextExpected.setDate(nextExpected.getDate() + daysToAdd)
+
+      // Use calendar-based increments for predictable dates
+      if (frequency === 'weekly') {
+        nextExpected.setDate(nextExpected.getDate() + 7)
+      } else if (frequency === 'bi-weekly') {
+        nextExpected.setDate(nextExpected.getDate() + 14)
+      } else if (frequency === 'monthly') {
+        nextExpected.setMonth(nextExpected.getMonth() + 1)
+      } else if (frequency === 'quarterly') {
+        nextExpected.setMonth(nextExpected.getMonth() + 3)
+      } else if (frequency === 'yearly') {
+        nextExpected.setFullYear(nextExpected.getFullYear() + 1)
+      }
+
       updates.next_expected_date = nextExpected.toISOString().split('T')[0]
     }
   }
