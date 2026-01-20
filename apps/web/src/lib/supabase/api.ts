@@ -35,6 +35,34 @@ export async function createApiClient(request: NextRequest) {
 
 // Helper to get user from either Bearer token or cookies
 export async function getApiUser(request: NextRequest) {
+  const authHeader = request.headers.get('authorization')
+
+  // For Bearer token auth (mobile), pass the token directly to getUser()
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.substring(7)
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      }
+    )
+
+    // Pass the JWT directly to getUser() for validation
+    const { data: { user }, error } = await supabase.auth.getUser(token)
+
+    if (error || !user) {
+      return { user: null, supabase, error: error || new Error('No user found') }
+    }
+
+    return { user, supabase, error: null }
+  }
+
+  // No Bearer token - use standard client
   const supabase = await createApiClient(request)
   const { data: { user }, error } = await supabase.auth.getUser()
 
