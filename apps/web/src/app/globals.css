@@ -177,7 +177,7 @@ body {
   margin-bottom: 1.6em;
 }
 
-.dark .prose, .prose.dark\\:prose-invert {
+.dark .prose {
   color: var(--foreground);
 }
 
