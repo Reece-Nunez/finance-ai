@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@plugin "@tailwindcss/typography";
+/* @plugin "@tailwindcss/typography"; -- temporarily disabled due to Tailwind v4 compatibility */
 
 @variant dark (&:where(.dark, .dark *));
 
@@ -110,3 +110,75 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--foreground);
 }
+
+/* Basic prose styles (replacement for @tailwindcss/typography) */
+.prose {
+  color: var(--foreground);
+  max-width: 65ch;
+  line-height: 1.75;
+}
+
+.prose p {
+  margin-top: 1.25em;
+  margin-bottom: 1.25em;
+}
+
+.prose-sm p {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+  color: var(--foreground);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.prose h1 { font-size: 2.25em; margin-top: 0; margin-bottom: 0.8em; }
+.prose h2 { font-size: 1.5em; margin-top: 2em; margin-bottom: 1em; }
+.prose h3 { font-size: 1.25em; margin-top: 1.6em; margin-bottom: 0.6em; }
+
+.prose a {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.prose strong { font-weight: 600; }
+
+.prose ul, .prose ol {
+  margin-top: 1.25em;
+  margin-bottom: 1.25em;
+  padding-left: 1.625em;
+}
+
+.prose li { margin-top: 0.5em; margin-bottom: 0.5em; }
+
+.prose code {
+  font-size: 0.875em;
+  font-weight: 600;
+}
+
+.prose pre {
+  overflow-x: auto;
+  font-size: 0.875em;
+  line-height: 1.7;
+  margin-top: 1.7em;
+  margin-bottom: 1.7em;
+  border-radius: 0.375rem;
+  padding: 0.85em 1.15em;
+  background: var(--muted);
+}
+
+.prose blockquote {
+  font-style: italic;
+  border-left: 0.25rem solid var(--border);
+  padding-left: 1em;
+  margin-top: 1.6em;
+  margin-bottom: 1.6em;
+}
+
+.dark .prose, .prose.dark\\:prose-invert {
+  color: var(--foreground);
+}
+
+.prose.max-w-none { max-width: none; }
