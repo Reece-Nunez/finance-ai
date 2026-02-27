@@ -1,9 +1,5 @@
 import { z } from 'zod'
 
-// ============================================
-// Common Schemas
-// ============================================
-
 export const uuidSchema = z.string().uuid('Invalid ID format')
 
 export const paginationSchema = z.object({
@@ -15,10 +11,6 @@ export const dateRangeSchema = z.object({
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
 })
-
-// ============================================
-// Transaction Schemas
-// ============================================
 
 export const transactionCategorySchema = z.enum([
   'Food & Drink',
@@ -67,10 +59,6 @@ export const transactionFilterSchema = z.object({
   accountId: uuidSchema.optional(),
 }).merge(paginationSchema)
 
-// ============================================
-// Budget Schemas
-// ============================================
-
 export const createBudgetSchema = z.object({
   category: z.string().min(1).max(100),
   amount: z.number().positive().max(1000000),
@@ -83,19 +71,11 @@ export const updateBudgetSchema = z.object({
   period: z.enum(['monthly', 'weekly', 'yearly']).optional(),
 })
 
-// ============================================
-// Account Schemas
-// ============================================
-
 export const linkAccountSchema = z.object({
   publicToken: z.string().min(1),
   institutionId: z.string().min(1).optional(),
   institutionName: z.string().min(1).optional(),
 })
-
-// ============================================
-// Chat/AI Schemas
-// ============================================
 
 export const chatMessageSchema = z.object({
   role: z.enum(['user', 'assistant']),
@@ -107,19 +87,11 @@ export const sendChatSchema = z.object({
   session_id: uuidSchema.optional(),
 })
 
-// ============================================
-// Transaction Rule Schemas
-// ============================================
-
 export const createTransactionRuleSchema = z.object({
   merchant_pattern: z.string().min(1).max(200),
   category: z.string().min(1).max(100),
   match_type: z.enum(['exact', 'contains', 'starts_with', 'regex']).default('contains'),
 })
-
-// ============================================
-// Webhook Schemas
-// ============================================
 
 export const stripeWebhookSchema = z.object({
   type: z.string(),
@@ -138,10 +110,6 @@ export const plaidWebhookSchema = z.object({
   }).optional(),
 })
 
-// ============================================
-// User Settings Schemas
-// ============================================
-
 export const updateUserSettingsSchema = z.object({
   notifications_enabled: z.boolean().optional(),
   email_reports: z.boolean().optional(),
@@ -150,43 +118,3 @@ export const updateUserSettingsSchema = z.object({
   bill_reminders: z.boolean().optional(),
   theme: z.enum(['light', 'dark', 'system']).optional(),
 })
-
-// ============================================
-// Helper Functions
-// ============================================
-
-export type ValidationResult<T> =
-  | { success: true; data: T }
-  | { success: false; error: string; details?: z.core.$ZodIssue[] }
-
-export function validateRequest<T>(
-  schema: z.ZodSchema<T>,
-  data: unknown
-): ValidationResult<T> {
-  const result = schema.safeParse(data)
-
-  if (result.success) {
-    return { success: true, data: result.data }
-  }
-
-  return {
-    success: false,
-    error: result.error.issues[0]?.message || 'Validation failed',
-    details: result.error.issues,
-  }
-}
-
-// Sanitize string input to prevent XSS
-export function sanitizeString(input: string): string {
-  return input
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-    .replace(/\//g, '&#x2F;')
-}
-
-// Validate and sanitize search input
-export function sanitizeSearchQuery(query: string): string {
-  return sanitizeString(query.trim().slice(0, 200))
-}

@@ -4,20 +4,8 @@ import { toHaveNoViolations } from 'jest-axe'
 // Extend Jest matchers with accessibility testing
 expect.extend(toHaveNoViolations)
 
-// Mock @/lib/sentry (Sentry SDK removed for Amplify compatibility)
 jest.mock('@/lib/sentry', () => ({
   captureException: jest.fn(),
-  captureMessage: jest.fn(),
-  setUser: jest.fn(),
-  addBreadcrumb: jest.fn(),
-  Sentry: {
-    init: jest.fn(),
-    captureException: jest.fn(),
-    captureMessage: jest.fn(),
-    setUser: jest.fn(),
-    addBreadcrumb: jest.fn(),
-    withScope: jest.fn((callback) => callback({ setExtras: jest.fn() })),
-  },
 }))
 
 // Mock @/lib/logger
