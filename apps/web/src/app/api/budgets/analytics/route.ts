@@ -25,10 +25,10 @@ export async function GET(request: NextRequest) {
     const startOfLastMonth = new Date(currentYear, currentMonth - 1, 1).toISOString().split('T')[0]
     const endOfLastMonth = new Date(currentYear, currentMonth, 0).toISOString().split('T')[0]
 
-    // Fetch budgets
+    // Fetch budgets with group info
     const { data: budgets } = await supabase
       .from('budgets')
-      .select('*')
+      .select('*, budget_groups(id, name, sort_order, color, icon)')
       .eq('user_id', user.id)
       .order('category')
 
@@ -80,10 +80,16 @@ export async function GET(request: NextRequest) {
 
     // Build budget categories with analytics
     // Store both normalized key and original display name
-    const budgetMap: Record<string, { id: string; amount: number; displayName: string }> = {}
+    const budgetMap: Record<string, { id: string; amount: number; displayName: string; groupId: string | null; group: { id: string; name: string; sort_order: number; color: string; icon: string | null } | null }> = {}
     budgets?.forEach((b) => {
       const normalizedKey = normalizeCategory(b.category)
-      budgetMap[normalizedKey] = { id: b.id, amount: b.amount, displayName: b.category }
+      budgetMap[normalizedKey] = {
+        id: b.id,
+        amount: b.amount,
+        displayName: b.category,
+        groupId: b.group_id,
+        group: b.budget_groups || null,
+      }
     })
 
     // Get all unique categories (from budgets and spending)
@@ -95,6 +101,8 @@ export async function GET(request: NextRequest) {
     interface BudgetCategory {
       category: string
       budgetId: string | null
+      groupId: string | null
+      group: { id: string; name: string; sort_order: number; color: string; icon: string | null } | null
       budgeted: number
       spent: number
       remaining: number
@@ -142,6 +150,8 @@ export async function GET(request: NextRequest) {
       return {
         category: displayCategory,
         budgetId: budget?.id || null,
+        groupId: budget?.groupId || null,
+        group: budget?.group || null,
         budgeted,
         spent,
         remaining,

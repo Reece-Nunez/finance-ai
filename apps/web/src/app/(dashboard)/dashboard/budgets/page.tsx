@@ -38,8 +38,18 @@ import {
   GraduationCap,
   Gift,
   MoreHorizontal,
+  Lock,
+  CreditCard,
+  Sparkles,
+  GripVertical,
 } from 'lucide-react'
 import { SterlingIcon } from '@/components/ui/sterling-icon'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
 
 interface Transaction {
   id: string
@@ -51,9 +61,19 @@ interface Transaction {
   display_name: string | null
 }
 
+interface BudgetGroup {
+  id: string
+  name: string
+  sort_order: number
+  color: string
+  icon: string | null
+}
+
 interface BudgetCategory {
   category: string
   budgetId: string | null
+  groupId: string | null
+  group: BudgetGroup | null
   budgeted: number
   spent: number
   remaining: number
@@ -132,6 +152,20 @@ function getCategoryIcon(category: string): React.ComponentType<{ className?: st
   for (const [key, icon] of Object.entries(CATEGORY_ICONS)) {
     if (lower.includes(key)) return icon
   }
+  return MoreHorizontal
+}
+
+// Group icon mapping
+const GROUP_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  'lock': Lock,
+  'shopping-cart': ShoppingCart,
+  'sparkles': Sparkles,
+  'credit-card': CreditCard,
+  'piggy-bank': PiggyBank,
+}
+
+function getGroupIcon(icon: string | null): React.ComponentType<{ className?: string }> {
+  if (icon && GROUP_ICONS[icon]) return GROUP_ICONS[icon]
   return MoreHorizontal
 }
 
@@ -513,22 +547,26 @@ function AlertsSection({ alerts }: { alerts: Alert[] }) {
 function AddBudgetSection({
   suggestedCategories,
   existingCategories,
+  groups,
   onAddBudget,
   onClose,
 }: {
   suggestedCategories: SuggestedCategory[]
   existingCategories: string[]
-  onAddBudget: (category: string, amount: number) => void
+  groups: BudgetGroup[]
+  onAddBudget: (category: string, amount: number, groupId: string | null) => void
   onClose: () => void
 }) {
   const [category, setCategory] = useState('')
   const [amount, setAmount] = useState('')
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
 
   const handleAdd = () => {
     if (category && amount) {
-      onAddBudget(category, parseFloat(amount))
+      onAddBudget(category, parseFloat(amount), selectedGroupId)
       setCategory('')
       setAmount('')
+      setSelectedGroupId(null)
       onClose()
     }
   }
@@ -576,32 +614,126 @@ function AddBudgetSection({
         )}
 
         {/* Manual Input */}
-        <div className="flex gap-3">
-          <div className="flex-1">
-            <Input
-              placeholder="Category name"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            />
+        <div className="flex flex-col gap-3">
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <Input
+                placeholder="Category name"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              />
+            </div>
+            <div className="w-32">
+              <Input
+                type="number"
+                placeholder="Amount"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            </div>
+            <Button
+              onClick={handleAdd}
+              disabled={!category || !amount}
+              className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
+            >
+              Add
+            </Button>
           </div>
-          <div className="w-32">
-            <Input
-              type="number"
-              placeholder="Amount"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-          </div>
-          <Button
-            onClick={handleAdd}
-            disabled={!category || !amount}
-            className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
-          >
-            Add
-          </Button>
+
+          {/* Group Selector */}
+          {groups.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-2">ASSIGN TO GROUP</p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={selectedGroupId === null ? 'default' : 'outline'}
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => setSelectedGroupId(null)}
+                >
+                  Ungrouped
+                </Button>
+                {groups.map((group) => (
+                  <Button
+                    key={group.id}
+                    variant={selectedGroupId === group.id ? 'default' : 'outline'}
+                    size="sm"
+                    className="text-xs"
+                    style={selectedGroupId === group.id ? { backgroundColor: group.color } : undefined}
+                    onClick={() => setSelectedGroupId(group.id)}
+                  >
+                    {group.name}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+// Group Header Component for accordion trigger
+function BudgetGroupHeader({
+  group,
+  categories,
+}: {
+  group: BudgetGroup | null
+  categories: BudgetCategory[]
+}) {
+  const totalBudgeted = categories.reduce((sum, c) => sum + c.budgeted, 0)
+  const totalSpent = categories.reduce((sum, c) => sum + c.spent, 0)
+  const totalRemaining = totalBudgeted - totalSpent
+  const percentUsed = totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0
+
+  const GroupIcon = group ? getGroupIcon(group.icon) : MoreHorizontal
+
+  return (
+    <div className="flex items-center gap-3 w-full cursor-pointer">
+      <div
+        className="flex h-9 w-9 items-center justify-center rounded-lg shrink-0"
+        style={{ backgroundColor: `${group?.color || '#6b7280'}20` }}
+      >
+        <GroupIcon
+          className="h-4 w-4"
+          style={{ color: group?.color || '#6b7280' }}
+        />
+      </div>
+      <div className="flex-1 min-w-0 text-left">
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold text-sm">
+            {group?.name || 'Ungrouped'}
+          </h3>
+          <span className="text-xs text-muted-foreground">
+            {categories.length} {categories.length === 1 ? 'budget' : 'budgets'}
+          </span>
+        </div>
+        {totalBudgeted > 0 && (
+          <div className="flex items-center gap-3 mt-1">
+            <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden max-w-48">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  percentUsed > 100 ? 'bg-red-500' : percentUsed > 80 ? 'bg-amber-500' : 'bg-emerald-500'
+                }`}
+                style={{ width: `${Math.min(percentUsed, 100)}%` }}
+              />
+            </div>
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
+              {formatCurrency(totalSpent)} of {formatCurrency(totalBudgeted)}
+            </span>
+          </div>
+        )}
+      </div>
+      <div className="text-right shrink-0">
+        <p className={`text-sm font-semibold ${totalRemaining >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+          {totalRemaining >= 0 ? formatCurrency(totalRemaining) : `-${formatCurrency(Math.abs(totalRemaining))}`}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {totalRemaining >= 0 ? 'remaining' : 'over'}
+        </p>
+      </div>
+    </div>
   )
 }
 
@@ -609,65 +741,68 @@ function AddBudgetSection({
 export default function BudgetsPage() {
   const searchParams = useSearchParams()
   const [data, setData] = useState<BudgetData | null>(null)
+  const [groups, setGroups] = useState<BudgetGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddBudget, setShowAddBudget] = useState(false)
   const [showUnbudgeted, setShowUnbudgeted] = useState(false)
   const [highlightedBudgetId, setHighlightedBudgetId] = useState<string | null>(null)
   const budgetRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await fetch('/api/budgets/analytics')
-      if (response.ok) {
-        const result = await response.json()
+      const [analyticsRes, groupsRes] = await Promise.all([
+        fetch('/api/budgets/analytics'),
+        fetch('/api/budget-groups'),
+      ])
+
+      if (analyticsRes.ok) {
+        const result = await analyticsRes.json()
         setData(result)
+      }
+      if (groupsRes.ok) {
+        const result = await groupsRes.json()
+        setGroups(result.groups || [])
       }
     } catch (error) {
       console.error('Error fetching budget data:', error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     fetchData()
-  }, [])
+  }, [fetchData])
 
   // Handle deep link from notifications
   useEffect(() => {
     const budgetId = searchParams.get('id')
     if (budgetId && data) {
-      // Find the budget category with this ID
       const targetCategory = data.categories.find((c) => c.budgetId === budgetId)
       if (targetCategory) {
-        // Highlight and scroll to the budget
         setHighlightedBudgetId(budgetId)
-
-        // Scroll to the budget after a brief delay to allow render
         setTimeout(() => {
           const ref = budgetRefs.current[budgetId]
           if (ref) {
             ref.scrollIntoView({ behavior: 'smooth', block: 'center' })
           }
         }, 100)
-
-        // Clear highlight after 3 seconds
         setTimeout(() => {
           setHighlightedBudgetId(null)
         }, 3000)
-
-        // Clear URL
         window.history.replaceState({}, '', '/dashboard/budgets')
       }
     }
   }, [searchParams, data])
 
-  const handleUpdateBudget = async (category: string, amount: number) => {
+  const handleUpdateBudget = async (category: string, amount: number, groupId?: string | null) => {
+    const body: Record<string, unknown> = { category, amount }
+    if (groupId !== undefined) body.group_id = groupId
     await fetch('/api/budgets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ category, amount }),
+      body: JSON.stringify(body),
     })
     fetchData()
   }
@@ -677,8 +812,60 @@ export default function BudgetsPage() {
     fetchData()
   }
 
+  const handleAssignGroup = async (category: string, amount: number, groupId: string | null) => {
+    await fetch('/api/budgets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category, amount, group_id: groupId }),
+    })
+    fetchData()
+  }
+
   const budgetedCategories = data?.categories.filter((c) => c.budgeted > 0) || []
   const unbudgetedCategories = data?.categories.filter((c) => !c.budgeted && c.spent > 0) || []
+
+  // Group budgeted categories by their group
+  const groupedBudgets = useMemo(() => {
+    const grouped = new Map<string | null, BudgetCategory[]>()
+
+    // Initialize with all groups (even empty ones)
+    for (const group of groups) {
+      grouped.set(group.id, [])
+    }
+    grouped.set(null, []) // Ungrouped
+
+    for (const cat of budgetedCategories) {
+      const key = cat.groupId || null
+      if (!grouped.has(key)) grouped.set(key, [])
+      grouped.get(key)!.push(cat)
+    }
+
+    // Build ordered array: groups by sort_order, then ungrouped at end
+    const result: { group: BudgetGroup | null; categories: BudgetCategory[] }[] = []
+
+    // Sorted groups first
+    const sortedGroups = [...groups].sort((a, b) => a.sort_order - b.sort_order)
+    for (const group of sortedGroups) {
+      const cats = grouped.get(group.id) || []
+      if (cats.length > 0) {
+        result.push({ group, categories: cats })
+      }
+    }
+
+    // Ungrouped at end
+    const ungrouped = grouped.get(null) || []
+    if (ungrouped.length > 0) {
+      result.push({ group: null, categories: ungrouped })
+    }
+
+    return result
+  }, [budgetedCategories, groups])
+
+  // Default all groups to open
+  const defaultOpenGroups = useMemo(
+    () => groupedBudgets.map((_, i) => `group-${i}`),
+    [groupedBudgets]
+  )
 
   if (loading) {
     return (
@@ -723,6 +910,7 @@ export default function BudgetsPage() {
         <AddBudgetSection
           suggestedCategories={data.suggestedCategories}
           existingCategories={budgetedCategories.map((c) => c.category)}
+          groups={groups}
           onAddBudget={handleUpdateBudget}
           onClose={() => setShowAddBudget(false)}
         />
@@ -829,54 +1017,60 @@ export default function BudgetsPage() {
           </Card>
         </div>
 
-        {/* Right Column - Categories */}
+        {/* Right Column - Categories grouped by Budget Group */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Budgeted Categories */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">
-                Budget Categories ({budgetedCategories.length})
-              </h2>
-            </div>
-
-            {budgetedCategories.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                  <PiggyBank className="mb-4 h-12 w-12 text-muted-foreground/50" />
-                  <h3 className="font-medium">No budgets set yet</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Add a budget to start tracking your spending
-                  </p>
-                  <Button
-                    className="mt-4"
-                    onClick={() => setShowAddBudget(true)}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Your First Budget
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-3">
-                {budgetedCategories.map((category) => (
-                  <BudgetCategoryCard
-                    key={category.category}
-                    category={category}
-                    onUpdateBudget={handleUpdateBudget}
-                    onDeleteBudget={handleDeleteBudget}
-                    isHighlighted={highlightedBudgetId === category.budgetId}
-                    cardRef={category.budgetId ? (el) => { budgetRefs.current[category.budgetId!] = el } : undefined}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+          {budgetedCategories.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                <PiggyBank className="mb-4 h-12 w-12 text-muted-foreground/50" />
+                <h3 className="font-medium">No budgets set yet</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Add a budget to start tracking your spending
+                </p>
+                <Button
+                  className="mt-4"
+                  onClick={() => setShowAddBudget(true)}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Your First Budget
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <Accordion type="multiple" defaultValue={defaultOpenGroups} className="space-y-3">
+              {groupedBudgets.map(({ group, categories }, idx) => (
+                <AccordionItem
+                  key={group?.id || 'ungrouped'}
+                  value={`group-${idx}`}
+                  className="rounded-xl border bg-card overflow-hidden"
+                >
+                  <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 transition-colors">
+                    <BudgetGroupHeader group={group} categories={categories} />
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pb-3">
+                    <div className="space-y-3">
+                      {categories.map((category) => (
+                        <BudgetCategoryCard
+                          key={category.category}
+                          category={category}
+                          onUpdateBudget={(cat, amt) => handleUpdateBudget(cat, amt)}
+                          onDeleteBudget={handleDeleteBudget}
+                          isHighlighted={highlightedBudgetId === category.budgetId}
+                          cardRef={category.budgetId ? (el) => { budgetRefs.current[category.budgetId!] = el } : undefined}
+                        />
+                      ))}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          )}
 
           {/* Unbudgeted Spending */}
           {unbudgetedCategories.length > 0 && (
             <div>
               <button
-                className="flex items-center justify-between w-full mb-4"
+                className="flex items-center justify-between w-full mb-4 cursor-pointer"
                 onClick={() => setShowUnbudgeted(!showUnbudgeted)}
               >
                 <h2 className="text-lg font-semibold">
@@ -891,7 +1085,7 @@ export default function BudgetsPage() {
                     <BudgetCategoryCard
                       key={category.category}
                       category={category}
-                      onUpdateBudget={handleUpdateBudget}
+                      onUpdateBudget={(cat, amt) => handleUpdateBudget(cat, amt)}
                       onDeleteBudget={handleDeleteBudget}
                     />
                   ))}

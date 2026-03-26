@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
 
     const { data: budgets, error } = await supabase
       .from('budgets')
-      .select('*')
+      .select('*, budget_groups(id, name, sort_order, color, icon)')
       .order('category')
 
     if (error) {
@@ -33,14 +33,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { category, amount } = await request.json()
+    const { category, amount, group_id } = await request.json()
+
+    const upsertData: Record<string, unknown> = {
+      user_id: user.id,
+      category,
+      amount,
+      period: 'monthly',
+    }
+    if (group_id !== undefined) {
+      upsertData.group_id = group_id
+    }
 
     const { data: budget, error } = await supabase
       .from('budgets')
-      .upsert(
-        { user_id: user.id, category, amount, period: 'monthly' },
-        { onConflict: 'user_id,category' }
-      )
+      .upsert(upsertData, { onConflict: 'user_id,category' })
       .select()
       .single()
 
