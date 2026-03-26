@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getApiUser } from '@/lib/supabase/api'
 import { auditLog } from '@/lib/audit'
 import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
@@ -21,28 +20,10 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
       return rateLimitResponse
     }
 
-    // Authenticate user (support both mobile and web)
-    const authHeader = request.headers.get('authorization')
-    let supabase
-    let user
-
-    if (authHeader?.startsWith('Bearer ')) {
-      const result = await getApiUser(request)
-      if (result.error || !result.user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
-      supabase = result.supabase
-      user = result.user
-    } else {
-      supabase = await createClient()
-      const {
-        data: { user: cookieUser },
-        error: authError,
-      } = await supabase.auth.getUser()
-      if (authError || !cookieUser) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
-      user = cookieUser
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Validate confirmation

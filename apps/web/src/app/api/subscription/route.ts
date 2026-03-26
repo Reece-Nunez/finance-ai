@@ -1,29 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getApiUser } from '@/lib/supabase/api'
 
 export async function GET(request: NextRequest) {
   try {
-    // Check for Bearer token first (mobile), then fall back to cookies (web)
-    const authHeader = request.headers.get('authorization')
-
-    let supabase
-    let user
-
-    if (authHeader?.startsWith('Bearer ')) {
-      const result = await getApiUser(request)
-      if (result.error || !result.user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
-      supabase = result.supabase
-      user = result.user
-    } else {
-      supabase = await createClient()
-      const { data: { user: cookieUser }, error: authError } = await supabase.auth.getUser()
-      if (authError || !cookieUser) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
-      user = cookieUser
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Query subscription directly using the authenticated supabase client
@@ -45,6 +28,8 @@ export async function GET(request: NextRequest) {
       isTrialing,
       trialEndsAt: profile?.trial_ends_at || null,
       currentPeriodEnd: profile?.current_period_end || null,
+    }, {
+      headers: { 'Cache-Control': 'no-store' },
     })
   } catch (error) {
     console.error('Error fetching subscription:', error)

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getApiUser } from '@/lib/supabase/api'
+import { createClient } from '@/lib/supabase/server'
 import { anthropic } from '@/lib/ai'
 import { getUserSubscription, canAccessFeature } from '@/lib/subscription'
 import { checkAndIncrementUsage, rateLimitResponse } from '@/lib/ai-usage'
@@ -76,13 +76,13 @@ For anomalies, always flag critical/high severity ones - the user needs to know 
 
 export async function GET(request: NextRequest) {
   try {
-    const { user, supabase, error: authError } = await getApiUser(request)
-
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check subscription for AI suggestions access (pass supabase client for mobile auth)
+    // Check subscription for AI suggestions access
     const subscription = await getUserSubscription(user.id, supabase)
     if (!canAccessFeature(subscription, 'ai_suggestions')) {
       return NextResponse.json(
@@ -126,8 +126,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { user, supabase, error: authError } = await getApiUser(request)
-
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
       // No body or invalid JSON - default to not forcing
     }
 
-    // Check subscription for AI suggestions access (pass supabase client for mobile auth)
+    // Check subscription for AI suggestions access
     const subscription = await getUserSubscription(user.id, supabase)
     const isPro = canAccessFeature(subscription, 'ai_suggestions')
     if (!isPro) {
@@ -690,8 +690,8 @@ Based on ALL of this data, provide highly personalized suggestions. Be specific 
 
 export async function PATCH(request: NextRequest) {
   try {
-    const { user, supabase, error: authError } = await getApiUser(request)
-
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

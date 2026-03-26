@@ -2,22 +2,15 @@
 
 ## Overview
 
-Sterling exposes a RESTful API for the web and mobile applications. All endpoints are located under `/api/`.
+Sterling exposes a RESTful API for the web application. All endpoints are located under `/api/`.
 
 ## Authentication
 
-Most endpoints require authentication via one of two methods:
+Most endpoints require authentication:
 
 ### Cookie-based (Web)
 - Automatically handled by Supabase auth cookies
 - Used by the Next.js web application
-
-### Bearer Token (Mobile)
-```
-Authorization: Bearer <access_token>
-```
-- Used by the React Native mobile app
-- Token obtained from Supabase auth
 
 ## Rate Limiting
 

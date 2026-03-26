@@ -6,7 +6,7 @@
 **Why first:** Everything else depends on these. Can't safely deploy enterprise features without testing and CI/CD.
 
 - [x] **Testing Infrastructure**
-  - Jest + React Testing Library setup (`apps/web/jest.config.ts`, `apps/mobile/jest.config.js`)
+  - Jest + React Testing Library setup (`apps/web/jest.config.ts`)
   - Unit tests for utilities and hooks
   - Integration tests for API routes
   - E2E tests with Playwright
@@ -20,7 +20,7 @@
   - Codecov integration for coverage reporting
 
 - [x] **Error Tracking & Monitoring**
-  - Sentry integration (web + mobile) (`sentry.client.config.ts`, `apps/mobile/src/lib/sentry.ts`)
+  - Sentry integration (`sentry.client.config.ts`)
   - Structured logging with Pino (`apps/web/src/lib/logger.ts`)
   - Performance monitoring (10% prod, 100% dev)
   - Session replay on errors
@@ -61,8 +61,7 @@
 **Why third:** Users need graceful failures, not crashes.
 
 - [x] **Error Boundaries**
-  - Expo Router ErrorBoundary for mobile app
-  - Next.js error boundaries for web (`apps/web/src/app/error.tsx`, `global-error.tsx`, `not-found.tsx`)
+  - Next.js error boundaries (`apps/web/src/app/error.tsx`, `global-error.tsx`, `not-found.tsx`)
   - Dashboard-specific error boundary (`apps/web/src/app/(dashboard)/error.tsx`)
   - Sentry integration for error reporting
 
@@ -70,7 +69,6 @@
   - Retry logic with exponential backoff + jitter (`apps/web/src/lib/retry.ts`)
   - Circuit breakers for external APIs (`apps/web/src/lib/circuit-breaker.ts`)
   - Resilient service wrappers for Plaid/Stripe/Anthropic (`apps/web/src/lib/resilient-services.ts`)
-  - Mobile API client with automatic retry (`apps/mobile/src/services/api.ts`)
 
 - [x] **Health Checks**
   - `/api/health` - Basic liveness probe
@@ -164,7 +162,7 @@
 - [x] Add security headers (`apps/web/src/lib/security/session-config.ts`)
 - [x] Add Zod validation to all API routes (`apps/web/src/lib/validations.ts`)
 - [x] Add rate limiting middleware (`apps/web/src/lib/rate-limit.ts`)
-- [x] Set up Sentry (web + mobile)
+- [x] Set up Sentry
 - [x] Add basic health check endpoint (`/api/health`, `/api/health/ready`, `/api/health/live`)
 
 ---

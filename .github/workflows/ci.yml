@@ -48,32 +48,6 @@ jobs:
       - name: Run TypeScript
         run: npm run typecheck
 
-  test-shared:
-    name: Test Shared Package
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run tests
-        run: npm run test:ci --workspace=@sterling/shared
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
-        with:
-          file: packages/shared/coverage/lcov.info
-          flags: shared
-          fail_ci_if_error: false
-
   test-web:
     name: Test Web App
     runs-on: ubuntu-latest
@@ -91,7 +65,7 @@ jobs:
         run: npm ci
 
       - name: Run tests
-        run: npm run test:ci --workspace=@sterling/web
+        run: npm run test:ci
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
@@ -100,36 +74,10 @@ jobs:
           flags: web
           fail_ci_if_error: false
 
-  test-mobile:
-    name: Test Mobile App
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run tests
-        run: npm run test:ci --workspace=@sterling/mobile
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
-        with:
-          file: apps/mobile/coverage/lcov.info
-          flags: mobile
-          fail_ci_if_error: false
-
   build-web:
     name: Build Web App
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, test-shared, test-web]
+    needs: [lint, typecheck, test-web]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -144,7 +92,7 @@ jobs:
         run: npm ci
 
       - name: Build
-        run: npm run build:web
+        run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}

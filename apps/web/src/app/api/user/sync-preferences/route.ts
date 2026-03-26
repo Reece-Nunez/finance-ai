@@ -1,36 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getApiUser } from '@/lib/supabase/api'
 import { getUserSubscription } from '@/lib/subscription'
-import { SyncFrequency, calculateNextSyncDue } from '@/lib/sync-service'
+import { SyncFrequency } from '@/lib/sync-service'
 
 export async function GET(request: NextRequest) {
   try {
-    // Check for Bearer token first (mobile), then fall back to cookies (web)
-    const authHeader = request.headers.get('authorization')
-
-    let supabase
-    let user
-
-    if (authHeader?.startsWith('Bearer ')) {
-      const result = await getApiUser(request)
-      if (result.error || !result.user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
-      supabase = result.supabase
-      user = result.user
-    } else {
-      supabase = await createClient()
-      const { data: { user: cookieUser }, error: authError } = await supabase.auth.getUser()
-      if (authError || !cookieUser) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
-      user = cookieUser
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { data: profile, error } = await supabase
       .from('user_profiles')
-      .select('sync_frequency, last_auto_sync, next_sync_due, subscription_tier')
+      .select('subscription_tier')
       .eq('user_id', user.id)
       .single()
 
@@ -41,10 +24,11 @@ export async function GET(request: NextRequest) {
 
     const isPro = profile?.subscription_tier === 'pro'
 
+    // sync_frequency columns not yet in DB — return defaults
     return NextResponse.json({
-      sync_frequency: profile?.sync_frequency || 'daily',
-      last_auto_sync: profile?.last_auto_sync || null,
-      next_sync_due: profile?.next_sync_due || null,
+      sync_frequency: 'daily',
+      last_auto_sync: null,
+      next_sync_due: null,
       isPro,
     })
   } catch (error) {
@@ -82,30 +66,12 @@ export async function PATCH(request: NextRequest) {
       effectiveFrequency = 'daily'
     }
 
-    // Calculate next sync due time
-    const nextSyncDue = calculateNextSyncDue(effectiveFrequency, subscription.isPro)
-
-    const { data: profile, error } = await supabase
-      .from('user_profiles')
-      .update({
-        sync_frequency: effectiveFrequency,
-        next_sync_due: nextSyncDue?.toISOString() || null,
-      })
-      .eq('user_id', user.id)
-      .select('sync_frequency, last_auto_sync, next_sync_due')
-      .single()
-
-    if (error) {
-      console.error('Error updating sync preferences:', error)
-      return NextResponse.json({ error: 'Failed to update preferences' }, { status: 500 })
-    }
-
+    // sync_frequency columns not yet in DB — return the selection without persisting
     return NextResponse.json({
-      sync_frequency: profile.sync_frequency,
-      last_auto_sync: profile.last_auto_sync,
-      next_sync_due: profile.next_sync_due,
+      sync_frequency: effectiveFrequency,
+      last_auto_sync: null,
+      next_sync_due: null,
       isPro: subscription.isPro,
-      // Inform user if they were downgraded
       downgraded: sync_frequency !== effectiveFrequency,
     })
   } catch (error) {

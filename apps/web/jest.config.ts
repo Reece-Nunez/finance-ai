@@ -12,7 +12,6 @@ const config: Config = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
-    '^@sterling/shared$': '<rootDir>/../../packages/shared/src',
   },
   testMatch: [
     '<rootDir>/src/**/*.test.{ts,tsx}',
